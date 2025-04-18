@@ -1,3 +1,4 @@
+// GIFアニメーションで表示するプログラム
 // コンパイル方法「gcc -o my_program main.c module.c -lm」
 #include <stdio.h>
 #include <math.h>
