@@ -1,0 +1,3 @@
+/home/user/デスクトップ/m1haru/Automation/build/CMakeFiles/my_program.dir
+/home/user/デスクトップ/m1haru/Automation/build/CMakeFiles/edit_cache.dir
+/home/user/デスクトップ/m1haru/Automation/build/CMakeFiles/rebuild_cache.dir
