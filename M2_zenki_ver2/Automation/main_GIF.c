@@ -757,7 +757,9 @@ int main(void)
     fprintf(gp, "set size square\n");
     fprintf(gp, "unset key\n");
 
-    fprintf(gp, "set term gif animate delay 5 optimize size 640,480\n"); //
+    // fprintf(gp, "set term gif animate delay 5 optimize size 640,480\n");
+    // fprintf(gp, "set term gif animate delay 5 optimize size 640,480 font 'arial,12'\n"); //
+    fprintf(gp, "set term gif animate delay 5 optimize size 640,480 font 'DejaVu Sans,12'\n");
     fprintf(gp, "set output 'drone_datafile/test.gif'\n");
 
     // ラベルの表示
