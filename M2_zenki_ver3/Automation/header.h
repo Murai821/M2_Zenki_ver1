@@ -15,6 +15,8 @@
 #define D 8         /*ドローン数*/
 #define SD 6        /*シミュレーションで用いるドローン数*/
 #define I_SIZE 150  /*情報配列の要素数*/
+#define Y_SIZE 20   /*薬の情報配列の二次元要素数*/
+#define Z_SIZE 2    /*薬の情報配列の三次元要素数*/
 #define INF 9999    /*無限大*/
 #define TRUE 1
 #define FALSE 0
@@ -35,14 +37,16 @@
 // 配送センターと避難所の構造体
 typedef struct
 {
-    double x;           // x座標
-    double y;           // y座標
-    int re;             // 物資数カウンター
-    int re_req;         // 物資要求量
-    int re_req_sum;     // 物資要求量の合計値
-    int re_deli;        // 一巡会の間に届けられた物資量
-    int inf[N][I_SIZE]; // 情報配列
-    int i_ptr[N];       // 情報配列のポインタ
+    double x;                          // x座標
+    double y;                          // y座標
+    int re;                            // 物資数カウンター
+    int re_req;                        // 物資要求量
+    int re_req_sum;                    // 物資要求量の合計値
+    int re_deli;                       // 一巡会の間に届けられた物資量
+    int inf[N][I_SIZE];                // 情報配列
+    int i_ptr[N];                      // 情報配列のポインタ
+    double inf_med[N][Y_SIZE][Z_SIZE]; // 避難所の薬の情報配列三次元(避難所番号,情報配列のインデックス,（生成時間・緊急度（生成してから運搬までの目標時間））)
+    int i_med_ptr[N];                  // 薬の情報配列のポインタ
 } point;
 
 // 配送車の構造体
@@ -53,10 +57,12 @@ typedef struct
     int re; // 積載物資量
     int inf[N][I_SIZE];
     int i_ptr[N];
-    int next_wait_flag;     // 次の避難所が荷降ろしのために30分要する避難所の場合にTRUE
-    int drone_charge_count; // TVでのドローンの最大充電可能台数
-    double charge_amount;   // TVでのドローン総充電時間（一巡回中）
-    double chargeable_flag; // TVでドローンを充電可能かを表すフラグ（充電可能：１、不可能：０）
+    double inf_med[N][Y_SIZE][Z_SIZE]; // 避難所の薬の情報配列三次元(避難所番号,情報配列のインデックス,（生成時間・緊急度（生成してから運搬までの目標時間））)
+    int i_med_ptr[N];                  // 薬の情報配列のポインタ
+    int next_wait_flag;                // 次の避難所が荷降ろしのために30分要する避難所の場合にTRUE
+    int drone_charge_count;            // TVでのドローンの最大充電可能台数
+    double charge_amount;              // TVでのドローン総充電時間（一巡回中）
+    double chargeable_flag;            // TVでドローンを充電可能かを表すフラグ（充電可能：１、不可能：０）
 } vehicle;
 
 // ドローンの構造体
@@ -69,9 +75,11 @@ typedef struct
     int re;
     int inf[N][I_SIZE];
     int i_ptr[N];
-    int follow_num; // ドローンが従う配送車番号
-    int target_num; // ドローンが巡回路をまたいで向かう巡回路番号
-    int wait_flag;  // ドローンが先回りして避難所で待機することを示すフラグ
+    double inf_med[N][Y_SIZE][Z_SIZE]; // 避難所の薬の情報配列三次元(避難所番号,情報配列のインデックス,（生成時間・緊急度（生成してから運搬までの目標時間））)
+    int i_med_ptr[N];                  // 薬の情報配列のポインタ
+    int follow_num;                    // ドローンが従う配送車番号
+    int target_num;                    // ドローンが巡回路をまたいで向かう巡回路番号
+    int wait_flag;                     // ドローンが先回りして避難所で待機することを示すフラグ
     int free_mode;
     int charge_time;          // ドローンが飛行した分だけ充電する時間
     double flight_start_time; // ドローンの飛行開始時間

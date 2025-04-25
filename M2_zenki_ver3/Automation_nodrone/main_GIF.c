@@ -50,6 +50,7 @@ int main(void)
     for (i = 0; i < N; i++)
     {
         p[0].i_ptr[i] = 0;
+        p[0].i_med_ptr[i] = 0;
     }
 
     for (i = 0; i < N; i++)
@@ -57,6 +58,17 @@ int main(void)
         for (j = 0; j < I_SIZE; j++)
         {
             p[0].inf[i][j] = 0;
+        }
+    }
+
+    for (i = 0; i < N; i++)
+    {
+        for (j = 0; j < Y_SIZE; j++)
+        {
+            for (k = 0; k < Z_SIZE; k++)
+            {
+                p[0].inf_med[i][j][k] = 0.0;
+            }
         }
     }
 
@@ -90,6 +102,7 @@ int main(void)
         for (j = 0; j < N; j++)
         {
             p[i].i_ptr[j] = 0;
+            p[i].i_med_ptr[j] = 0;
         }
 
         for (j = 0; j < N; j++)
@@ -97,6 +110,17 @@ int main(void)
             for (k = 0; k < I_SIZE; k++)
             {
                 p[i].inf[j][k] = 0;
+            }
+        }
+
+        for (j = 0; j < N; j++)
+        {
+            for (k = 0; k < Y_SIZE; k++)
+            {
+                for (m = 0; m < Z_SIZE; m++)
+                {
+                    p[i].inf_med[j][k][m] = 0.0;
+                }
             }
         }
     }
@@ -124,6 +148,7 @@ int main(void)
         for (j = 0; j < N; j++)
         {
             p[i].i_ptr[j] = 0;
+            p[i].i_med_ptr[j] = 0.0;
         }
 
         for (j = 0; j < N; j++)
@@ -131,6 +156,17 @@ int main(void)
             for (k = 0; k < I_SIZE; k++)
             {
                 p[i].inf[j][k] = 0;
+            }
+        }
+
+        for (j = 0; j < N; j++)
+        {
+            for (k = 0; k < Y_SIZE; k++)
+            {
+                for (m = 0; m < Z_SIZE; m++)
+                {
+                    p[i].inf_med[j][k][m] = 0.0;
+                }
             }
         }
     }
@@ -148,6 +184,7 @@ int main(void)
         for (j = 0; j < N; j++)
         {
             v[i].i_ptr[j] = 0;
+            v[i].i_med_ptr[j] = 0;
         }
 
         for (j = 0; j < N; j++)
@@ -155,6 +192,17 @@ int main(void)
             for (k = 0; k < I_SIZE; k++)
             {
                 v[i].inf[j][k] = 0;
+            }
+        }
+
+        for (j = 0; j < N; j++)
+        {
+            for (k = 0; k < Y_SIZE; k++)
+            {
+                for (m = 0; m < Z_SIZE; m++)
+                {
+                    v[i].inf_med[j][k][m] = 0.0;
+                }
             }
         }
     }
@@ -319,6 +367,7 @@ int main(void)
         for (j = 0; j < N; j++)
         {
             new_p[i].i_ptr[j] = 0;
+            new_p[i].i_med_ptr[j] = 0.0;
         }
 
         for (j = 0; j < N; j++)
@@ -326,6 +375,17 @@ int main(void)
             for (k = 0; k < I_SIZE; k++)
             {
                 new_p[i].inf[j][k] = 0.0;
+            }
+        }
+
+        for (j = 0; j < N; j++)
+        {
+            for (k = 0; k < Y_SIZE; k++)
+            {
+                for (m = 0; m < Z_SIZE; m++)
+                {
+                    new_p[i].inf_med[j][k][m] = 0.0;
+                }
             }
         }
     }
@@ -764,10 +824,13 @@ int main(void)
     double dis_stay = stay + t_wait;                     // 配送センターでの待機時間
     double lambda_g = 0.25;                              // 配送センターへの物資到着率
     double lambda_i = 0.25;                              // 各避難所での情報生成率
+    double lambda_i_med = 0.1;                           // 各避難所での薬の情報性成立
     double poisson_re_total = rand_exp(lambda_g) * 3600; // 物資の到着間隔
     double poisson_re_count = 0;
-    double poisson_inf_total = rand_exp(lambda_i) * 3600;
+    double poisson_inf_total = rand_exp(lambda_i) * 3600; // 情報の到着
     double poisson_inf_count = 0;
+    double poisson_Medinf_total = rand_exp(lambda_i_med) * 3600; // 薬の情報の到着
+    double poisson_Medinf_count = 0;
     int re_load_num = 10 * MEAN;   // 配送センターで一度に積載する物資の数
     int re_finish_num = 5 * MEAN;  // シミュレーション終了物資量
     int ind_relief[M];             // 物資を避難所に下ろすindex :配送車1なら1,2,3,,,
@@ -1244,6 +1307,37 @@ int main(void)
             {
                 new_p[i].inf[i][new_p[i].i_ptr[i]] = (int)total_t;
                 new_p[i].i_ptr[i] += 1; //
+            }
+        }
+
+        /*****************避難所への情報の到着(薬の情報について)******************/
+        if (total_t != 0 && (int)(total_t) % ((int)(poisson_Medinf_total) - (int)(poisson_Medinf_total) % 10) == 0)
+        {
+            poisson_Medinf_total += rand_exp(lambda_i_med) * 3600;
+            poisson_Medinf_count += 1;
+
+            for (i = 1; i < N; i++)
+            {
+                new_p[i].inf_med[i][new_p[i].i_med_ptr[i]][0] = total_t; // 情報の生成時間を格納
+                new_p[i].inf_med[i][new_p[i].i_med_ptr[i]][1] = 60 * 60; // 薬の緊急時間を生成
+                new_p[i].i_med_ptr[i] += 1;                              // ポインタ更新
+            }
+
+            // 表示確認用
+            printf("薬の情報配列表示 (t=%lfs)\n", total_t);
+            for (i = 0; i < N; i++)
+            {
+                if (i == 4) // 避難所１の薬情報配列
+                {
+                    for (j = 0; j < N; j++)
+                    {
+                        for (k = 0; k < 10; k++)
+                        {
+                            printf("%.1lf ", new_p[i].inf_med[j][k][0]);
+                        }
+                        printf("\n");
+                    }
+                }
             }
         }
 
