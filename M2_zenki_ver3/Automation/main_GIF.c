@@ -992,7 +992,7 @@ int main(void)
             n_tan[i] = n_sin[i] / n_cos[i];
         }
 
-        if (total_t >= 0 && total_t <= 50000)
+        if (total_t >= 26000 && total_t <= 50000)
         {
             if ((int)(total_t) % 50 == 0)
             { // 50sごとに描画
@@ -1008,8 +1008,23 @@ int main(void)
                 {
                     if (new_p[i].i_med_ptr[i] != 0)
                     {
-                        fprintf(gp, "set label %d at first %f,%f 'Med:%d'\n", i + 151, new_p[i].x + 0.1, new_p[i].y + 0.1, new_p[i].i_med_ptr[i]);
+                        fprintf(gp, "set label %d at first %f,%f 'Med:%d'\n", i + 151, new_p[i].x - 0.1, new_p[i].y - 0.1, new_p[i].i_med_ptr[i]);
                     }
+                }
+
+                // 薬の情報ラベル(薬の情報を持っている車を表示)
+                int c_label = 0; // ラベル表示かぶらないようにするためのカウンター
+                for (i = 0; i < M; i++)
+                {
+                    for (j = 0; j < N; j++)
+                    {
+                        if (v[i].i_med_ptr[j] != 0)
+                        {
+                            fprintf(gp, "set label %d at first %f,%f ':%d'\n", c_label + 251, v[i].x + 0.55 * c_label, v[i].y + 0.1, j);
+                            c_label += 1;
+                        }
+                    }
+                    c_label = 0; // 初期化
                 }
 
                 // ドローン8台
@@ -1485,7 +1500,7 @@ int main(void)
             printf("%-8s %-8s %-8s %-8s %-8s %-8s %-8s\n", "避難所", "必要物資量", "配達物資量", "物資不足量", "総物資必要量", "総物資配達量", "総物資不足量");
             for (int i = 1; i < N; i++)
             {
-                printf("%-8d %-8d %-8d    %-8d   %-8d         %-8d %-8d\n", i, new_p[i].re_req, new_p[i].re_deli, new_p[i].re_req - new_p[i].re_deli, new_p[i].re_req_sum, new_p[i].re, new_p[i].re_req_sum - new_p[i].re);
+                // printf("%-8d %-8d %-8d    %-8d   %-8d         %-8d %-8d\n", i, new_p[i].re_req, new_p[i].re_deli, new_p[i].re_req - new_p[i].re_deli, new_p[i].re_req_sum, new_p[i].re, new_p[i].re_req_sum - new_p[i].re);
             }
 
             // 各避難所の要求物資量を更新
