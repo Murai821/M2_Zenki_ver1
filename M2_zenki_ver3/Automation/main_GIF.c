@@ -26,6 +26,7 @@ int main(void)
     char *inf_delay_part_file; // 個別の避難所Td
     char *re_interval_file;    // 平均物資到着間隔
     char *Etd_data_file;       // シミュレーションごとに平均情報遅延時間を格納してくファイル
+    char *Medinf_delay_file;   // 薬情報の平均遅延時間
 
     double COST[N]; /*距離*/
     int VIA[N];     /*経由点*/
@@ -877,6 +878,9 @@ int main(void)
     // 最終的に求まった平均情報遅延時間をファイルに格納（シミュレーションごとに格納していく）
     FILE *fp_Etd_data;
     Etd_data_file = "drone_datafile/txtfile/Etd_data.txt";
+    // 平均薬情報遅延間隔
+    FILE *fp_Medinf_delay;
+    Medinf_delay_file = "drone_datafile/txtfile/Medinf_delay.txt";
 
     // 平均配送車マッチング数
     double meet_vehicle_num[M] = {0};
@@ -979,7 +983,9 @@ int main(void)
     fp_inf_interval = fopen(inf_interval_file, "w"); // 平均情報到着間隔ファイルのオープン
     fp_inf_delay = fopen(inf_delay_file, "w");       // 平均情報遅延間隔ファイルのオープン
     fp_inf_delay_part = fopen(inf_delay_part_file, "w");
-    fp_re_interval = fopen(re_interval_file, "w"); // 平均物資到着間隔のファイルオープン
+    fp_re_interval = fopen(re_interval_file, "w");   // 平均物資到着間隔のファイルオープン
+    fp_re_interval = fopen(re_interval_file, "w");   // 平均物資到着間隔のファイルオープン
+    fp_Medinf_delay = fopen(Medinf_delay_file, "w"); // 薬情報の遅延間隔ファイルのオープン
 
     /************************************ ループ処理 ***********************************************************/
     while (1)
@@ -1221,9 +1227,16 @@ int main(void)
                         {
                             for (k = v[i].i_med_ptr[j]; k < new_p[current[i]].i_med_ptr[j]; k++)
                             {
-                                v[i].inf_med[j][v[i].i_ptr[j]][0] = new_p[current[i]].inf_med[j][k][0]; // 情報の生成時間
-                                v[i].inf_med[j][v[i].i_ptr[j]][1] = new_p[current[i]].inf_med[j][k][1]; // 薬の緊急度
+                                v[i].inf_med[j][v[i].i_med_ptr[j]][0] = new_p[current[i]].inf_med[j][k][0]; // 情報の生成時間
+                                v[i].inf_med[j][v[i].i_med_ptr[j]][1] = new_p[current[i]].inf_med[j][k][1]; // 薬の緊急度
                                 v[i].i_med_ptr[j] += 1;
+
+                                // debug
+                                printf("%d:%d********p[%d]toV[%d]%lf\n", v[i].i_med_ptr[j] - 1, new_p[current[i]].i_med_ptr[j], current[i], i, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]);
+
+                                // ファイルへの書き込み
+                                fprintf(fp_Medinf_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
+                                fprintf(fp_Medinf_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間
                             }
                         }
                     }
@@ -1622,14 +1635,25 @@ int main(void)
                     {
                         if (v[i].i_med_ptr[k] > v[j].i_med_ptr[k])
                         {
-                            v[j].inf_med[k][m][0] = v[i].inf_med[k][m][0];
-                            v[j].inf_med[k][m][1] = v[i].inf_med[k][m][1];
-                            v[j].i_med_ptr[k] += 1;
-                            // 配列の容量オーバー
-                            if (v[j].i_med_ptr[k] == Y_SIZE)
+                            for (m = v[j].i_med_ptr[k]; m < v[i].i_med_ptr[k]; m++)
                             {
-                                printf("配列要素数オーバー\n");
-                                break;
+                                // debug
+                                printf("%d:%d***************************(i,j,k,m)=(%d,%d,%d,%d) %lf\n", v[j].i_med_ptr[k], v[i].i_med_ptr[k], i, j, k, m, v[i].inf_med[k][m][0]);
+
+                                v[j].inf_med[k][m][0] = v[i].inf_med[k][m][0];
+                                v[j].inf_med[k][m][1] = v[i].inf_med[k][m][1];
+                                v[j].i_med_ptr[k] += 1;
+
+                                // ファイルへの書き込み
+                                fprintf(fp_Medinf_delay, "t=%lf generate_time:%lf v[%d]->v[%d]\n", total_t, v[i].inf_med[k][m][0], i, j);
+                                fprintf(fp_Medinf_delay, "%lf\n", total_t - v[i].inf_med[k][m][0]); // 生成されてから配送車で回収されるまでの遅延時間
+
+                                // 配列の容量オーバー
+                                if (v[j].i_med_ptr[k] == Y_SIZE)
+                                {
+                                    printf("配列要素数オーバー\n");
+                                    break;
+                                }
                             }
                         }
                     }
@@ -1709,6 +1733,7 @@ int main(void)
                 }
 
                 // 薬の情報配列を交換
+
                 for (j = 0; j < N; j++)
                 {
                     if (drone[i].i_med_ptr[j] > v[drone[i].follow_num].i_med_ptr[j])
@@ -1724,6 +1749,11 @@ int main(void)
                                 printf("配列要素数オーバー\n");
                                 break;
                             }
+
+                            // fprintf(fp_Medinf_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
+                            // fprintf(fp_Medinf_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間
+                            fprintf(fp_Medinf_delay, "t=%lf generate_time:%lf drone[%d]->v[%d]\n", total_t, drone[i].inf_med[j][k][0], i, drone[i].follow_num);
+                            fprintf(fp_Medinf_delay, "%lf\n", total_t - drone[i].inf_med[j][k][0]); // 生成されてから配送車で回収されるまでの遅延時間
                         }
                     }
                 }
@@ -1960,6 +1990,7 @@ int main(void)
     fclose(fp_inf_delay);   // 平均情報遅延時間ファイルクローズ
     fclose(fp_inf_delay_part);
     fclose(fp_inf_interval); // 平均情報到着間隔ファイルクローズ
+    fclose(fp_Medinf_delay);
     pclose(gp);
 
     /*********平均値の導出**********/
