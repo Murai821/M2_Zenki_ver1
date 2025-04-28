@@ -957,7 +957,7 @@ int main(void)
             n_tan[i] = n_sin[i] / n_cos[i];
         }
 
-        if (total_t >= 26000 && total_t <= 55000)
+        if (total_t >= 50000 && total_t <= 65000)
         {
             if ((int)(total_t) % 50 == 0)
             { // 50sごとに描画
@@ -985,7 +985,7 @@ int main(void)
                     {
                         if (v[i].i_med_ptr[j] != 0)
                         {
-                            fprintf(gp, "set label %d at first %f,%f ':%d'\n", c_label + 251, v[i].x + 0.55 * c_label, v[i].y + 0.1, j);
+                            fprintf(gp, "set label %d at first %f,%f ':%d'\n", c_label + 251 + 20 * i, v[i].x + 0.55 * c_label, v[i].y + 0.1, j);
                             c_label += 1;
                         }
                     }
@@ -1275,6 +1275,7 @@ int main(void)
 
         /********************* 配送車 -> 配送車 (配送センターにおいて)*****************************/
 
+        // 避難所情報の交換
         for (i = 0; i < M; i++)
         {
             for (j = 0; j < M; j++)
@@ -1295,6 +1296,32 @@ int main(void)
                                     printf("配列要素数オーバー\n");
                                     break;
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 薬の情報配列の交換
+        for (i = 0; i < M; i++)
+        {
+            for (j = 0; j < M; j++)
+            {
+                if (fabs(v[i].x - new_p[0].x) < 0.001 && fabs(v[j].x - new_p[0].x) < 0.001 && i != j)
+                {
+                    for (k = 0; k < N; k++)
+                    {
+                        if (v[i].i_med_ptr[k] > v[j].i_med_ptr[k])
+                        {
+                            v[j].inf_med[k][m][0] = v[i].inf_med[k][m][0];
+                            v[j].inf_med[k][m][1] = v[i].inf_med[k][m][1];
+                            v[j].i_med_ptr[k] += 1;
+                            // 配列の容量オーバー
+                            if (v[j].i_med_ptr[k] == Y_SIZE)
+                            {
+                                printf("配列要素数オーバー\n");
+                                break;
                             }
                         }
                     }
