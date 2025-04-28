@@ -992,7 +992,7 @@ int main(void)
             n_tan[i] = n_sin[i] / n_cos[i];
         }
 
-        if (total_t >= 56000 && total_t <= 70000)
+        if (total_t >= 20000 && total_t <= 70000)
         {
             if ((int)(total_t) % 50 == 0)
             { // 50sごとに描画
@@ -1003,7 +1003,7 @@ int main(void)
                     // fprintf(gp, "set label %d at first %f,%f '%d'\n", j + 51, new_p[j].x + 0.1, new_p[j].y + 0.1, new_p[j].re);
                 }
 
-                // 薬の情報ラベル(薬の情報を持っている避難所を表示)
+                // 薬の情報ラベル(避難所)
                 for (i = 0; i < N; i++)
                 {
                     if (new_p[i].i_med_ptr[i] != 0)
@@ -1012,7 +1012,7 @@ int main(void)
                     }
                 }
 
-                // 薬の情報ラベル(薬の情報を持っている車を表示)
+                // 薬の情報ラベル(車)
                 int c_label = 0; // ラベル表示かぶらないようにするためのカウンター
                 for (i = 0; i < M; i++)
                 {
@@ -1020,7 +1020,21 @@ int main(void)
                     {
                         if (v[i].i_med_ptr[j] != 0)
                         {
-                            fprintf(gp, "set label %d at first %f,%f ':%d'\n", c_label + 251 + 20 * i, v[i].x + 0.55 * c_label, v[i].y + 0.1, j);
+                            fprintf(gp, "set label %d at first %f,%f ':%d'\n", c_label + 251 + 40 * i, v[i].x + 0.55 * c_label, v[i].y + 0.15, j);
+                            c_label += 1;
+                        }
+                    }
+                    c_label = 0; // 初期化
+                }
+
+                // 薬の情報ラベル(ドローン)
+                for (i = 0; i < M; i++)
+                {
+                    for (j = 0; j < N; j++)
+                    {
+                        if (drone[i].i_med_ptr[j] != 0)
+                        {
+                            fprintf(gp, "set label %d at first %f,%f ':%d'\n", c_label + 451 + 40 * i, drone[i].x + 0.55 * c_label, drone[i].y - 0.15, j);
                             c_label += 1;
                         }
                     }
@@ -1393,6 +1407,7 @@ int main(void)
 
                     /************************** 配送車 -> ドローン **********************************/
 
+                    // 避難所情報の交換
                     for (j = 0; j < N; j++)
                     {
                         if (v[drone[i].target_num].i_ptr[j] > drone[i].i_ptr[j])
@@ -1628,7 +1643,7 @@ int main(void)
         {
             if (drone[i].free_mode == FALSE || (drone[i].free_mode == TRUE && drone[i].charge_time != 0))
             { // followモードならコピー
-                // 処理を追加していく
+                // 避難所情報を交換
                 for (j = 0; j < N; j++)
                 {
                     if (v[drone[i].follow_num].i_ptr[j] > drone[i].i_ptr[j])
@@ -1646,6 +1661,26 @@ int main(void)
                         }
                     }
                 }
+
+                // 薬の情報配列の交換
+                for (j = 0; j < N; j++)
+                {
+                    if (v[drone[i].follow_num].i_med_ptr[j] > drone[i].i_med_ptr[j])
+                    {
+                        for (k = drone[i].i_med_ptr[j]; k < v[drone[i].follow_num].i_med_ptr[j]; k++)
+                        {
+                            drone[i].inf_med[j][k][0] = v[drone[i].follow_num].inf_med[j][k][0]; // 生成時間の情報
+                            drone[i].inf_med[j][k][1] = v[drone[i].follow_num].inf_med[j][k][1]; // 緊急度の情報
+                            drone[i].i_med_ptr[j] += 1;
+                            // 配列の容量オーバー
+                            if (drone[i].i_med_ptr[j] == Y_SIZE)
+                            {
+                                printf("配列要素数オーバー\n");
+                                break;
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -1654,7 +1689,7 @@ int main(void)
         {
             if (drone[i].free_mode == FALSE || (drone[i].free_mode == TRUE && drone[i].charge_time != 0))
             { // followモードならコピー
-                // 処理を追加していく
+                // 　避難所情報の交換
                 for (j = 0; j < N; j++)
                 {
                     if (drone[i].i_ptr[j] > v[drone[i].follow_num].i_ptr[j])
@@ -1665,6 +1700,26 @@ int main(void)
                             v[drone[i].follow_num].i_ptr[j] += 1;
                             // 配列の容量オーバー
                             if (v[drone[i].follow_num].i_ptr[j] == I_SIZE)
+                            {
+                                printf("配列要素数オーバー\n");
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // 薬の情報配列を交換
+                for (j = 0; j < N; j++)
+                {
+                    if (drone[i].i_med_ptr[j] > v[drone[i].follow_num].i_med_ptr[j])
+                    {
+                        for (k = v[drone[i].follow_num].i_med_ptr[j]; k < drone[i].i_med_ptr[j]; k++)
+                        {
+                            v[drone[i].follow_num].inf_med[j][k][0] = drone[i].inf_med[j][k][0]; // 生成時間情報
+                            v[drone[i].follow_num].inf_med[j][k][1] = drone[i].inf_med[j][k][1]; // 緊急度情報
+                            v[drone[i].follow_num].i_med_ptr[j] += 1;
+                            // 配列の容量オーバー
+                            if (v[drone[i].follow_num].i_med_ptr[j] == Y_SIZE)
                             {
                                 printf("配列要素数オーバー\n");
                                 break;
@@ -1732,6 +1787,7 @@ int main(void)
             new_p[med_num].i_med_ptr[med_num] += 1;                                          // ポインタ更新
 
             // 表示確認用
+            /*
             printf("薬の情報配列表示 (t=%lfs)\n", total_t);
             for (i = 0; i < N; i++)
             {
@@ -1746,7 +1802,7 @@ int main(void)
                         printf("\n");
                     }
                 }
-            }
+            }*/
         }
 
         /*****配送センターへの物資の到着******/

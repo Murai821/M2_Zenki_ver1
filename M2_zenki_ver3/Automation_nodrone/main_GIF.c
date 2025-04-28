@@ -985,7 +985,7 @@ int main(void)
                     {
                         if (v[i].i_med_ptr[j] != 0)
                         {
-                            fprintf(gp, "set label %d at first %f,%f ':%d'\n", c_label + 251 + 20 * i, v[i].x + 0.55 * c_label, v[i].y + 0.1, j);
+                            fprintf(gp, "set label %d at first %f,%f ':%d'\n", c_label + 251 + 40 * i, v[i].x + 0.55 * c_label, v[i].y + 0.1, j);
                             c_label += 1;
                         }
                     }
