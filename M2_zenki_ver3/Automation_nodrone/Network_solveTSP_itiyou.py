@@ -67,11 +67,11 @@ current_directory = os.getcwd()
 print("現在のカレントディレクトリ:", current_directory)
 
 # 新しいファイルのパスを指定（このプログラムが入っているディレクトリ名を「jidouka_2」から変更!!!）
-points_file_path = os.path.join(current_directory, "Automation_nodrone/pythonfile/points.txt")
-adjacency_matrix_file_path = os.path.join(current_directory, "Automation_nodrone/pythonfile/adjacency_matrix.txt")
-plot_image_path = os.path.join(current_directory, "Automation_nodrone/pythonfile/network_plot.png")
-jyunkairo_image_path = os.path.join(current_directory, "Automation_nodrone/pythonfile/jyunkairo_plot.png")
-tsp_result_file_path = os.path.join(current_directory, "Automation_nodrone/pythonfile/tsp_result.txt")
+points_file_path = os.path.join(current_directory, "pythonfile/points.txt")
+adjacency_matrix_file_path = os.path.join(current_directory, "pythonfile/adjacency_matrix.txt")
+plot_image_path = os.path.join(current_directory, "pythonfile/network_plot.png")
+jyunkairo_image_path = os.path.join(current_directory, "pythonfile/jyunkairo_plot.png")
+tsp_result_file_path = os.path.join(current_directory, "pythonfile/tsp_result.txt")
 
 #plot_image_path = os.path.join(network_directory, "network_plot.png")
 
@@ -122,7 +122,7 @@ plt.ylabel("Y coordinate")
 plt.xlim(0, 10)
 plt.ylim(0, 10)
 plt.gca().set_aspect('equal', adjustable='box')
-generated_points_image_path = os.path.join(current_directory, "Automation_nodrone/pythonfile/generated_points.png")
+generated_points_image_path = os.path.join(current_directory, "pythonfile/generated_points.png")
 plt.savefig(generated_points_image_path)
 plt.clf()  # 図をクリアする
 plt.close()  # 図を閉じる

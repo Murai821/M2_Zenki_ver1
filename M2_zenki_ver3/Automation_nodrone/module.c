@@ -882,3 +882,9 @@ double generate_normal(double mean, double std_dev)
 
     return z;
 }
+
+// min から maxの範囲の整数値をランダムに返す関数
+int get_random_int(int min, int max)
+{
+    return rand() % (max - min + 1) + min;
+}

@@ -152,6 +152,9 @@ void readAdjacencyMatrix(const char *filename, int connect[][N]);
 // Box-Muller法を用いた正規乱数生成関数
 double generate_normal(double mean, double std_dev);
 
+// min から maxの範囲の整数値をランダムに返す関数
+int get_random_int(int min, int max);
+
 /*********************************************** 変数定義 ******************************************************************************/
 
 #endif // HEADER_H

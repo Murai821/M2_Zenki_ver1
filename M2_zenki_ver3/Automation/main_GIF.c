@@ -824,7 +824,7 @@ int main(void)
     // ラベルの表示
     for (i = 0; i < N; i++)
     {
-        // fprintf(gp, "set label %d at first %f,%f '%d'\n", i + 1, new_p[i].x + 0.1, new_p[i].y + 0.1, i);
+        fprintf(gp, "set label %d at first %f,%f '%d'\n", i + 1, new_p[i].x + 0.1, new_p[i].y + 0.1, i);
     }
 
     /************************************シミュレーション******************************************/
@@ -1000,7 +1000,16 @@ int main(void)
                 // ラベルの表示
                 for (j = 0; j < N; j++)
                 {
-                    fprintf(gp, "set label %d at first %f,%f '%d'\n", j + 51, new_p[j].x + 0.1, new_p[j].y + 0.1, new_p[j].re);
+                    // fprintf(gp, "set label %d at first %f,%f '%d'\n", j + 51, new_p[j].x + 0.1, new_p[j].y + 0.1, new_p[j].re);
+                }
+
+                // 薬の情報ラベル(薬の情報を持っている避難所を表示)
+                for (i = 0; i < N; i++)
+                {
+                    if (new_p[i].i_med_ptr[i] != 0)
+                    {
+                        fprintf(gp, "set label %d at first %f,%f 'Med:%d'\n", i + 151, new_p[i].x + 0.1, new_p[i].y + 0.1, new_p[i].i_med_ptr[i]);
+                    }
                 }
 
                 // ドローン8台
@@ -1157,6 +1166,7 @@ int main(void)
                     /**************** 避難所 -> 配送車 (各避難所において)************/
                     for (j = 0; j < N; j++)
                     {
+                        // 避難所情報の交換
                         if (new_p[current[i]].i_ptr[j] > v[i].i_ptr[j])
                         { // 避難所の情報配列に要素が入っているならその分の情報を配送車に渡す
                             if (i == 0)
@@ -1174,6 +1184,17 @@ int main(void)
                                     printf("配列要素数オーバー\n");
                                     break;
                                 }
+                            }
+                        }
+
+                        // 避難所情報（薬の情報）の交換
+                        if (new_p[current[i]].i_med_ptr[j] > v[i].i_med_ptr[j])
+                        {
+                            for (k = v[i].i_med_ptr[j]; k < new_p[current[i]].i_med_ptr[j]; k++)
+                            {
+                                v[i].inf_med[j][v[i].i_ptr[j]][0] = new_p[current[i]].inf_med[j][k][0]; // 情報の生成時間
+                                v[i].inf_med[j][v[i].i_ptr[j]][1] = new_p[current[i]].inf_med[j][k][1]; // 薬の緊急度
+                                v[i].i_med_ptr[j] += 1;
                             }
                         }
                     }
@@ -1660,24 +1681,25 @@ int main(void)
             poisson_Medinf_total += rand_exp(lambda_i_med) * 3600;
             poisson_Medinf_count += 1;
 
-            for (i = 1; i < N; i++)
-            {
-                new_p[i].inf_med[i][new_p[i].i_med_ptr[i]][0] = total_t; // 情報の生成時間を格納
-                new_p[i].inf_med[i][new_p[i].i_med_ptr[i]][1] = 60 * 60; // 薬の緊急時間を生成
-                new_p[i].i_med_ptr[i] += 1;                              // ポインタ更新
-            }
+            int med_num = get_random_int(1, N - 1); // 薬の情報が発生する避難所番号をランダムに決定
+
+            printf("避難所[%d]で薬情報発生\n", med_num);
+
+            new_p[med_num].inf_med[med_num][new_p[med_num].i_med_ptr[med_num]][0] = total_t; // 情報の生成時間を格納
+            new_p[med_num].inf_med[med_num][new_p[med_num].i_med_ptr[med_num]][1] = 60 * 60; // 薬の緊急時間を生成
+            new_p[med_num].i_med_ptr[med_num] += 1;                                          // ポインタ更新
 
             // 表示確認用
             printf("薬の情報配列表示 (t=%lfs)\n", total_t);
             for (i = 0; i < N; i++)
             {
-                if (i == 4) // 避難所１の薬情報配列
+                if (i == med_num) // 避難所１の薬情報配列
                 {
                     for (j = 0; j < N; j++)
                     {
                         for (k = 0; k < 10; k++)
                         {
-                            printf("%.1lf ", new_p[i].inf_med[j][k][0]);
+                            printf("%.1lf ", new_p[i].inf_med[j][k][1]);
                         }
                         printf("\n");
                     }
