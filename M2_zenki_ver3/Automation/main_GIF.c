@@ -856,7 +856,7 @@ int main(void)
     double poisson_Medinf_total = rand_exp(lambda_i_med) * 3600; // 薬の情報の到着
     double poisson_Medinf_count = 0;
     int re_load_num = 10 * MEAN;   // 配送センターで一度に積載する物資の数
-    int re_finish_num = 5 * MEAN;  // シミュレーション終了物資量
+    int re_finish_num = 5 * MEAN;  // シミュレーション終了物資量(避難所に物資届ける回数×MEAN)
     int ind_relief[M];             // 物資を避難所に下ろすindex :配送車1なら1,2,3,,,
     int re_wait_flag[M] = {FALSE}; // 配送センターの物資存在フラグ
     // 平均情報到着間隔
@@ -1129,8 +1129,8 @@ int main(void)
                 v[i].y = new_p[current[i]].y;
                 part_t[i] = 0;
                 dis_stay_t[i] = dis_stay; // 配送センターでの待機時間セット
-                printf("配送車%dの到着時間: %fhour : %fs\n", i + 1, total_t / 3600, total_t);
-                // 周回時間の計算
+                // printf("配送車%dの到着時間: %fhour : %fs\n", i + 1, total_t / 3600, total_t);
+                //  周回時間の計算
                 total_time_trip[i] += total_t - previous_time[i];
                 previous_time[i] = total_t;
                 trip_count[i] += 1;
@@ -1232,10 +1232,10 @@ int main(void)
                                 v[i].i_med_ptr[j] += 1;
 
                                 // debug
-                                printf("%d:%d********p[%d]toV[%d]%lf\n", v[i].i_med_ptr[j] - 1, new_p[current[i]].i_med_ptr[j], current[i], i, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]);
+                                // printf("%d:%d********p[%d]toV[%d]%lf\n", v[i].i_med_ptr[j] - 1, new_p[current[i]].i_med_ptr[j], current[i], i, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]);
 
                                 // ファイルへの書き込み
-                                fprintf(fp_Medinf_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
+                                // fprintf(fp_Medinf_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
                                 fprintf(fp_Medinf_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間
                             }
                         }
@@ -1404,7 +1404,7 @@ int main(void)
                     {
                         drone[i].free_mode = FALSE;
                         flight_time[i] = 0; // 飛行時間初期化初期化
-                        printf("drone[%d]はTV[%d]にて飛行やめる\n", i, drone[i].target_num);
+                        // printf("drone[%d]はTV[%d]にて飛行やめる\n", i, drone[i].target_num);
                     }
                     else // TVでまだ充電可能な場合
                     {
@@ -1487,7 +1487,7 @@ int main(void)
         if (total_vehicle_num == M)
         {
 
-            printf("t_wait: %f\n", findMax(total_time_trip, M) - findMin(total_time_trip, M));
+            // printf("t_wait: %f\n", findMax(total_time_trip, M) - findMin(total_time_trip, M));
 
             // follow,target,depature_flag初期化
             for (i = 0; i < SD; i++)
@@ -1509,7 +1509,7 @@ int main(void)
             /******************TVにおけるドローンの充電回数制限に関する処理*****************/
             for (i = 0; i < M; i++)
             {
-                printf("TV[%d]のドローン充電回数：%d\n", i, v[i].drone_charge_count);
+                // printf("TV[%d]のドローン充電回数：%d\n", i, v[i].drone_charge_count);
                 v[i].drone_charge_count = 0; // TVの充電回数初期化
             }
 
@@ -1525,7 +1525,7 @@ int main(void)
             TV_chargeAmount = 0;
 
             /**************************************** 各避難所の要求物資量と実際に届けられた物資の比較結果表示 **************************************************/
-            printf("%-8s %-8s %-8s %-8s %-8s %-8s %-8s\n", "避難所", "必要物資量", "配達物資量", "物資不足量", "総物資必要量", "総物資配達量", "総物資不足量");
+            // printf("%-8s %-8s %-8s %-8s %-8s %-8s %-8s\n", "避難所", "必要物資量", "配達物資量", "物資不足量", "総物資必要量", "総物資配達量", "総物資不足量");
             for (int i = 1; i < N; i++)
             {
                 // printf("%-8d %-8d %-8d    %-8d   %-8d         %-8d %-8d\n", i, new_p[i].re_req, new_p[i].re_deli, new_p[i].re_req - new_p[i].re_deli, new_p[i].re_req_sum, new_p[i].re, new_p[i].re_req_sum - new_p[i].re);
@@ -1638,14 +1638,14 @@ int main(void)
                             for (m = v[j].i_med_ptr[k]; m < v[i].i_med_ptr[k]; m++)
                             {
                                 // debug
-                                printf("%d:%d***************************(i,j,k,m)=(%d,%d,%d,%d) %lf\n", v[j].i_med_ptr[k], v[i].i_med_ptr[k], i, j, k, m, v[i].inf_med[k][m][0]);
+                                // printf("%d:%d***************************(i,j,k,m)=(%d,%d,%d,%d) %lf\n", v[j].i_med_ptr[k], v[i].i_med_ptr[k], i, j, k, m, v[i].inf_med[k][m][0]);
 
                                 v[j].inf_med[k][m][0] = v[i].inf_med[k][m][0];
                                 v[j].inf_med[k][m][1] = v[i].inf_med[k][m][1];
                                 v[j].i_med_ptr[k] += 1;
 
                                 // ファイルへの書き込み
-                                fprintf(fp_Medinf_delay, "t=%lf generate_time:%lf v[%d]->v[%d]\n", total_t, v[i].inf_med[k][m][0], i, j);
+                                // fprintf(fp_Medinf_delay, "t=%lf generate_time:%lf v[%d]->v[%d]\n", total_t, v[i].inf_med[k][m][0], i, j);
                                 fprintf(fp_Medinf_delay, "%lf\n", total_t - v[i].inf_med[k][m][0]); // 生成されてから配送車で回収されるまでの遅延時間
 
                                 // 配列の容量オーバー
@@ -1752,7 +1752,7 @@ int main(void)
 
                             // fprintf(fp_Medinf_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
                             // fprintf(fp_Medinf_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間
-                            fprintf(fp_Medinf_delay, "t=%lf generate_time:%lf drone[%d]->v[%d]\n", total_t, drone[i].inf_med[j][k][0], i, drone[i].follow_num);
+                            // fprintf(fp_Medinf_delay, "t=%lf generate_time:%lf drone[%d]->v[%d]\n", total_t, drone[i].inf_med[j][k][0], i, drone[i].follow_num);
                             fprintf(fp_Medinf_delay, "%lf\n", total_t - drone[i].inf_med[j][k][0]); // 生成されてから配送車で回収されるまでの遅延時間
                         }
                     }
@@ -1902,7 +1902,7 @@ int main(void)
             {
                 dis_stay_t[i] = stay; // すべての配送車が合流し、物資到着待ちでないなら同時に出発
             }
-            printf("合流時間：%f\n", total_t);
+            // printf("合流時間：%f\n", total_t);
 
             vehicle_merge_flag = TRUE;
         }
@@ -1964,7 +1964,7 @@ int main(void)
             printf("各避難所のE(TD)\n");
             for (i = 1; i < N; i++)
             {
-                printf("%f\n", (double)(total_td[i] / total_td_count[i]) / 3600);
+                // printf("%f\n", (double)(total_td[i] / total_td_count[i]) / 3600);
             }
 
             // printf("ポアソン到着（物資）:%f\n", poisson_re_total / poisson_re_count / 3600);
@@ -2122,6 +2122,39 @@ int main(void)
         printf("平均情報遅延時間（避難所%d）:%f\n", analyse_num, average4);
         printf("MAX:%f\n", td_max);
         printf("min:%f\n", td_min);
+    }
+    else
+    {
+        printf("データがありません\n");
+    }
+
+    /******** 薬情報の平均情報遅延時間 *********/
+    double value5 = 0;
+    double sum5 = 0;
+    double count5 = 0;
+    double average5;
+
+    fp_Medinf_delay = fopen(Medinf_delay_file, "r"); // 平均情報遅延間隔ファイルのオープン
+    if (fp_Medinf_delay == NULL)
+    {
+        printf("ファイルを開くことができませんでした\n");
+        return 1;
+    }
+    while (fscanf(fp_Medinf_delay, "%lf", &value5) == 1)
+    {
+        sum5 += value5;
+        count5++;
+    }
+    fclose(fp_Medinf_delay); // 平均情報遅延時間ファイルクローズ
+
+    if (count5 > 0)
+    {
+        average5 = sum5 / count5;
+        printf("薬情報の平均情報遅延時間：%f [h]\n", average5 / 3600);
+        // 各シミュレーションごとのMed_E(TD)のデータを格納する
+        // fp_Etd_data = fopen(Etd_data_file, "a+");
+        // fprintf(fp_Etd_data, "%f\n", average2 / 3600);
+        // fclose(fp_Etd_data);
     }
     else
     {
