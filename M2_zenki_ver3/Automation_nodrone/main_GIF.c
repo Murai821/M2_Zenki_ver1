@@ -825,7 +825,7 @@ int main(void)
     double dis_stay = stay + t_wait;                     // 配送センターでの待機時間
     double lambda_g = 0.25;                              // 配送センターへの物資到着率
     double lambda_i = 0.25;                              // 各避難所での情報生成率
-    double lambda_i_med = 0.1;                           // 各避難所での薬の情報性成立
+    double lambda_i_med = 0.15;                          // 各避難所での薬の情報性成立
     double poisson_re_total = rand_exp(lambda_g) * 3600; // 物資の到着間隔
     double poisson_re_count = 0;
     double poisson_inf_total = rand_exp(lambda_i) * 3600; // 情報の到着
@@ -833,7 +833,7 @@ int main(void)
     double poisson_Medinf_total = rand_exp(lambda_i_med) * 3600; // 薬の情報の到着
     double poisson_Medinf_count = 0;
     int re_load_num = 10 * MEAN;   // 配送センターで一度に積載する物資の数
-    int re_finish_num = 5 * MEAN;  // シミュレーション終了物資量(避難所に物資届ける回数×MEAN)
+    int re_finish_num = 10 * MEAN; // シミュレーション終了物資量(避難所に物資届ける回数×MEAN)
     int ind_relief[M];             // 物資を避難所に下ろすindex :配送車1なら1,2,3,,,
     int re_wait_flag[M] = {FALSE}; // 配送センターの物資存在フラグ
     // 平均情報到着間隔
@@ -1745,10 +1745,12 @@ int main(void)
     {
         average5 = sum5 / count5;
         printf("薬情報の平均情報遅延時間：%f [h]\n", average5 / 3600);
-        // 各シミュレーションごとのMed_E(TD)のデータを格納する
-        // fp_Etd_data = fopen(Etd_data_file, "a+");
-        // fprintf(fp_Etd_data, "%f\n", average2 / 3600);
-        // fclose(fp_Etd_data);
+        // 各シミュレーションごとのMed_E(TD) のデータを格納する
+        FILE *fp_Mean_MedInf_data;
+        char *Mean_MedInf_file = "drone_datafile/txtfile/Mean_Medinf_delay.txt";
+        fp_Mean_MedInf_data = fopen(Mean_MedInf_file, "a+");
+        fprintf(fp_Mean_MedInf_data, "%f\n", average5 / 3600);
+        fclose(fp_Mean_MedInf_data);
     }
     else
     {

@@ -7,7 +7,7 @@
 #include "header.h"
 
 /**************************************メイン関数******************************************************/
-int main(void)
+int main(int argc, char *argv[])
 {
     int i, j, k, m;
     char *data_file;     // 座標プロット用
@@ -32,7 +32,14 @@ int main(void)
     int VIA[N];     /*経由点*/
     char USED[N];   /*確定か未確定か*/
 
-    srand(821); // シード値
+    // シェルスクリプトにおける記述
+    if (argc < 2)
+    {
+        fprintf(stderr, "Usage: %s <seed>\n", argv[0]);
+        return 1;
+    }
+    int seed = atoi(argv[1]);
+    srand(seed); // シード値
 
     point p[N];   // 避難所と配送センターの宣言
     vehicle v[M]; // 配送車の宣言
@@ -809,10 +816,12 @@ int main(void)
         fprintf(fp, "%d\t%lf\t%lf\n", i, p[i].x, p[i].y);
     }
     fclose(fp);
+
     // #if 0
     //  gnuplotの設定
-
+    /*
     gp = popen("gnuplot -persist", "w");
+
     fprintf(gp, "set xrange [0:10]\n");
     fprintf(gp, "set yrange [0:10]\n");
     fprintf(gp, "set size square\n");
@@ -827,6 +836,7 @@ int main(void)
     {
         fprintf(gp, "set label %d at first %f,%f '%d'\n", i + 1, new_p[i].x + 0.1, new_p[i].y + 0.1, i);
     }
+        */
 
     /************************************シミュレーション******************************************/
 
@@ -998,6 +1008,7 @@ int main(void)
             n_tan[i] = n_sin[i] / n_cos[i];
         }
 
+#if 0
         if (total_t >= 20000 && total_t <= 70000)
         {
             if ((int)(total_t) % 50 == 0)
@@ -1097,6 +1108,7 @@ int main(void)
                 */
             }
         }
+#endif
 
         /**************配送車の座標更新*****************/
         for (i = 0; i < M; i++)
@@ -1991,7 +2003,7 @@ int main(void)
     fclose(fp_inf_delay_part);
     fclose(fp_inf_interval); // 平均情報到着間隔ファイルクローズ
     fclose(fp_Medinf_delay);
-    pclose(gp);
+    // pclose(gp);
 
     /*********平均値の導出**********/
 
