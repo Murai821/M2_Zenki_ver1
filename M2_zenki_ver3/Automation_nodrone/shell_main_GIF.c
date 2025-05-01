@@ -816,6 +816,7 @@ int main(int argc, char *argv[])
     /************************************シミュレーション******************************************/
 
     double total_t = 0;                                  // シミュレーションの合計時間
+    double termination_t = 500000;                       // シミュレーション強制終了時間
     double r_velo = 360;                                 // 速度の逆数
     double part_t[M] = {0};                              // 二点間の経過時間
     int current[M] = {0};                                // 始点
@@ -1528,7 +1529,7 @@ int main(int argc, char *argv[])
         relief_count = 0;
 
         // シミュレーション強制終了条件
-        if (total_t >= 300000)
+        if (total_t >= termination_t)
         {
             printf("シミュレーション時間が規定を超過したため強制終了\n");
             break;

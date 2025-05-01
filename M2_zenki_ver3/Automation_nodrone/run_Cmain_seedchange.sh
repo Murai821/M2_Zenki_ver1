@@ -2,7 +2,7 @@
 
 # シード値の範囲を設定(100回)
 start_seed=41
-end_seed=46
+end_seed=140
 
 gcc shell_main_GIF.c module.c -o my_program -lm
 
