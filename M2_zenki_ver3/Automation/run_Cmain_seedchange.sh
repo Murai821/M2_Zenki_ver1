@@ -2,12 +2,13 @@
 
 # シード値の範囲を設定(100回)
 start_seed=41
-end_seed=140
+end_seed=45
 
 gcc shell_main_GIF.c module.c -o my_program -lm
 
 # 特定ディレクトリ内のファイルを初期化
 > drone_datafile/txtfile/Mean_Medinf_delay.txt
+> drone_datafile/txtfile/Mean_Med_re_delay.txt
 
 for i in $(seq $start_seed $end_seed)
 do
@@ -17,4 +18,8 @@ done
 
 # Cプログラムをコンパイル
 gcc E_MedInf_average_shell.c
+./a.out
+
+# Cプログラムをコンパイル
+gcc E_Med_re_average_shell.c
 ./a.out
