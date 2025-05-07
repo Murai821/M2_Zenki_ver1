@@ -26,6 +26,7 @@ int main(void)
     char *re_interval_file;    // 平均物資到着間隔
     char *Etd_data_file;       // シミュレーションごとに平均情報遅延時間を格納してくファイル
     char *Medinf_delay_file;   // 薬情報の平均遅延時間
+    char *Med_re_delay_file;   // 医療品の配送平均遅延時間
 
     double COST[N]; /*距離*/
     int VIA[N];     /*経由点*/
@@ -179,6 +180,8 @@ int main(void)
         v[i].y = L / 2;
 
         v[i].re = 0;
+
+        v[i].Med_re = 0;
 
         v[i].next_wait_flag = FALSE;
 
@@ -859,6 +862,9 @@ int main(void)
     // 平均薬情報遅延間隔
     FILE *fp_Medinf_delay;
     Medinf_delay_file = "drone_datafile/txtfile/Medinf_delay.txt";
+    // 医療品の配送遅延時間
+    FILE *fp_Med_re_delay;
+    Med_re_delay_file = "drone_datafile/txtfile/Med_re_delay.txt";
 
     // 平均配送車マッチング数
     double meet_vehicle_num[M] = {0};
@@ -951,6 +957,7 @@ int main(void)
     fp_inf_delay_part = fopen(inf_delay_part_file, "w");
     fp_re_interval = fopen(re_interval_file, "w");   // 平均物資到着間隔のファイルオープン
     fp_Medinf_delay = fopen(Medinf_delay_file, "w"); // 薬情報の遅延間隔ファイルのオープン
+    fp_Med_re_delay = fopen(Med_re_delay_file, "w"); // 医療品の配送遅延間隔ファイルのオープン
 
     /************************************ ループ処理 ***********************************************************/
     while (1)
@@ -1158,6 +1165,17 @@ int main(void)
                         }
                     }
 
+                    /**************************医療品の避難所への配達処理***********************************/
+                    if (v[i].Med_re > 0 && v[i].i_med_ptr[current[i]] > 0 && v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][3] != TRUE) // 配送車が集積所で物資を積載してまた戻って来たなら
+                    {
+                        // 医療品の配達
+                        v[i].Med_re -= 1;
+                        v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][3] = TRUE; // 配送車が医療品を届けたことを記録
+                        printf("配送車%d 避難所%d 医療品%d\n", i, current[i], v[i].Med_re);
+                        fprintf(fp_Med_re_delay, "%lf\n", total_t - v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][0]);
+                        // fprintf(fp_Med_re_delay, "t=%lf v[%d] -> new_p[%d] : %lf\n", total_t, i, current[i], total_t - v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][0]);
+                    }
+
                     /***************** 配送車 -> 避難所（各避難所において）*********/
 
                     count = 0;
@@ -1229,6 +1247,19 @@ int main(void)
                 // new_p[i].re_req = generate_normal(MEAN, STD_DEV); // 各避難所の必要物資量をランダムに生成(正規分布)
                 new_p[i].re_req += (int)rand_exp(lambda_re); // 指数分布による増加分
                 new_p[i].re_req_sum += new_p[i].re_req;      // 各避難所の総必要物資量
+            }
+
+            // 医療品の積載について
+            for (int i = 0; i < M; i++)
+            {
+                for (j = 1; j < N; j++)
+                {
+                    if (v[i].i_med_ptr[j] > 0 && v[i].inf_med[j][v[i].i_med_ptr[j] - 1][3] != TRUE && j <= (i + 1) * 10 && j >= i * 10 + 1)
+                    {
+                        v[i].Med_re += 1;
+                        printf("配送車%d:避難所[%d]への物資積載\n", i, j);
+                    }
+                }
             }
         }
 
@@ -1405,7 +1436,7 @@ int main(void)
 
             int med_num = get_random_int(1, N - 1); // 薬の情報が発生する避難所番号をランダムに決定
 
-            printf("避難所[%d]で薬情報発生\n", med_num);
+            printf("避難所[%d]で薬情報発生 t=%lf\n", med_num, total_t);
 
             new_p[med_num].inf_med[med_num][new_p[med_num].i_med_ptr[med_num]][0] = total_t; // 情報の生成時間を格納
             new_p[med_num].inf_med[med_num][new_p[med_num].i_med_ptr[med_num]][1] = 60 * 60; // 薬の緊急時間を生成
@@ -1586,6 +1617,7 @@ int main(void)
     fclose(fp_inf_delay_part);
     fclose(fp_inf_interval); // 平均情報到着間隔ファイルクローズ
     fclose(fp_Medinf_delay);
+    fclose(fp_Med_re_delay);
     pclose(gp);
 
     /*********平均値の導出**********/

@@ -16,7 +16,7 @@
 #define SD 8        /*シミュレーションで用いるドローン数*/
 #define I_SIZE 150  /*情報配列の要素数*/
 #define Y_SIZE 20   /*薬の情報配列の二次元要素数*/
-#define Z_SIZE 2    /*薬の情報配列の三次元要素数*/
+#define Z_SIZE 3    /*薬の情報配列の三次元要素数*/
 #define INF 9999    /*無限大*/
 #define TRUE 1
 #define FALSE 0
@@ -52,7 +52,8 @@ typedef struct
 {
     double x;
     double y;
-    int re; // 積載物資量
+    int re;     // 積載物資量
+    int Med_re; // 医療品積載量
     int inf[N][I_SIZE];
     int i_ptr[N];
     double inf_med[N][Y_SIZE][Z_SIZE]; // 避難所の薬の情報配列三次元(避難所番号,情報配列のインデックス,（生成時間・緊急度（生成してから運搬までの目標時間））)
