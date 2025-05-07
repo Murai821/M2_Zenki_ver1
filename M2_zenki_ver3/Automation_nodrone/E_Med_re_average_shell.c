@@ -5,8 +5,8 @@
 int main()
 {
     FILE *inputFile, *outputFile;
-    char inputFilePath[] = "drone_datafile/txtfile/Mean_Medinf_delay.txt";                // 読み込むファイルのパス
-    char outputFilePath[] = "drone_datafile/txtfile/excel_data/Shell_MedInf_average.txt"; // 書き込むファイルのパス
+    char inputFilePath[] = "drone_datafile/txtfile/Mean_Med_re_delay.txt";                // 読み込むファイルのパス
+    char outputFilePath[] = "drone_datafile/txtfile/excel_data/Shell_Med_re_average.txt"; // 書き込むファイルのパス
     double value, sum = 0.0;
     int count = 0;
 

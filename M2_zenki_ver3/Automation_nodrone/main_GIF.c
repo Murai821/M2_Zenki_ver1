@@ -1790,6 +1790,41 @@ int main(void)
         printf("データがありません\n");
     }
 
+    /******** 薬の配送平均情報遅延時間 *********/
+    double value6 = 0;
+    double sum6 = 0;
+    double count6 = 0;
+    double average6;
+
+    fp_Med_re_delay = fopen(Med_re_delay_file, "r"); // 平均情報遅延間隔ファイルのオープン
+    if (fp_Med_re_delay == NULL)
+    {
+        printf("ファイルを開くことができませんでした\n");
+        return 1;
+    }
+    while (fscanf(fp_Med_re_delay, "%lf", &value6) == 1)
+    {
+        sum6 += value6;
+        count6++;
+    }
+    fclose(fp_Med_re_delay); // 平均情報遅延時間ファイルクローズ
+
+    if (count6 > 0)
+    {
+        average6 = sum6 / count6;
+        printf("薬の配送平均情報遅延時間：%f [h]\n", average6 / 3600);
+        // 各シミュレーションごとのMed_E(TD) のデータを格納する
+        FILE *fp_Mean_Med_re_data;
+        char *Mean_Med_re_file = "drone_datafile/txtfile/Mean_Med_re_delay.txt";
+        fp_Mean_Med_re_data = fopen(Mean_Med_re_file, "a+");
+        fprintf(fp_Mean_Med_re_data, "%f\n", average6 / 3600);
+        fclose(fp_Mean_Med_re_data);
+    }
+    else
+    {
+        printf("データがありません\n");
+    }
+
     /********************************************************************　シミュレーション終了　**************************************************************************************************/
     // #endif
     /*************************** gnuplot表示 *************************************/
