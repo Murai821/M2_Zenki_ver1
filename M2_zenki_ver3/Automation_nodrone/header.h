@@ -16,7 +16,7 @@
 #define SD 8        /*シミュレーションで用いるドローン数*/
 #define I_SIZE 150  /*情報配列の要素数*/
 #define Y_SIZE 20   /*薬の情報配列の二次元要素数*/
-#define Z_SIZE 3    /*薬の情報配列の三次元要素数*/
+#define Z_SIZE 4    /*薬の情報配列の三次元要素数*/
 #define INF 9999    /*無限大*/
 #define TRUE 1
 #define FALSE 0
@@ -43,7 +43,7 @@ typedef struct
     int re_deli;                       // 一巡回の間に届けられた物資量
     int inf[N][I_SIZE];                // 情報配列
     int i_ptr[N];                      // 情報配列のポインタ
-    double inf_med[N][Y_SIZE][Z_SIZE]; // 避難所の薬の情報配列三次元(避難所番号,情報配列のインデックス,（生成時間・緊急度（生成してから運搬までの目標時間））)
+    double inf_med[N][Y_SIZE][Z_SIZE]; // 避難所の薬の情報配列三次元(避難所番号,情報配列のインデックス,（生成時間・緊急度（生成してから運搬までの目標時間）・要求情報が発生してから共有されるまでの時間・要求物資が運搬されたか(TRUE or FALSE)）
     int i_med_ptr[N];                  // 薬の情報配列のポインタ
 } point;
 
@@ -56,7 +56,7 @@ typedef struct
     int Med_re; // 医療品積載量
     int inf[N][I_SIZE];
     int i_ptr[N];
-    double inf_med[N][Y_SIZE][Z_SIZE]; // 避難所の薬の情報配列三次元(避難所番号,情報配列のインデックス,（生成時間・緊急度（生成してから運搬までの目標時間））)
+    double inf_med[N][Y_SIZE][Z_SIZE]; // 避難所の薬の情報配列三次元(避難所番号,情報配列のインデックス,（生成時間・緊急度（生成してから運搬までの目標時間）・要求情報が発生してから共有されるまでの時間・要求物資が運搬されたか(TRUE or FALSE)）
     int i_med_ptr[N];                  // 薬の情報配列のポインタ
     int next_wait_flag;                // 次の避難所が荷降ろしのために30分要する避難所の場合にTRUE
 } vehicle;
@@ -71,8 +71,7 @@ typedef struct
     int re;
     int inf[N][I_SIZE];
     int i_ptr[N];
-    double inf_med[N][Y_SIZE][Z_SIZE]; // 避難所の薬の情報配列三次元(避難所番号,情報配列のインデックス,（生成時間・緊急度（生成してから運搬までの目標時間））)
-    int i_med_ptr[N];                  // 薬の情報配列のポインタ
+    double inf_med[N][Y_SIZE][Z_SIZE]; // 避難所の薬の情報配列三次元(避難所番号,情報配列のインデックス,（生成時間・緊急度（生成してから運搬までの目標時間）・要求情報が発生してから共有されるまでの時間・要求物資が運搬されたか(TRUE or FALSE)）
     int follow_num;                    // ドローンが従う配送車番号
     int target_num;                    // ドローンが巡回路をまたいで向かう巡回路番号
     int wait_flag;                     // ドローンが先回りして避難所で待機することを示すフラグ

@@ -20,13 +20,15 @@ int main(int argc, char *argv[])
     char *v3_file;
     char *v4_file;
     char *v5_file;
-    char *inf_interval_file;   // 平均情報到着間隔
-    char *inf_delay_file;      // 平均情報遅延時間
-    char *inf_delay_part_file; // 個別の避難所Td
-    char *re_interval_file;    // 平均物資到着間隔
-    char *Etd_data_file;       // シミュレーションごとに平均情報遅延時間を格納してくファイル
-    char *Medinf_delay_file;   // 薬情報の平均遅延時間
-    char *Med_re_delay_file;   // 医療品の配送平均遅延時間
+    char *inf_interval_file;                     // 平均情報到着間隔
+    char *inf_delay_file;                        // 平均情報遅延時間
+    char *inf_delay_part_file;                   // 個別の避難所Td
+    char *re_interval_file;                      // 平均物資到着間隔
+    char *Etd_data_file;                         // シミュレーションごとに平均情報遅延時間を格納してくファイル
+    char *Medinf_delay_file;                     // 薬情報の平均遅延時間
+    char *Med_re_delay_file;                     // 医療品の配送平均遅延時間
+    char *Medinf_collect_delay_file;             // 薬情報の収集平均遅延時間
+    char *Med_re_collect_to_delivery_delay_file; // 医療品の収集平均遅延時間
 
     double COST[N]; /*距離*/
     int VIA[N];     /*経由点*/
@@ -873,6 +875,12 @@ int main(int argc, char *argv[])
     // 医療品の配送遅延時間
     FILE *fp_Med_re_delay;
     Med_re_delay_file = "drone_datafile/txtfile/Med_re_delay.txt";
+    // 医療品情報の収集遅延時間（避難所から配送車への情報共有の遅延時間限定）
+    FILE *fp_Medinf_collect_delay;
+    Medinf_collect_delay_file = "drone_datafile/txtfile/Medinf_collect_delay.txt";
+    // 医療品の配送遅延時間（要求情報発生が回収されてから実際に医療品が避難所へ届けられるまでの遅延時間）
+    FILE *fp_Med_re_collect_to_delivery_delay;
+    Med_re_collect_to_delivery_delay_file = "drone_datafile/txtfile/Med_re_collect_to_delivery_delay.txt";
 
     // 平均配送車マッチング数
     double meet_vehicle_num[M] = {0};
@@ -963,9 +971,11 @@ int main(int argc, char *argv[])
     fp_inf_interval = fopen(inf_interval_file, "w"); // 平均情報到着間隔ファイルのオープン
     fp_inf_delay = fopen(inf_delay_file, "w");       // 平均情報遅延間隔ファイルのオープン
     fp_inf_delay_part = fopen(inf_delay_part_file, "w");
-    fp_re_interval = fopen(re_interval_file, "w");   // 平均物資到着間隔のファイルオープン
-    fp_Medinf_delay = fopen(Medinf_delay_file, "w"); // 薬情報の遅延間隔ファイルのオープン
-    fp_Med_re_delay = fopen(Med_re_delay_file, "w"); // 医療品の配送遅延間隔ファイルのオープン
+    fp_re_interval = fopen(re_interval_file, "w");                                           // 平均物資到着間隔のファイルオープン
+    fp_Medinf_delay = fopen(Medinf_delay_file, "w");                                         // 薬情報の遅延間隔ファイルのオープン
+    fp_Med_re_delay = fopen(Med_re_delay_file, "w");                                         // 医療品の配送遅延間隔ファイルのオープン
+    fp_Medinf_collect_delay = fopen(Medinf_collect_delay_file, "w");                         // 医療品情報の収集遅延間隔ファイルのオープン
+    fp_Med_re_collect_to_delivery_delay = fopen(Med_re_collect_to_delivery_delay_file, "w"); // 医療品の収集から配送への遅延間隔ファイルのオープン
 
     /************************************ ループ処理 ***********************************************************/
     while (1)
@@ -1171,6 +1181,9 @@ int main(int argc, char *argv[])
                                 // ファイルへの書き込み
                                 // fprintf(fp_Medinf_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
                                 fprintf(fp_Medinf_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間
+                                // fprintf(fp_Medinf_collect_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
+                                fprintf(fp_Medinf_collect_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
+                                v[i].inf_med[j][v[i].i_med_ptr[j] - 1][2] = total_t;
                             }
                         }
                     }
@@ -1184,6 +1197,9 @@ int main(int argc, char *argv[])
                         printf("配送車%d 避難所%d 医療品%d\n", i, current[i], v[i].Med_re);
                         fprintf(fp_Med_re_delay, "%lf\n", total_t - v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][0]);
                         // fprintf(fp_Med_re_delay, "t=%lf v[%d] -> new_p[%d] : %lf\n", total_t, i, current[i], total_t - v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][0]);
+                        fprintf(fp_Med_re_collect_to_delivery_delay, "%lf\n", total_t - v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][2]); // 医療品の収集から配送への遅延時間
+                        // fprintf(fp_Med_re_collect_to_delivery_delay, "t=%lf v[%d] -> new_p[%d] : %lf\n", total_t, i, current[i], total_t - v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][2]); // 医療品の収集から配送への遅延時間
+                        // fprintf(fp_Med_re_collect_to_delivery_delay, "t=%lf v[%d] -> new_p[%d] : 情報が回収された時間 %lf\n", total_t, i, current[i], v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][2]); // 医療品の収集から配送への遅延時間
                     }
 
                     /***************** 配送車 -> 避難所（各避難所において）*********/
@@ -1628,6 +1644,8 @@ int main(int argc, char *argv[])
     fclose(fp_inf_interval); // 平均情報到着間隔ファイルクローズ
     fclose(fp_Medinf_delay);
     fclose(fp_Med_re_delay);
+    fclose(fp_Medinf_collect_delay);
+    fclose(fp_Med_re_collect_to_delivery_delay);
     // pclose(gp);
 
     /*********平均値の導出**********/
