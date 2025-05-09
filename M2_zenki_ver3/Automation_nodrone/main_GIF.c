@@ -211,6 +211,15 @@ int main(void)
                 }
             }
         }
+
+        for (j = 0; j < QUEUE_SIZE; j++)
+        {
+            v[i].Med_delivery_queue[j] = 0;
+        }
+
+        v[i].queue_ptr = 0;
+
+        v[i].queue_Notdelivery_ptr = 0;
     }
 
     /*********************************************** pythonの出力ファイルから点の「座標」と「隣接行列」を読み込む **************************************************************************/
@@ -1165,31 +1174,46 @@ int main(void)
                                 v[i].inf_med[j][v[i].i_med_ptr[j]][1] = new_p[current[i]].inf_med[j][k][1]; // 薬の緊急度
                                 v[i].i_med_ptr[j] += 1;
 
+                                // 医療品の配送先をキューに保存
+                                v[i].Med_delivery_queue[v[i].queue_ptr] = current[i]; // 医療品の配送先をキューに格納
+                                v[i].queue_ptr += 1;                                  // キューのポインタを進める
+                                if (v[i].queue_ptr == QUEUE_SIZE)
+                                {
+                                    printf("キューの要素数オーバー\n");
+                                    break;
+                                }
+                                {
+                                    /* code */
+                                }
+
                                 // debug
                                 // printf("%d:%d********p[%d]toV[%d]%lf\n", v[i].i_med_ptr[j] - 1, new_p[current[i]].i_med_ptr[j], current[i], i, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]);
 
                                 // ファイルへの書き込み
                                 // fprintf(fp_Medinf_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
                                 fprintf(fp_Medinf_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間
-                                // fprintf(fp_Medinf_collect_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
-                                fprintf(fp_Medinf_collect_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
-                                v[i].inf_med[j][v[i].i_med_ptr[j] - 1][2] = total_t;                                            // 生成されてから配送車で回収された時点のシミュレーション時間を配列に格納しておく
+                                fprintf(fp_Medinf_collect_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
+                                // fprintf(fp_Medinf_collect_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
+                                v[i].inf_med[j][v[i].i_med_ptr[j] - 1][2] = total_t; // 生成されてから配送車で回収された時点のシミュレーション時間を配列に格納しておく
                             }
                         }
                     }
 
                     /**************************医療品の避難所への配達処理***********************************/
-                    if (v[i].Med_re > 0 && v[i].i_med_ptr[current[i]] > 0 && v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][3] != TRUE) // 配送車が集積所で物資を積載してまた戻って来たなら
+                    if (v[i].Med_re > 0 && v[i].i_med_ptr[current[i]] > 0 && v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][3] != TRUE && current[i] == v[i].Med_delivery_queue[v[i].queue_Notdelivery_ptr]) // 配送車が集積所で物資を積載してまた戻って来たなら
                     {
                         // 医療品の配達
                         v[i].Med_re -= 1;
                         v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][3] = TRUE; // 配送車が医療品を届けたことを記録
                         printf("配送車%d 避難所%d 医療品%d\n", i, current[i], v[i].Med_re);
+                        v[i].queue_Notdelivery_ptr += 1; // 配達が完了したキュー内の避難所のポインタを進める
+
+                        // ファイルへの書き込み処理
                         fprintf(fp_Med_re_delay, "%lf\n", total_t - v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][0]);
                         // fprintf(fp_Med_re_delay, "t=%lf v[%d] -> new_p[%d] : %lf\n", total_t, i, current[i], total_t - v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][0]);
-                        fprintf(fp_Med_re_collect_to_delivery_delay, "%lf\n", total_t - v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][2]); // 医療品の収集から配送への遅延時間
+                        // fprintf(fp_Med_re_collect_to_delivery_delay, "%lf\n", total_t - v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][2]); // 医療品の収集から配送への遅延時間
                         // fprintf(fp_Med_re_collect_to_delivery_delay, "t=%lf v[%d] -> new_p[%d] : %lf\n", total_t, i, current[i], total_t - v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][2]); // 医療品の収集から配送への遅延時間
-                        // fprintf(fp_Med_re_collect_to_delivery_delay, "t=%lf v[%d] -> new_p[%d] : 情報が回収された時間 %lf\n", total_t, i, current[i], v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][2]); // 医療品の収集から配送への遅延時間
+                        fprintf(fp_Med_re_collect_to_delivery_delay, "t=%lf v[%d] -> new_p[%d] : 情報が回収された時間 %lf\n", total_t, i, current[i], v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][2]); // 医療品の収集から配送への遅延時間
                     }
 
                     /***************** 配送車 -> 避難所（各避難所において）*********/
@@ -1272,7 +1296,7 @@ int main(void)
                 {
                     if (v[i].i_med_ptr[j] > 0 && v[i].inf_med[j][v[i].i_med_ptr[j] - 1][3] != TRUE && j <= (i + 1) * 10 && j >= i * 10 + 1)
                     {
-                        v[i].Med_re += 1;
+                        v[i].Med_re += 1; // 医療物資を積載
                         printf("配送車%d:避難所[%d]への物資積載\n", i, j);
                     }
                 }

@@ -28,10 +28,11 @@
 #define MAX_charge_count 9999 // 各TVが一巡回する間にドローンを充電することができる回数
 #define MAX_TVchargeable 300  // TVで一巡回する間にドローンを充電することができる総計（単位は[min]）
 // Box-Muller法を用いた正規乱数生成関数に必要なパラメータ
-#define MEAN 50.0    // 平均
-#define STD_DEV 10.0 // 標準偏差
-#define MIN_VAL 30.0 // 下限
-#define MAX_VAL 70.0 // 上限
+#define MEAN 50.0      // 平均
+#define STD_DEV 10.0   // 標準偏差
+#define MIN_VAL 30.0   // 下限
+#define MAX_VAL 70.0   // 上限
+#define QUEUE_SIZE 100 // 医療品を配達する避難所番号を順に格納するキューのサイズ
 
 /*************************************************** 構造体定義 *********************************************************************/
 // 配送センターと避難所の構造体
@@ -46,6 +47,7 @@ typedef struct
     int inf[N][I_SIZE];                // 情報配列
     int i_ptr[N];                      // 情報配列のポインタ
     double inf_med[N][Y_SIZE][Z_SIZE]; // 避難所の薬の情報配列三次元(避難所番号,情報配列のインデックス,（生成時間・緊急度（生成してから運搬までの目標時間）・要求情報が発生してから共有されるまでの時間・要求物資が運搬されたか(TRUE or FALSE)）
+    int i_med_ptr[N];                  // 薬の情報配列のポインタ
 } point;
 
 // 配送車の構造体
@@ -57,12 +59,15 @@ typedef struct
     int Med_re; // 医療品積載量
     int inf[N][I_SIZE];
     int i_ptr[N];
-    double inf_med[N][Y_SIZE][Z_SIZE]; // 避難所の薬の情報配列三次元(避難所番号,情報配列のインデックス,（生成時間・緊急度（生成してから運搬までの目標時間）・要求情報が発生してから共有されるまでの時間・要求物資が運搬されたか(TRUE or FALSE)）
-    int i_med_ptr[N];                  // 薬の情報配列のポインタ
-    int next_wait_flag;                // 次の避難所が荷降ろしのために30分要する避難所の場合にTRUE
-    int drone_charge_count;            // TVでのドローンの最大充電可能台数
-    double charge_amount;              // TVでのドローン総充電時間（一巡回中）
-    double chargeable_flag;            // TVでドローンを充電可能かを表すフラグ（充電可能：１、不可能：０）
+    double inf_med[N][Y_SIZE][Z_SIZE];  // 避難所の薬の情報配列三次元(避難所番号,情報配列のインデックス,（生成時間・緊急度（生成してから運搬までの目標時間）・要求情報が発生してから共有されるまでの時間・要求物資が運搬されたか(TRUE or FALSE)）
+    int i_med_ptr[N];                   // 薬の情報配列のポインタ
+    int next_wait_flag;                 // 次の避難所が荷降ろしのために30分要する避難所の場合にTRUE
+    int drone_charge_count;             // TVでのドローンの最大充電可能台数
+    double charge_amount;               // TVでのドローン総充電時間（一巡回中）
+    double chargeable_flag;             // TVでドローンを充電可能かを表すフラグ（充電可能：１、不可能：０）
+    int Med_delivery_queue[QUEUE_SIZE]; // 医療品を配達する避難所番号を順に格納するキュー
+    int queue_ptr;                      // 医療品を配達する避難所番号を順に格納するキューのポインタ
+    int queue_Notdelivery_ptr;          // キューのうち、医療品が未配達の避難所の戦闘のポインタ
 } vehicle;
 
 // ドローンの構造体
