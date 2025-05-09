@@ -1874,6 +1874,76 @@ int main(int argc, char *argv[])
         printf("データがありません\n");
     }
 
+    /******** 医療品情報の回収における平均情報遅延時間 *********/
+    double value7 = 0;
+    double sum7 = 0;
+    double count7 = 0;
+    double average7;
+
+    fp_Medinf_collect_delay = fopen(Medinf_collect_delay_file, "r"); // 平均情報遅延間隔ファイルのオープン
+    if (fp_Medinf_collect_delay == NULL)
+    {
+        printf("ファイルを開くことができませんでした\n");
+        return 1;
+    }
+    while (fscanf(fp_Medinf_collect_delay, "%lf", &value7) == 1)
+    {
+        sum7 += value7;
+        count7++;
+    }
+    fclose(fp_Medinf_collect_delay); // 平均情報遅延時間ファイルクローズ
+
+    if (count7 > 0)
+    {
+        average7 = sum7 / count7;
+        printf("医療品情報の回収における平均情報遅延時間：%f [h]\n", average7 / 3600);
+        // 各シミュレーションごとのMed_E(TD) のデータを格納する
+        FILE *fp_Mean_Medinf_collect_data;
+        char *Mean_Medinf_collect_delay_file = "drone_datafile/txtfile/Mean_Medinf_collect_delay.txt";
+        fp_Mean_Medinf_collect_data = fopen(Mean_Medinf_collect_delay_file, "a+");
+        fprintf(fp_Mean_Medinf_collect_data, "%f\n", average7 / 3600);
+        fclose(fp_Mean_Medinf_collect_data);
+    }
+    else
+    {
+        printf("データがありません\n");
+    }
+
+    /******** 医療品情報の回収から配達における平均情報遅延時間 *********/
+    double value8 = 0;
+    double sum8 = 0;
+    double count8 = 0;
+    double average8;
+
+    fp_Med_re_collect_to_delivery_delay = fopen(Med_re_collect_to_delivery_delay_file, "r"); // 平均情報遅延間隔ファイルのオープン
+    if (fp_Med_re_collect_to_delivery_delay == NULL)
+    {
+        printf("ファイルを開くことができませんでした\n");
+        return 1;
+    }
+    while (fscanf(fp_Med_re_collect_to_delivery_delay, "%lf", &value8) == 1)
+    {
+        sum8 += value8;
+        count8++;
+    }
+    fclose(fp_Med_re_collect_to_delivery_delay); // 平均情報遅延時間ファイルクローズ
+
+    if (count8 > 0)
+    {
+        average8 = sum8 / count8;
+        printf("医療品情報の回収から配達までにおける平均情報遅延時間：%f [h]\n", average8 / 3600);
+        // 各シミュレーションごとのMed_E(TD) のデータを格納する
+        FILE *fp_Mean_Med_re_collect_to_delivery_data;
+        char *Mean_Med_re_collect_to_derivery_delay_file = "drone_datafile/txtfile/Mean_Med_re_collect_to_delivery_delay.txt";
+        fp_Mean_Med_re_collect_to_delivery_data = fopen(Mean_Med_re_collect_to_derivery_delay_file, "a+");
+        fprintf(fp_Mean_Med_re_collect_to_delivery_data, "%f\n", average8 / 3600);
+        fclose(fp_Mean_Med_re_collect_to_delivery_data);
+    }
+    else
+    {
+        printf("データがありません\n");
+    }
+
     /********************************************************************　シミュレーション終了　**************************************************************************************************/
     // #endif
     /*************************** gnuplot表示 *************************************/

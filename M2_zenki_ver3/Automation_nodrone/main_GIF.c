@@ -1192,9 +1192,9 @@ int main(void)
                                 // ファイルへの書き込み
                                 // fprintf(fp_Medinf_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
                                 fprintf(fp_Medinf_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間
-                                fprintf(fp_Medinf_collect_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
-                                // fprintf(fp_Medinf_collect_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
-                                v[i].inf_med[j][v[i].i_med_ptr[j] - 1][2] = total_t; // 生成されてから配送車で回収された時点のシミュレーション時間を配列に格納しておく
+                                // fprintf(fp_Medinf_collect_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
+                                fprintf(fp_Medinf_collect_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
+                                v[i].inf_med[j][v[i].i_med_ptr[j] - 1][2] = total_t;                                            // 生成されてから配送車で回収された時点のシミュレーション時間を配列に格納しておく
                             }
                         }
                     }
@@ -1211,9 +1211,9 @@ int main(void)
                         // ファイルへの書き込み処理
                         fprintf(fp_Med_re_delay, "%lf\n", total_t - v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][0]);
                         // fprintf(fp_Med_re_delay, "t=%lf v[%d] -> new_p[%d] : %lf\n", total_t, i, current[i], total_t - v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][0]);
-                        // fprintf(fp_Med_re_collect_to_delivery_delay, "%lf\n", total_t - v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][2]); // 医療品の収集から配送への遅延時間
+                        fprintf(fp_Med_re_collect_to_delivery_delay, "%lf\n", total_t - v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][2]); // 医療品の収集から配送への遅延時間
                         // fprintf(fp_Med_re_collect_to_delivery_delay, "t=%lf v[%d] -> new_p[%d] : %lf\n", total_t, i, current[i], total_t - v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][2]); // 医療品の収集から配送への遅延時間
-                        fprintf(fp_Med_re_collect_to_delivery_delay, "t=%lf v[%d] -> new_p[%d] : 情報が回収された時間 %lf\n", total_t, i, current[i], v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][2]); // 医療品の収集から配送への遅延時間
+                        // fprintf(fp_Med_re_collect_to_delivery_delay, "t=%lf v[%d] -> new_p[%d] : 情報が回収された時間 %lf\n", total_t, i, current[i], v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][2]); // 医療品の収集から配送への遅延時間
                     }
 
                     /***************** 配送車 -> 避難所（各避難所において）*********/
@@ -1861,6 +1861,76 @@ int main(void)
         fp_Mean_Med_re_data = fopen(Mean_Med_re_file, "a+");
         fprintf(fp_Mean_Med_re_data, "%f\n", average6 / 3600);
         fclose(fp_Mean_Med_re_data);
+    }
+    else
+    {
+        printf("データがありません\n");
+    }
+
+    /******** 医療品情報の回収における平均情報遅延時間 *********/
+    double value7 = 0;
+    double sum7 = 0;
+    double count7 = 0;
+    double average7;
+
+    fp_Medinf_collect_delay = fopen(Medinf_collect_delay_file, "r"); // 平均情報遅延間隔ファイルのオープン
+    if (fp_Medinf_collect_delay == NULL)
+    {
+        printf("ファイルを開くことができませんでした\n");
+        return 1;
+    }
+    while (fscanf(fp_Medinf_collect_delay, "%lf", &value7) == 1)
+    {
+        sum7 += value7;
+        count7++;
+    }
+    fclose(fp_Medinf_collect_delay); // 平均情報遅延時間ファイルクローズ
+
+    if (count7 > 0)
+    {
+        average7 = sum7 / count7;
+        printf("医療品情報の回収における平均情報遅延時間：%f [h]\n", average7 / 3600);
+        // 各シミュレーションごとのMed_E(TD) のデータを格納する
+        FILE *fp_Mean_Medinf_collect_data;
+        char *Mean_Medinf_collect_delay_file = "drone_datafile/txtfile/Mean_Medinf_collect_delay.txt";
+        fp_Mean_Medinf_collect_data = fopen(Mean_Medinf_collect_delay_file, "a+");
+        fprintf(fp_Mean_Medinf_collect_data, "%f\n", average7 / 3600);
+        fclose(fp_Mean_Medinf_collect_data);
+    }
+    else
+    {
+        printf("データがありません\n");
+    }
+
+    /******** 医療品情報の回収から配達における平均情報遅延時間 *********/
+    double value8 = 0;
+    double sum8 = 0;
+    double count8 = 0;
+    double average8;
+
+    fp_Med_re_collect_to_delivery_delay = fopen(Med_re_collect_to_delivery_delay_file, "r"); // 平均情報遅延間隔ファイルのオープン
+    if (fp_Med_re_collect_to_delivery_delay == NULL)
+    {
+        printf("ファイルを開くことができませんでした\n");
+        return 1;
+    }
+    while (fscanf(fp_Med_re_collect_to_delivery_delay, "%lf", &value8) == 1)
+    {
+        sum8 += value8;
+        count8++;
+    }
+    fclose(fp_Med_re_collect_to_delivery_delay); // 平均情報遅延時間ファイルクローズ
+
+    if (count8 > 0)
+    {
+        average8 = sum8 / count8;
+        printf("医療品情報の回収から配達までにおける平均情報遅延時間：%f [h]\n", average8 / 3600);
+        // 各シミュレーションごとのMed_E(TD) のデータを格納する
+        FILE *fp_Mean_Med_re_collect_to_delivery_data;
+        char *Mean_Med_re_collect_to_derivery_delay_file = "drone_datafile/txtfile/Mean_Med_re_collect_to_delivery_delay.txt";
+        fp_Mean_Med_re_collect_to_delivery_data = fopen(Mean_Med_re_collect_to_derivery_delay_file, "a+");
+        fprintf(fp_Mean_Med_re_collect_to_delivery_data, "%f\n", average8 / 3600);
+        fclose(fp_Mean_Med_re_collect_to_delivery_data);
     }
     else
     {

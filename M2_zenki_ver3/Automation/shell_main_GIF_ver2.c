@@ -830,12 +830,10 @@ int main(int argc, char *argv[])
         fprintf(fp, "%d\t%lf\t%lf\n", i, p[i].x, p[i].y);
     }
     fclose(fp);
-
     // #if 0
     //  gnuplotの設定
-    /*
-    gp = popen("gnuplot -persist", "w");
 
+    gp = popen("gnuplot -persist", "w");
     fprintf(gp, "set xrange [0:10]\n");
     fprintf(gp, "set yrange [0:10]\n");
     fprintf(gp, "set size square\n");
@@ -850,7 +848,6 @@ int main(int argc, char *argv[])
     {
         fprintf(gp, "set label %d at first %f,%f '%d'\n", i + 1, new_p[i].x + 0.1, new_p[i].y + 0.1, i);
     }
-        */
 
     /************************************シミュレーション******************************************/
 
@@ -1034,7 +1031,6 @@ int main(int argc, char *argv[])
             n_cos[i] = (new_p[target[i]].y - new_p[current[i]].y) / d[i];
             n_tan[i] = n_sin[i] / n_cos[i];
         }
-
 #if 0
         if (total_t >= 20000 && total_t <= 70000)
         {
@@ -1136,7 +1132,6 @@ int main(int argc, char *argv[])
             }
         }
 #endif
-
         /**************配送車の座標更新*****************/
         for (i = 0; i < M; i++)
         {
@@ -1236,17 +1231,6 @@ int main(int argc, char *argv[])
                     total_tg[current[i]] += total_t - current_re_arrival_time[current[i]];
                     total_tg_count[current[i]] += 1;
                     current_re_arrival_time[current[i]] = total_t;
-
-                    /**************************医療品の避難所への配達処理***********************************/
-                    if (v[i].Med_re > 0 && v[i].i_med_ptr[current[i]] > 0 && v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][3] != TRUE) // 配送車が集積所で物資を積載してまた戻って来たなら
-                    {
-                        // 医療品の配達
-                        v[i].Med_re -= 1;
-                        v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][3] = TRUE; // 配送車が医療品を届けたことを記録
-                        printf("配送車%d 避難所%d 医療品%d\n", i, current[i], v[i].Med_re);
-                        fprintf(fp_Med_re_delay, "%lf\n", total_t - v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][0]);
-                        // fprintf(fp_Med_re_delay, "t=%lf v[%d] -> new_p[%d] : %lf\n", total_t, i, current[i], total_t - v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][0]);
-                    }
 
                     /**************** 避難所 -> 配送車 (各避難所において)************/
                     for (j = 0; j < N; j++)
@@ -2086,7 +2070,7 @@ int main(int argc, char *argv[])
     fclose(fp_Med_re_delay);
     fclose(fp_Medinf_collect_delay);
     fclose(fp_Med_re_collect_to_delivery_delay);
-    // pclose(gp);
+    pclose(gp);
 
     /*********平均値の導出**********/
 
