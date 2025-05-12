@@ -930,9 +930,10 @@ int main(void)
     // 物資数が100の避難所のカウンター
     int relief_count;
     // ドローンに関する変数
-    double r_d_velo = 180;                // 配送車の2倍
-    double v_d_ratio = r_velo / r_d_velo; // 配送車の速度とドローンの速度の比率
-    double capable_flight_time = 60 * 30; // ドローンの最大飛行時間
+    double r_d_velo = 180;                 // 配送車の2倍
+    double v_d_ratio = r_velo / r_d_velo;  // 配送車の速度とドローンの速度の比率
+    double capable_flight_time = 60 * 30;  // ドローンの最大飛行時間(３０分)
+    double drone_Med_loding_time = 60 * 5; // ドローンの医療物資積載時間(５分)
     double d_d[D];
     double d_n_sin[D];
     double d_n_cos[D];
@@ -1301,12 +1302,16 @@ int main(void)
 
                                     d_d[k] = sqrt(pow(drone[k].xt - drone[k].x, 2) + pow(drone[k].yt - drone[k].y, 2)); // ドローンと集積所との距離算出
 
-                                    // ドローンが充電量で集積所へ飛行して医療物資を補充し避難所へ戻ってくることができる距離ならば
-                                    if (2 * d_d[k] * r_d_velo <= capable_flight_time)
+                                    // ドローンが充電量で集積所へ飛行して医療物資を補充し避難所へ戻ってくることができる距離 かつ 配送車が避難所で荷降ろししている間に戻ってくることができるなら
+                                    if (2 * d_d[k] * r_d_velo <= capable_flight_time && 2 * d_d[k] * r_d_velo + drone_Med_loding_time <= stay)
                                     {
-                                        printf("bbbbbbbbbb\n");
+                                        printf("drone[%d]が集積所へ医療物資を補給しに飛行を開始\n", k);
                                         drone[k].free_mode = TRUE;         // ドローンのフリーモードを有効にする
                                         drone[k].FtoDiscenter_mode = TRUE; // ドローンの配送モードを有効にする
+                                    }
+                                    else
+                                    {
+                                        printf("drone[%d]が集積所へ医療物資を補給しに飛行を開始できません\n", k);
                                     }
                                 }
                             }
@@ -1331,7 +1336,6 @@ int main(void)
                     }
 
                     /***************** 配送車 -> 避難所（各避難所において）*********/
-
                     count = 0;
                     for (j = 0; j < N; j++)
                     {
@@ -1414,7 +1418,7 @@ int main(void)
             }
         }
 #endif
-        /************************************************* ドローン free_mode によって場合分け ******************************************************************/
+        /************************************************* ドローンの飛行に関する処理（ free_mode によって場合分け） ******************************************************************/
         for (i = 0; i < SD; i++)
         {
             if (drone[i].free_mode == FALSE) // free_modeオフの時
@@ -1493,7 +1497,7 @@ int main(void)
 
                 flight_time[i] += time_span; // 飛行時間加算
 
-                /************ ドローンが目的の配送車に到着したら **********/
+                /************ ドローンが目的の避難所に到着したら **********/
                 if ((d_n_cos[i] < 0 && drone[i].y < drone[i].yt) || (d_n_cos[i] > 0 && drone[i].y > drone[i].yt))
                 {
                     drone[i].x = drone[i].xt; // 座標修正
@@ -1509,11 +1513,6 @@ int main(void)
 
                     // ドローンの充電時間処理
                     drone[i].charge_time = flight_time[i] * charge_constant; // ドローンの配送車での充電時間
-
-                    // ドローンの配送モードを無効にする
-                    // printf("ドローン%dの飛行時間:%lf[min]\n", i, flight_time[k] / 60);
-                    // printf("ドローン%dの配送完了\n", i);
-                    // printf("ドローン%dの配送車%dの飛行時間:%lf[min]\n", i, k, total_flight_time[drone[k].follow_num] / 60);
                 }
             }
 #if 0
