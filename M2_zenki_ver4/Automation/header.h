@@ -13,7 +13,7 @@
 #define HEN 11      /*hen[][]の要素数*/
 #define M 5         /*配送車数*/
 #define D 8         /*ドローン数*/
-#define SD 8        /*シミュレーションで用いるドローン数*/
+#define SD 5        /*シミュレーションで用いるドローン数*/
 #define I_SIZE 150  /*情報配列の要素数*/
 #define Y_SIZE 20   /*薬の情報配列の二次元要素数*/
 #define Z_SIZE 4    /*薬の情報配列の三次元要素数*/
@@ -78,6 +78,7 @@ typedef struct
     double xt; // ドローンの飛行目標点
     double yt;
     int re;
+    int Med_re; // 医療品積載量
     int inf[N][I_SIZE];
     int i_ptr[N];
     double inf_med[N][Y_SIZE][Z_SIZE]; // 避難所の薬の情報配列三次元(避難所番号,情報配列のインデックス,（生成時間・緊急度（生成してから運搬までの目標時間）・要求情報が発生してから共有されるまでの時間・要求物資が運搬されたか(TRUE or FALSE)）
@@ -88,6 +89,9 @@ typedef struct
     int free_mode;
     int charge_time;          // ドローンが飛行した分だけ充電する時間
     double flight_start_time; // ドローンの飛行開始時間
+    int FtoDiscenter_mode;    // ドローンが配送センターに向かうモード(避難所から集積所)（FALSE:配送車に従う、TRUE:ドローン単独で配送センターへ向かう）
+    int delivery_mode;        // ドローンの配達モード(集積所から避難所)（FALSE:配送車に従う、TRUE:ドローン単独で配達)
+    int target_shelter_num;   // ドローンの目標避難所番号
 } dro;
 
 /********************************************** 関数定義 ******************************************************************/
