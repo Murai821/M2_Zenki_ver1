@@ -841,7 +841,7 @@ int main(void)
     fprintf(gp, "unset key\n");
 
     // fprintf(gp, "set term gif animate delay 5 optimize size 640,480\n");
-    fprintf(gp, "set term gif animate delay 5 optimize size 640,480 font 'DejaVu Sans,12'\n");
+    fprintf(gp, "set term gif animate delay 10 optimize size 640,480 font 'DejaVu Sans,12'\n");
     fprintf(gp, "set output 'drone_datafile/test.gif'\n");
 
     // ラベルの表示
@@ -1035,7 +1035,7 @@ int main(void)
             n_tan[i] = n_sin[i] / n_cos[i];
         }
 
-        if (total_t >= 0 && total_t <= 70000)
+        if (total_t >= 0 && total_t <= 60000)
         {
             if ((int)(total_t) % 50 == 0)
             { // 50sごとに描画
@@ -1290,7 +1290,7 @@ int main(void)
                         }
                     }
 
-                    /**************************医療品の避難所への配達処理***********************************/
+                    /**************************配送車による医療品の避難所への配達処理***********************************/
                     if (v[i].Med_re > 0 && v[i].i_med_ptr[current[i]] > 0 && v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][3] != TRUE && current[i] == v[i].Med_delivery_queue[v[i].queue_Notdelivery_ptr]) // 配送車が集積所で物資を積載してまた戻って来たなら
                     {
                         // 医療品の配達
@@ -1363,13 +1363,9 @@ int main(void)
             {
                 for (k = 0; k < SD; k++)
                 {
-                    if (drone[k].follow_num == i && drone[k].free_mode == FALSE && drone[k].FtoDiscenter_mode == FALSE && drone[k].charge_time == 0) // 現在要求情報を受け取った配送車上にいながら，充電中ではなく飛行可能なとき
+                    if (drone[k].follow_num == i && drone[k].free_mode == FALSE && drone[k].FtoDiscenter_mode == FALSE && drone[k].charge_time == 0 && v[i].x == new_p[v[i].Med_delivery_queue[v[i].queue_Notdelivery_ptr]].x && v[i].y == new_p[v[i].Med_delivery_queue[v[i].queue_Notdelivery_ptr]].y) // 現在要求情報を受け取った配送車上にいながら，充電中ではなく飛行可能なとき、かつその避難所に車がいるとき
                     {
                         drone[k].target_shelter_num = v[i].Med_delivery_queue[v[i].queue_Notdelivery_ptr]; // ドローンの目的地を現在の配送車の避難所に設定
-
-                        v[i].queue_Notdelivery_ptr += 1; // 配達が完了したキューの避難所のポインタを進める
-
-                        v[i].inf_med[drone[k].target_shelter_num][v[i].i_med_ptr[drone[k].target_shelter_num] - 1][3] = TRUE; // ドローンが避難所に医療品を届けたことを記録（配送車は集積所で補充しなくてもよい）
 
                         drone[k].xt = new_p[0].x;
                         drone[k].yt = new_p[0].y; // ドローンの目的地を配送センターに設定
@@ -1380,13 +1376,16 @@ int main(void)
                         if (2 * d_d[k] * r_d_velo <= capable_flight_time && 2 * d_d[k] * r_d_velo + drone_Med_loding_time <= stay)
                         {
                             // printf("drone[%d]が集積所へ医療物資を補給しに飛行を開始\n", k);
-                            printf("t=%.2lf : 避難所[%d]にて 配送車[%d] 上の ドローン[%d] が集積所へ飛行開始\n", total_t, v[i].Med_delivery_queue[v[i].queue_Notdelivery_ptr - 1], i, k);
+                            printf("t=%.2lf : 避難所[%d]にて 配送車[%d] 上の ドローン[%d] が集積所へ飛行開始\n", total_t, v[i].Med_delivery_queue[v[i].queue_Notdelivery_ptr], i, k);
                             drone[k].free_mode = TRUE;         // ドローンのフリーモードを有効にする
                             drone[k].FtoDiscenter_mode = TRUE; // ドローンの配送モードを有効にする
+
+                            v[i].inf_med[drone[k].target_shelter_num][v[i].i_med_ptr[drone[k].target_shelter_num - 1]][3] = TRUE; // ドローンが避難所に医療品を届けるため医療品配達フラグを有効にする（配送車は集積所で補充しなくてもよい）
+                            v[i].queue_Notdelivery_ptr += 1;                                                                      // 配達が完了したキューの避難所のポインタを進める
                         }
                         else
                         {
-                            printf("t=%.2lf : drone[%d] が避難所[%d] のために、集積所へ医療物資を補給しに飛行を開始できません\n", total_t, k, drone[k].target_shelter_num);
+                            // printf("t=%.2lf : drone[%d] が避難所[%d] のために、集積所へ医療物資を補給しに飛行を開始できません\n", total_t, k, drone[k].target_shelter_num);
                         }
                     }
                 }
@@ -1524,6 +1523,13 @@ int main(void)
                     printf("t=%.2lf : 避難所[%d]にて ドローン[%d] が医療物資を届けた 充電時間 : %lf[min]\n", total_t, drone[i].target_shelter_num, i, (double)drone[i].charge_time / 60);
 
                     flight_time[i] = 0; // ドローンの飛行時間初期化
+
+                    // ドローンによる医療物資の配送遅延時間のファイルへの書き込み
+                    fprintf(fp_Med_re_delay, "%lf\n", total_t - v[drone[i].follow_num].inf_med[drone[i].target_shelter_num][v[drone[i].follow_num].i_med_ptr[drone[i].target_shelter_num - 1]][0]);
+                    // fprintf(fp_Med_re_delay, "t=%lf drone[%d] -> new_p[%d] : %lf\n", total_t, i, drone[i].target_shelter_num, total_t - v[drone[i].follow_num].inf_med[drone[i].target_shelter_num][v[drone[i].follow_num].i_med_ptr[drone[i].target_shelter_num - 1]][0]);
+
+                    fprintf(fp_Med_re_collect_to_delivery_delay, "%lf\n", total_t - v[drone[i].follow_num].inf_med[drone[i].target_shelter_num][v[drone[i].follow_num].i_med_ptr[drone[i].target_shelter_num] - 1][2]); // 医療品の収集から配送への遅延時間                                                                                                                                               // 医療品の収集から配送への遅延時間
+                    // fprintf(fp_Med_re_collect_to_delivery_delay, "t=%lf drone[%d] -> new_p[%d] : %lf\n", total_t, i, drone[i].target_shelter_num, total_t - v[drone[i].follow_num].inf_med[drone[i].target_shelter_num][v[drone[i].follow_num].i_med_ptr[drone[i].target_shelter_num] - 1][2]); // 医療品の収集から配送への遅延時間
                 }
             }
 #if 0
