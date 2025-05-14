@@ -45,7 +45,7 @@ int main()
     // 出力ファイルを閉じる
     fclose(outputFile);
 
-    printf("平均値 %.6f をファイルに書き込みました。\n", average);
+    printf("医療品の配送遅延時間の平均値 %.6f をファイルに書き込みました。\n", average);
 
     return 0;
 }

@@ -1259,7 +1259,7 @@ int main(void)
                             }
                         }
 
-                        // 避難所情報（薬の情報）の交換
+                        // 避難所情報（薬の情報）の回収
                         if (new_p[current[i]].i_med_ptr[j] > v[i].i_med_ptr[j])
                         {
                             for (k = v[i].i_med_ptr[j]; k < new_p[current[i]].i_med_ptr[j]; k++)
@@ -1382,6 +1382,23 @@ int main(void)
 
                             v[i].inf_med[drone[k].target_shelter_num][v[i].i_med_ptr[drone[k].target_shelter_num - 1]][3] = TRUE; // ドローンが避難所に医療品を届けるため医療品配達フラグを有効にする（配送車は集積所で補充しなくてもよい）
                             v[i].queue_Notdelivery_ptr += 1;                                                                      // 配達が完了したキューの避難所のポインタを進める
+                        }
+                        else if (2 * d_d[k] * r_d_velo <= capable_flight_time && 2 * d_d[k] * r_d_velo + drone_Med_loding_time > stay) // ドローンが充電量で集積所へ飛行して医療物資を補充し避難所へ戻ってくることができる距離 かつ 配送車が避難所で荷降ろししている間に戻ってくることができるないなら
+                        {
+                            printf("t=%.2lf : 避難所[%d]にて 配送車[%d] 上の ドローン[%d] が集積所へ飛行開始\n", total_t, v[i].Med_delivery_queue[v[i].queue_Notdelivery_ptr], i, k);
+                            printf("-> 配送車[%d]の待機時間 %.2lf を %.2lf [min]延長 :延長後待機時間%.2lf\n", i, stay_t[i] / 60, ((2 * d_d[k] * r_d_velo + drone_Med_loding_time) - stay) / 60, (stay_t[i] + ((2 * d_d[k] * r_d_velo + drone_Med_loding_time) - stay)) / 60);
+
+                            double addtional_time = (2 * d_d[k] * r_d_velo + drone_Med_loding_time) - stay;
+                            stay_t[i] += (double)((int)(addtional_time) - (int)(addtional_time) % 10); // ドローンの飛行時間を考慮して配送車の待機時間を延長する
+                            //((int)(poisson_re_total) - (int)(poisson_re_total) % 10)
+
+                            printf("%lf [s]\n", (double)((int)(addtional_time) - (int)(addtional_time) % 10));
+
+                            drone[k].free_mode = TRUE;         // ドローンのフリーモードを有効にする
+                            drone[k].FtoDiscenter_mode = TRUE; // ドローンの配送モードを有効にする
+
+                            v[i].inf_med[drone[k].target_shelter_num][v[i].i_med_ptr[drone[k].target_shelter_num - 1]][3] = TRUE; // ドローンが避難所に医療品を届けるため医療品配達フラグを有効にする（配送車は集積所で補充しなくてもよい）
+                            v[i].queue_Notdelivery_ptr += 1;
                         }
                         else
                         {

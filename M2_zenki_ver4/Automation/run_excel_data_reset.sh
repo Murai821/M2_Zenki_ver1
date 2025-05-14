@@ -2,3 +2,7 @@
 > drone_datafile/txtfile/excel_data/Shell_flight_time_average.txt
 > drone_datafile/txtfile/excel_data/Shell_TV_chargecount.txt
 > drone_datafile/txtfile/excel_data/Shell_TV_chargeAmount.txt
+> drone_datafile/txtfile/excel_data/Shell_Med_re_average.txt
+> drone_datafile/txtfile/excel_data/Shell_Med_re_collect_to_delivery_average.txt
+> drone_datafile/txtfile/excel_data/Shell_MedInf_average.txt
+> drone_datafile/txtfile/excel_data/Shell_Medinf_collect_average.txt
