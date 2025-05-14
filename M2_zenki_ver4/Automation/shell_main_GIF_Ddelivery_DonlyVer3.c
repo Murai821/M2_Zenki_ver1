@@ -21,11 +21,13 @@ int main(int argc, char *argv[])
     char *v3_file;
     char *v4_file;
     char *v5_file;
-    char *inf_interval_file;                     // 平均情報到着間隔
-    char *inf_delay_file;                        // 平均情報遅延時間
-    char *inf_delay_part_file;                   // 個別の避難所Td
-    char *re_interval_file;                      // 平均物資到着間隔
-    char *Etd_data_file;                         // シミュレーションごとに平均情報遅延時間を格納してくファイル
+    char *inf_interval_file;   // 平均情報到着間隔
+    char *inf_delay_file;      // 平均情報遅延時間
+    char *inf_delay_part_file; // 個別の避難所Td
+    char *re_interval_file;    // 平均物資到着間隔
+    char *Etd_data_file;       // シミュレーションごとに平均情報遅延時間を格納してくファイル
+    char *Eti_data_file;
+    char *Etg_data_file;
     char *Medinf_delay_file;                     // 薬情報の平均遅延時間
     char *Med_re_delay_file;                     // 医療品の配送平均遅延時間
     char *Medinf_collect_delay_file;             // 薬情報の収集平均遅延時間
@@ -908,6 +910,10 @@ int main(int argc, char *argv[])
     // 最終的に求まった平均情報遅延時間をファイルに格納（シミュレーションごとに格納していく）
     FILE *fp_Etd_data;
     Etd_data_file = "drone_datafile/txtfile/Etd_data.txt";
+    FILE *fp_Eti_data;
+    Eti_data_file = "drone_datafile/txtfile/Eti_data.txt";
+    FILE *fp_Etg_data;
+    Etg_data_file = "drone_datafile/txtfile/Etg_data.txt";
     // 平均薬情報遅延間隔
     FILE *fp_Medinf_delay;
     Medinf_delay_file = "drone_datafile/txtfile/Medinf_delay.txt";
@@ -2235,6 +2241,10 @@ int main(int argc, char *argv[])
     {
         double average3 = sum3 / count3;
         printf("平均物資到着間隔：%f\n", average3 / 3600);
+        // 各シミュレーションごとのE(TG)のデータを格納する
+        fp_Etg_data = fopen(Etg_data_file, "a+");
+        fprintf(fp_Etg_data, "%f\n", average3 / 3600);
+        fclose(fp_Etg_data);
     }
     else
     {
@@ -2263,6 +2273,10 @@ int main(int argc, char *argv[])
     {
         double average1 = sum1 / count1;
         printf("平均情報到着間隔：%f\n", average1 / 3600);
+        // 各シミュレーションごとのE(TI)のデータを格納する
+        fp_Eti_data = fopen(Eti_data_file, "a+");
+        fprintf(fp_Eti_data, "%f\n", average1 / 3600);
+        fclose(fp_Eti_data);
     }
     else
     {

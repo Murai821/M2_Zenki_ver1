@@ -5,8 +5,8 @@
 int main()
 {
     FILE *inputFile, *outputFile;
-    char inputFilePath[] = "drone_datafile/txtfile/Etd_data.txt";                      // 読み込むファイルのパス
-    char outputFilePath[] = "drone_datafile/txtfile/excel_data/Shell_Etd_average.txt"; // 書き込むファイルのパス
+    char inputFilePath[] = "drone_datafile/txtfile/Etg_data.txt";                      // 読み込むファイルのパス
+    char outputFilePath[] = "drone_datafile/txtfile/excel_data/Shell_Etg_average.txt"; // 書き込むファイルのパス
     double value, sum = 0.0;
     int count = 0;
 
@@ -14,7 +14,7 @@ int main()
     inputFile = fopen(inputFilePath, "r");
     if (inputFile == NULL)
     {
-        printf("Etd_data.txt ファイルを開けませんでした。\n");
+        printf("Etg_data.txt ファイルを開けませんでした。\n");
         return 1;
     }
 
