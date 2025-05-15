@@ -941,7 +941,7 @@ int main(void)
     // ドローンに関する変数
     double r_d_velo = 180;                 // 配送車の2倍
     double v_d_ratio = r_velo / r_d_velo;  // 配送車の速度とドローンの速度の比率
-    double capable_flight_time = 60 * 30;  // ドローンの最大飛行時間(３０分)
+    double capable_flight_time = 60 * 20;  // ドローンの最大飛行時間(３０分)
     double drone_Med_loding_time = 60 * 5; // ドローンの医療物資積載時間(５分) 60*5
     double d_d[D];
     double d_n_sin[D];
@@ -2377,6 +2377,8 @@ int main(void)
     {
         printf("データがありません\n");
     }
+    /*****************ドローンによる医療物資配送割合の導出*******************/
+    printf("ドローンによる医療物資配送割合: %f\n", (double)counter_Med_re_Drone_delivery / (double)counter_Med_re_delivery);
 
     /******** 薬情報の平均情報遅延時間 *********/
     double value5 = 0;
@@ -2601,6 +2603,26 @@ int main(void)
 
     /************************ 道路網プロット(番号更新前) ********************************************/
 
+    // ドローンの飛行可能半径を導出
+    double capable_radius = (3600 / r_d_velo) * (capable_flight_time / 3600) / 2;
+
+    // 飛行可能距離内の避難所数と距離外の避難所数のカウント
+    int outer_capable_radius_count = 0;
+    int inner_capable_radius_count = 0;
+    for (i = 1; i < N; i++)
+    {
+        if (sqrt(pow(p[i].x - p[0].x, 2) + pow(p[i].y - p[0].y, 2)) > capable_radius)
+        {
+            outer_capable_radius_count++;
+        }
+        else
+        {
+            inner_capable_radius_count++;
+        }
+    }
+    printf("配送センターからの飛行可能距離内の避難所数:%d\n", inner_capable_radius_count);
+    printf("配送センターからの飛行可能距離外の避難所数:%d\n", outer_capable_radius_count);
+
     gp = popen("gnuplot -persist", "w");
     fprintf(gp, "set xrange [0:10]\n");
     fprintf(gp, "set yrange [0:10]\n");
@@ -2618,7 +2640,8 @@ int main(void)
         fprintf(gp, "set label %d at first %f,%f '%d'\n", i + 1, p[i].x + 0.1, p[i].y + 0.1, i);
     }
 
-    fprintf(gp, "plot \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'black',\'%s\' u 2:3 with points pt 7 lt rgbcolor'black',5 + %f*cos(t), 5 + %f*sin(t) lt rgbcolor'red'\n", ad_file, data_file, R, R);
+    // fprintf(gp, "plot \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'black',\'%s\' u 2:3 with points pt 7 lt rgbcolor'black',5 + %f*cos(t), 5 + %f*sin(t) lt rgbcolor'red'\n", ad_file, data_file, R, R);
+    fprintf(gp, "plot \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'black',\'%s\' u 2:3 with points pt 7 lt rgbcolor'black',5 + %f*cos(t), 5 + %f*sin(t) lt rgbcolor'red'\n", ad_file, data_file, capable_radius, capable_radius);
 
     pclose(gp);
 
@@ -2641,7 +2664,7 @@ int main(void)
         fprintf(gp, "set label %d at first %f,%f '%d'\n", i + 1, new_p[i].x + 0.1, new_p[i].y + 0.1, i);
     }
 
-    fprintf(gp, "plot \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'black',\'%s\' u 2:3 with points pt 7 lt rgbcolor'black',5 + %f*cos(t), 5 + %f*sin(t) lt rgbcolor'red'\n", ad_file, new_data_file, R, R);
+    fprintf(gp, "plot \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'black',\'%s\' u 2:3 with points pt 7 lt rgbcolor'black',5 + %f*cos(t), 5 + %f*sin(t) lt rgbcolor'red'\n", ad_file, new_data_file, capable_radius, capable_radius);
 
     pclose(gp);
 

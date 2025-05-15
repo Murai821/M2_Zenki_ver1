@@ -819,13 +819,13 @@ int main(int argc, char *argv[])
 
     // 結果を表示
     int sum_re = 0; // 物資総要求量
-    printf("避難所ごとの必要物資量:\n");
+    // printf("避難所ごとの必要物資量:\n");
     for (int i = 1; i < N; i++)
     {
         sum_re += new_p[i].re_req;
-        printf("避難所 %d: %d\n", i, new_p[i].re_req);
+        // printf("避難所 %d: %d\n", i, new_p[i].re_req);
     }
-    printf("物資総要求量：%d\n", sum_re);
+    // printf("物資総要求量：%d\n", sum_re);
 
     /********************************************************************　シミュレーション（これより上を「titibumodel_douromou_kettei2.c」からコピペ）　*************************************************************************************/
     /******************GNUPLOT**************************/
@@ -946,10 +946,10 @@ int main(int argc, char *argv[])
     // 物資数が100の避難所のカウンター
     int relief_count;
     // ドローンに関する変数
-    double r_d_velo = 180;                 // 配送車の2倍
-    double v_d_ratio = r_velo / r_d_velo;  // 配送車の速度とドローンの速度の比率
-    double capable_flight_time = 60 * 30;  // ドローンの最大飛行時間(３０分)
-    double drone_Med_loding_time = 60 * 5; // ドローンの医療物資積載時間(５分) 60*5
+    double r_d_velo = 180;                  // 配送車の2倍
+    double v_d_ratio = r_velo / r_d_velo;   // 配送車の速度とドローンの速度の比率
+    double capable_flight_time = 60 * 20;   // ドローンの最大飛行時間(３０分)
+    double drone_Med_loding_time = 60 * 10; // ドローンの医療物資積載時間(５分) 60*5
     double d_d[D];
     double d_n_sin[D];
     double d_n_cos[D];
