@@ -2,7 +2,7 @@
 
 # シード値の範囲を設定(100回)
 start_seed=41
-end_seed=46
+end_seed=50
 
 gcc shell_main_GIF.c module.c -o my_program -lm
 
@@ -12,11 +12,22 @@ gcc shell_main_GIF.c module.c -o my_program -lm
 > drone_datafile/txtfile/Mean_Medinf_collect_delay.txt
 > drone_datafile/txtfile/Mean_Med_re_collect_to_delivery_delay.txt
 
+> drone_datafile/txtfile/Etd_data.txt
+> drone_datafile/txtfile/Eti_data.txt
+> drone_datafile/txtfile/Etg_data.txt
+
 for i in $(seq $start_seed $end_seed)
 do
     echo "Running with seed $i"
     ./my_program "$i"
 done
+
+gcc Etd_average_shell.c
+./a.out
+gcc Eti_average_shell.c
+./a.out
+gcc Etg_average_shell.c
+./a.out
 
 # Cプログラムをコンパイル
 gcc E_MedInf_average_shell.c
