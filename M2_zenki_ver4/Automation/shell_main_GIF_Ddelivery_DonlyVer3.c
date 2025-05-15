@@ -9,7 +9,7 @@
 /**************************************メイン関数******************************************************/
 int main(int argc, char *argv[])
 {
-    int i, j, k, m;
+    int i, j, k, m, n;
     char *data_file;     // 座標プロット用
     char *ad_file;       // road-network表示用
     char *jyunkai_file;  // 巡回ルート表示用
@@ -887,10 +887,13 @@ int main(int argc, char *argv[])
     double poisson_inf_count = 0;
     double poisson_Medinf_total = rand_exp(lambda_i_med) * 3600; // 薬の情報の到着
     double poisson_Medinf_count = 0;
-    int re_load_num = 10 * MEAN;   // 配送センターで一度に積載する物資の数
-    int re_finish_num = 10 * MEAN; // シミュレーション終了物資量(避難所に物資届ける回数×MEAN)
-    int ind_relief[M];             // 物資を避難所に下ろすindex :配送車1なら1,2,3,,,
-    int re_wait_flag[M] = {FALSE}; // 配送センターの物資存在フラグ
+    int re_load_num = 10 * MEAN;           // 配送センターで一度に積載する物資の数
+    int re_finish_num = 10 * MEAN;         // シミュレーション終了物資量(避難所に物資届ける回数×MEAN)
+    int ind_relief[M];                     // 物資を避難所に下ろすindex :配送車1なら1,2,3,,,
+    int re_wait_flag[M] = {FALSE};         // 配送センターの物資存在フラグ
+    int counter_Med_re_delivery = 0;       // 医療物資の避難所への配送回数（配送車＋ドローン）
+    int counter_Med_re_Drone_delivery = 0; // 医療物資のドローンによる配送回数（ドローンのみ）
+
     // 平均情報到着間隔
     double current_inf_arrival_time[N] = {0}; // 各避難所の情報到着時刻
     FILE *fp_inf_interval;
@@ -1277,8 +1280,10 @@ int main(int argc, char *argv[])
                         {
                             for (k = v[i].i_med_ptr[j]; k < new_p[current[i]].i_med_ptr[j]; k++)
                             {
-                                v[i].inf_med[j][v[i].i_med_ptr[j]][0] = new_p[current[i]].inf_med[j][k][0]; // 情報の生成時間
-                                v[i].inf_med[j][v[i].i_med_ptr[j]][1] = new_p[current[i]].inf_med[j][k][1]; // 薬の緊急度
+                                for (m = 0; m < Z_SIZE; m++)
+                                {
+                                    v[i].inf_med[j][v[i].i_med_ptr[j]][m] = new_p[current[i]].inf_med[j][k][m]; // 薬の情報
+                                }
                                 v[i].i_med_ptr[j] += 1;
 
                                 // 医療品の配送先をキューに保存
@@ -1311,6 +1316,8 @@ int main(int argc, char *argv[])
                         v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][3] = TRUE; // 配送車が医療品を届けたことを記録
                         printf("t=%.2lf : 配送車[%d]から避難所[%d]医療品配達 残り医療物資量:%d\n", total_t, i, current[i], v[i].Med_re);
                         v[i].queue_Notdelivery_ptr += 1; // 配達が完了したキュー内の避難所のポインタを進める
+
+                        counter_Med_re_delivery++; // 医療品の配送回数をカウント
 
                         // ファイルへの書き込み処理
                         fprintf(fp_Med_re_delay, "%lf\n", total_t - v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][0]);
@@ -1518,6 +1525,7 @@ int main(int argc, char *argv[])
                     drone[i].delivery_mode = TRUE; // ドローンの配送モードを有効にする
 
                     // 医療物資積載に関する処理
+                    drone[i].Med_re += 1;
                 }
             }
             else if (drone[i].free_mode == TRUE && drone[i].FtoDiscenter_mode == FALSE && drone[i].delivery_mode == TRUE) // ドローンが避難所に医療物資を届けるモードに移行したら
@@ -1553,6 +1561,11 @@ int main(int argc, char *argv[])
                     printf("t=%.2lf : 避難所[%d]にて ドローン[%d] が医療物資を届けた 充電時間 : %lf[min]\n", total_t, drone[i].target_shelter_num, i, (double)drone[i].charge_time / 60);
 
                     flight_time[i] = 0; // ドローンの飛行時間初期化
+
+                    drone[i].Med_re -= 1; // ドローンの医療物資量を減少
+
+                    counter_Med_re_delivery++;       // 医療品の配送回数をカウント
+                    counter_Med_re_Drone_delivery++; // ドローンによる医療品の配送回数をカウント
 
                     // ドローンによる医療物資の配送遅延時間のファイルへの書き込み
                     fprintf(fp_Med_re_delay, "%lf\n", total_t - v[drone[i].follow_num].inf_med[drone[i].target_shelter_num][v[drone[i].follow_num].i_med_ptr[drone[i].target_shelter_num] - 1][0]);
@@ -1859,8 +1872,10 @@ int main(int argc, char *argv[])
                                 // debug
                                 // printf("%d:%d***************************(i,j,k,m)=(%d,%d,%d,%d) %lf\n", v[j].i_med_ptr[k], v[i].i_med_ptr[k], i, j, k, m, v[i].inf_med[k][m][0]);
 
-                                v[j].inf_med[k][m][0] = v[i].inf_med[k][m][0];
-                                v[j].inf_med[k][m][1] = v[i].inf_med[k][m][1];
+                                for (n = 0; n < Z_SIZE; n++)
+                                {
+                                    v[j].inf_med[k][m][n] = v[i].inf_med[k][m][n];
+                                }
                                 v[j].i_med_ptr[k] += 1;
 
                                 // ファイルへの書き込み
@@ -1912,8 +1927,10 @@ int main(int argc, char *argv[])
                     {
                         for (k = drone[i].i_med_ptr[j]; k < v[drone[i].follow_num].i_med_ptr[j]; k++)
                         {
-                            drone[i].inf_med[j][k][0] = v[drone[i].follow_num].inf_med[j][k][0]; // 生成時間の情報
-                            drone[i].inf_med[j][k][1] = v[drone[i].follow_num].inf_med[j][k][1]; // 緊急度の情報
+                            for (m = 0; m < Z_SIZE; m++)
+                            {
+                                drone[i].inf_med[j][k][m] = v[drone[i].follow_num].inf_med[j][k][m];
+                            }
                             drone[i].i_med_ptr[j] += 1;
                             // 配列の容量オーバー
                             if (drone[i].i_med_ptr[j] == Y_SIZE)
@@ -1959,8 +1976,10 @@ int main(int argc, char *argv[])
                     {
                         for (k = v[drone[i].follow_num].i_med_ptr[j]; k < drone[i].i_med_ptr[j]; k++)
                         {
-                            v[drone[i].follow_num].inf_med[j][k][0] = drone[i].inf_med[j][k][0]; // 生成時間情報
-                            v[drone[i].follow_num].inf_med[j][k][1] = drone[i].inf_med[j][k][1]; // 緊急度情報
+                            for (m = 0; m < Z_SIZE; m++)
+                            {
+                                v[drone[i].follow_num].inf_med[j][k][m] = drone[i].inf_med[j][k][m];
+                            }
                             v[drone[i].follow_num].i_med_ptr[j] += 1;
                             // 配列の容量オーバー
                             if (v[drone[i].follow_num].i_med_ptr[j] == Y_SIZE)
@@ -2508,6 +2527,14 @@ int main(int argc, char *argv[])
         }
         printf("\n");
     }
+
+    /******** 医療品の配送における配送車とドローンにおける配送の割合 *********/
+    // 各シミュレーションごとのMed_E(TD) のデータを格納する
+    FILE *fp_Mean_Med_re_DdeliveryCount_data;
+    char *Mean_Med_re_DdeliveryCount_file = "drone_datafile/txtfile/Drone_deliveryProbability.txt";
+    fp_Mean_Med_re_DdeliveryCount_data = fopen(Mean_Med_re_DdeliveryCount_file, "a+");
+    fprintf(fp_Mean_Med_re_DdeliveryCount_data, "%f\n", (double)counter_Med_re_Drone_delivery / (double)counter_Med_re_delivery);
+    fclose(fp_Mean_Med_re_DdeliveryCount_data);
 
     // ドローンの平均飛行時間の導出とファイルへの書き込み
 
