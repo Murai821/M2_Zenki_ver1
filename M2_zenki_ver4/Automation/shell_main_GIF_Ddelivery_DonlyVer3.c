@@ -948,7 +948,7 @@ int main(int argc, char *argv[])
     // ドローンに関する変数
     double r_d_velo = 180;                  // 配送車の2倍
     double v_d_ratio = r_velo / r_d_velo;   // 配送車の速度とドローンの速度の比率
-    double capable_flight_time = 60 * 20;   // ドローンの最大飛行時間(３０分)
+    double capable_flight_time = 60 * 40;   // ドローンの最大飛行時間(３０分)
     double drone_Med_loding_time = 60 * 10; // ドローンの医療物資積載時間(５分) 60*5
     double d_d[D];
     double d_n_sin[D];
@@ -1400,7 +1400,7 @@ int main(int argc, char *argv[])
                             drone[k].free_mode = TRUE;         // ドローンのフリーモードを有効にする
                             drone[k].FtoDiscenter_mode = TRUE; // ドローンの配送モードを有効にする
 
-                            v[i].inf_med[drone[k].target_shelter_num][v[i].i_med_ptr[drone[k].target_shelter_num - 1]][3] = TRUE; // ドローンが避難所に医療品を届けるため医療品配達フラグを有効にする（配送車は集積所で補充しなくてもよい）
+                            v[i].inf_med[drone[k].target_shelter_num][v[i].i_med_ptr[drone[k].target_shelter_num] - 1][3] = TRUE; // ドローンが避難所に医療品を届けるため医療品配達フラグを有効にする（配送車は集積所で補充しなくてもよい）
                             v[i].queue_Notdelivery_ptr += 1;                                                                      // 配達が完了したキューの避難所のポインタを進める
                         }
                         else if (2 * d_d[k] * r_d_velo <= capable_flight_time && 2 * d_d[k] * r_d_velo + drone_Med_loding_time > stay) // ドローンが充電量で集積所へ飛行して医療物資を補充し避難所へ戻ってくることができる距離 かつ 配送車が避難所で荷降ろししている間に戻ってくることができるないなら
@@ -1417,7 +1417,7 @@ int main(int argc, char *argv[])
                             drone[k].free_mode = TRUE;         // ドローンのフリーモードを有効にする
                             drone[k].FtoDiscenter_mode = TRUE; // ドローンの配送モードを有効にする
 
-                            v[i].inf_med[drone[k].target_shelter_num][v[i].i_med_ptr[drone[k].target_shelter_num - 1]][3] = TRUE; // ドローンが避難所に医療品を届けるため医療品配達フラグを有効にする（配送車は集積所で補充しなくてもよい）
+                            v[i].inf_med[drone[k].target_shelter_num][v[i].i_med_ptr[drone[k].target_shelter_num] - 1][3] = TRUE; // ドローンが避難所に医療品を届けるため医療品配達フラグを有効にする（配送車は集積所で補充しなくてもよい）
                             v[i].queue_Notdelivery_ptr += 1;
                         }
                         else
