@@ -282,6 +282,8 @@ int main(int argc, char *argv[])
         drone[i].Med_re = 0;
 
         drone[i].target_shelter_num = 0;
+
+        drone[i].stay_Medload_time = 0;
     }
 
     /*********************************************** pythonの出力ファイルから点の「座標」と「隣接行列」を読み込む **************************************************************************/
@@ -948,8 +950,8 @@ int main(int argc, char *argv[])
     // ドローンに関する変数
     double r_d_velo = 180;                  // 配送車の2倍
     double v_d_ratio = r_velo / r_d_velo;   // 配送車の速度とドローンの速度の比率
-    double capable_flight_time = 60 * 40;   // ドローンの最大飛行時間(３０分)
-    double drone_Med_loding_time = 60 * 10; // ドローンの医療物資積載時間(５分) 60*5
+    double capable_flight_time = 60 * 15;   // ドローンの最大飛行時間(３０分)
+    double drone_Med_loding_time = 60 * 10; // ドローンの医療物資積載時間(10分) 60*10
     double d_d[D];
     double d_n_sin[D];
     double d_n_cos[D];
@@ -1526,9 +1528,23 @@ int main(int argc, char *argv[])
 
                     // 医療物資積載に関する処理
                     drone[i].Med_re += 1;
+
+                    // ドローンの集積所での医療物資積載時間セット
+                    drone[i].stay_Medload_time = drone_Med_loding_time; // ドローンの集積所での医療物資積載時間
                 }
             }
-            else if (drone[i].free_mode == TRUE && drone[i].FtoDiscenter_mode == FALSE && drone[i].delivery_mode == TRUE) // ドローンが避難所に医療物資を届けるモードに移行したら
+            else if (drone[i].free_mode == TRUE && drone[i].FtoDiscenter_mode == FALSE && drone[i].delivery_mode == TRUE && drone[i].stay_Medload_time != 0) // ドローンが集積所で医療物資を積載中の時
+            {
+                drone[i].stay_Medload_time -= time_span; // 医療物資積載時間減算
+
+                if ((int)drone[i].stay_Medload_time == 0)
+                {
+                    // ドローンの医療物資積載時間が終了したら
+                    drone[i].stay_Medload_time = 0; // 医療物資積載時間初期化
+                    // printf("t=%.2lf : 集積所にて ドローン[%d] が医療物資を積載完了\n", total_t, i);
+                }
+            }
+            else if (drone[i].free_mode == TRUE && drone[i].FtoDiscenter_mode == FALSE && drone[i].delivery_mode == TRUE && drone[i].stay_Medload_time == 0) // ドローンが避難所に医療物資を届けるモードに移行したら
             {
                 // ドローンが避難所に向かって飛行
                 d_d[i] = sqrt(pow(drone[i].xt - drone[i].x, 2) + pow(drone[i].yt - drone[i].y, 2));
