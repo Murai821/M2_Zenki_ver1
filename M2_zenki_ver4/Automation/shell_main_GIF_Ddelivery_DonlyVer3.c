@@ -948,10 +948,12 @@ int main(int argc, char *argv[])
     // 物資数が100の避難所のカウンター
     int relief_count;
     // ドローンに関する変数
-    double r_d_velo = 180;                  // 配送車の2倍
-    double v_d_ratio = r_velo / r_d_velo;   // 配送車の速度とドローンの速度の比率
-    double capable_flight_time = 60 * 15;   // ドローンの最大飛行時間(３０分)
-    double drone_Med_loding_time = 60 * 10; // ドローンの医療物資積載時間(10分) 60*10
+    double r_d_velo = 180;                    // 配送車の2倍
+    double v_d_ratio = r_velo / r_d_velo;     // 配送車の速度とドローンの速度の比率
+    double capable_flight_time = 60 * 15;     // ドローンの最大飛行時間(３０分)
+    double drone_Med_loding_time = 60 * 10;   // ドローンの医療物資積載時間(10分) 60*10
+    double drone_Med_Unloding_time = 60 * 10; // ドローンの避難所での医療物資荷降ろし時間(10分) 60*10
+    double addtional_time = 0;                // ドローンの配送による配送車の避難所での追加待機時間
     double d_d[D];
     double d_n_sin[D];
     double d_n_cos[D];
@@ -1397,6 +1399,13 @@ int main(int argc, char *argv[])
                         // ドローンが充電量で集積所へ飛行して医療物資を補充し避難所へ戻ってくることができる距離 かつ 配送車が避難所で荷降ろししている間に戻ってくることができるなら
                         if (2 * d_d[k] * r_d_velo <= capable_flight_time && 2 * d_d[k] * r_d_velo + drone_Med_loding_time <= stay)
                         {
+                            // ドローンの医療品の荷降ろし中に物資運搬車両の荷降ろしが終わる場合追加で待機
+                            if (2 * d_d[k] * r_d_velo + drone_Med_loding_time + drone_Med_Unloding_time >= stay)
+                            {
+                                addtional_time = (2 * d_d[k] * r_d_velo + drone_Med_loding_time + drone_Med_Unloding_time) - stay;
+                                stay_t[i] += (double)((int)(addtional_time) - (int)(addtional_time) % 10); // ドローンの飛行時間を考慮して配送車の待機時間を延長する
+                            }
+
                             // printf("drone[%d]が集積所へ医療物資を補給しに飛行を開始\n", k);
                             printf("t=%.2lf : 避難所[%d]にて 配送車[%d] 上の ドローン[%d] が集積所へ飛行開始\n", total_t, v[i].Med_delivery_queue[v[i].queue_Notdelivery_ptr], i, k);
                             drone[k].free_mode = TRUE;         // ドローンのフリーモードを有効にする
@@ -1407,10 +1416,12 @@ int main(int argc, char *argv[])
                         }
                         else if (2 * d_d[k] * r_d_velo <= capable_flight_time && 2 * d_d[k] * r_d_velo + drone_Med_loding_time > stay) // ドローンが充電量で集積所へ飛行して医療物資を補充し避難所へ戻ってくることができる距離 かつ 配送車が避難所で荷降ろししている間に戻ってくることができるないなら
                         {
+                            stay_t[i] += drone_Med_Unloding_time; // ドローンの荷降ろし時間を考慮して配送車の待機時間を延長する
+
                             printf("t=%.2lf : 避難所[%d]にて 配送車[%d] 上の ドローン[%d] が集積所へ飛行開始\n", total_t, v[i].Med_delivery_queue[v[i].queue_Notdelivery_ptr], i, k);
                             printf("-> 配送車[%d]の待機時間 %.2lf を %.2lf [min]延長 :延長後待機時間%.2lf\n", i, stay_t[i] / 60, ((2 * d_d[k] * r_d_velo + drone_Med_loding_time) - stay) / 60, (stay_t[i] + ((2 * d_d[k] * r_d_velo + drone_Med_loding_time) - stay)) / 60);
 
-                            double addtional_time = (2 * d_d[k] * r_d_velo + drone_Med_loding_time) - stay;
+                            addtional_time = (2 * d_d[k] * r_d_velo + drone_Med_loding_time) - stay;
                             stay_t[i] += (double)((int)(addtional_time) - (int)(addtional_time) % 10); // ドローンの飛行時間を考慮して配送車の待機時間を延長する
                             //((int)(poisson_re_total) - (int)(poisson_re_total) % 10)
 
