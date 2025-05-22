@@ -37,8 +37,8 @@ int main(void)
     int VIA[N];     /*経由点*/
     char USED[N];   /*確定か未確定か*/
 
-    // srand(821); // シード値
-    srand(57); // シード値
+    srand(821); // シード値
+    // srand(57); // シード値
 
     point p[N];   // 避難所と配送センターの宣言
     vehicle v[M]; // 配送車の宣言
@@ -280,6 +280,8 @@ int main(void)
         drone[i].stay_Medload_time = 0;
 
         drone[i].TV_wait_flag = FALSE;
+
+        drone[i].cannot_fly_judge_flag = FALSE;
     }
 
     /*********************************************** pythonの出力ファイルから点の「座標」と「隣接行列」を読み込む **************************************************************************/
@@ -848,7 +850,7 @@ int main(void)
     fprintf(gp, "unset key\n");
 
     // fprintf(gp, "set term gif animate delay 5 optimize size 640,480\n");
-    fprintf(gp, "set term gif animate delay 10 optimize size 640,480 font 'DejaVu Sans,12'\n");
+    fprintf(gp, "set term gif animate delay 5 optimize size 640,480 font 'DejaVu Sans,12'\n");
     fprintf(gp, "set output 'drone_datafile/test.gif'\n");
 
     // ラベルの表示
@@ -1053,7 +1055,7 @@ int main(void)
         }
 
         // if (total_t >= 0 && total_t <= 70000)
-        if (total_t >= 28000 && total_t <= 36000)
+        if (total_t >= 160000 && total_t <= 200000)
         {
             if ((int)(total_t) % 50 == 0)
             { // 50sごとに描画
@@ -1070,7 +1072,7 @@ int main(void)
                     if (new_p[i].i_med_ptr[i] != 0)
                     {
                         // Plot a red circle at the coordinates of the shelter with medical information
-                        fprintf(gp, "set object circle at %f,%f size screen 0.01 fillcolor rgb 'red' front linewidth 3\n", new_p[i].x, new_p[i].y);
+                        // fprintf(gp, "set object circle at %f,%f size screen 0.01 fillcolor rgb 'red' front linewidth 3\n", new_p[i].x, new_p[i].y);
                     }
                 }
                 /*
@@ -1114,7 +1116,9 @@ int main(void)
                 // ドローン8台
                 fprintf(gp, "set title 't = %f'\n", total_t);
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'gold','-' pt 5 lt rgbcolor'dark-turquoise'\n", new_data_file, new_ad_file);
-                fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta'\n", new_data_file, new_ad_file);
+                // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta'\n", new_data_file, new_ad_file);
+                fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta'\n", new_data_file, new_ad_file);
+
                 fprintf(gp, "%f %f\n", v[0].x, v[0].y);
                 fprintf(gp, "e\n");
                 fprintf(gp, "%f %f\n", v[1].x, v[1].y);
@@ -1446,14 +1450,41 @@ int main(void)
                             v[i].inf_med[drone[k].target_shelter_num][v[i].i_med_ptr[drone[k].target_shelter_num] - 1][3] = TRUE; // ドローンが避難所に医療品を届けるため医療品配達フラグを有効にする（配送車は集積所で補充しなくてもよい）
                             v[i].queue_Notdelivery_ptr += 1;
                         }
-                        else if (d_d[k] * r_d_velo + d_s_dis * r_d_velo <= capable_flight_time) // ドローンが集積所への往復飛行ができない場合：運搬車両が集積所へ近づいて飛行可能になるまで待機する（集積所-避難所間の飛行は可能な場合）
+                        else // 距離的に飛行不可能である場合
                         {
-                            // printf("t=%.2lf : drone[%d] が避難所[%d] のために、集積所へ医療物資を補給しに飛行を開始できません\n", total_t, k, drone[k].target_shelter_num);
+                            drone[k].cannot_fly_judge_flag = TRUE; // ドローンの飛行不可能フラグを有効にする
+
+                            // printf("t=%.2lf : 配送車[%d] 上の ドローン[%d] が避難所[%d] のため集積所へ飛行不能と判断\n", total_t, i, k, v[i].Med_delivery_queue[v[i].queue_Notdelivery_ptr]);
+                        }
+                    }
+                }
+            }
+        }
+
+        /*********************充電制限により飛行不能で配送車で待機中だったドローンが配送車の移動により、距離的に飛行可能と判断する処理**************************/
+        for (i = 0; i < M; i++)
+        {
+            if (v[i].queue_ptr != v[i].queue_Notdelivery_ptr) // 配送車が避難所の医療物資要求（未配達）の情報を保持しているとき
+            {
+                for (k = 0; k < SD; k++)
+                {
+                    if (drone[k].follow_num == i && drone[k].free_mode == FALSE && drone[k].FtoDiscenter_mode == FALSE && drone[k].charge_time == 0 && drone[k].cannot_fly_judge_flag == TRUE) // 現在要求情報を受け取った配送車上にいながら，充電中ではなく飛行可能なとき、かつ飛行不可能判断フラグが有効なとき
+                    {
+                        drone[k].xt = new_p[0].x;
+                        drone[k].yt = new_p[0].y; // ドローンの目的地を配送センターに設定
+
+                        d_d[k] = sqrt(pow(drone[k].xt - drone[k].x, 2) + pow(drone[k].yt - drone[k].y, 2)); // ドローンと集積所との距離算出
+
+                        d_s_dis = sqrt(pow(new_p[v[i].Med_delivery_queue[v[i].queue_Notdelivery_ptr]].x - new_p[0].x, 2) + pow(new_p[v[i].Med_delivery_queue[v[i].queue_Notdelivery_ptr]].y - new_p[0].y, 2)); // 避難所と集積所との距離算出
+
+                        if ((d_d[k] * r_d_velo) + (d_s_dis * r_d_velo) <= capable_flight_time) // 配送車の移動により、集積所へ近づいて避難所へ飛行可能になった場合（集積所-避難所間の飛行は可能な場合）
+                        {
                             printf("t=%.2lf : 配送車[%d] で待機中の ドローン[%d] が集積所へ飛行開始：避難所[%d] のため\n", total_t, i, k, v[i].Med_delivery_queue[v[i].queue_Notdelivery_ptr]);
 
-                            drone[k].free_mode = TRUE;         // ドローンのフリーモードを有効にする
-                            drone[k].FtoDiscenter_mode = TRUE; // ドローンの配送モードを有効にする
-                            drone[k].TV_wait_flag = TRUE;      // ドローンの避難所待機フラグを有効にする
+                            drone[k].free_mode = TRUE;              // ドローンのフリーモードを有効にする
+                            drone[k].FtoDiscenter_mode = TRUE;      // ドローンの配送モードを有効にする
+                            drone[k].TV_wait_flag = TRUE;           // ドローンの避難所待機フラグを有効にする
+                            drone[k].cannot_fly_judge_flag = FALSE; // ドローンの飛行不可能フラグを無効にする
 
                             v[i].inf_med[drone[k].target_shelter_num][v[i].i_med_ptr[drone[k].target_shelter_num] - 1][3] = TRUE; // ドローンが避難所に医療品を届けるため医療品配達フラグを有効にする（配送車は集積所で補充しなくてもよい）
                             v[i].queue_Notdelivery_ptr += 1;
@@ -1514,7 +1545,7 @@ int main(void)
                     drone[i].flight_start_time -= time_span; // 飛行開始時間の時間差の減算
                 }
             }
-            else if (drone[i].free_mode == TRUE && drone[i].charge_time != 0) // 充電中の時
+            else if (drone[i].free_mode == TRUE && drone[i].charge_time != 0 && drone[i].TV_wait_flag == FALSE) // ドローンが配送車上にいて、充電中の時
             {
                 // ドローンが配送車で充電中なら配送車に従い, 飛行時間の定数倍分充電
                 drone[i].x = v[drone[i].follow_num].x;
@@ -1528,6 +1559,14 @@ int main(void)
                     // ドローンと配送車の合流地点算出
                     // solveConfluence(v[drone[i].target_num].x, v[drone[i].target_num].y, drone[i].x, drone[i].y, 1.0, v_d_ratio, new_p[target[drone[i].target_num]].x, new_p[target[drone[i].target_num]].y, &drone[i].xt, &drone[i].yt, v_d_ratio, r_d_velo, r_velo, stay_t, new_p, drone, i, v, drone[i].target_num, current, target, cir, cir_flag, ind, ind_last, ind_relief, size);
                     drone[i].free_mode = FALSE; // ドローンのフリーモードを無効にする
+                }
+            }
+            else if (drone[i].free_mode == TRUE && drone[i].charge_time != 0 && drone[i].TV_wait_flag == TRUE) // ドローンが避難所で配送車を待機中のとき（充電が必要）：配送車がくるまで医療物資を届けた避難所で待機
+            {
+                if (drone[i].x == v[drone[i].follow_num].x && drone[i].y == v[drone[i].follow_num].y)
+                {
+                    drone[i].TV_wait_flag = FALSE; // 配送車と合流したら充電開始（ドローンの避難所待機フラグを無効にする）
+                    printf("t=%.2lf : ドローン[%d] が避難所[%d] で配送車 [%d]と合流完了. 充電時間：%lf [min]\n", total_t, i, drone[i].target_shelter_num, drone[i].follow_num, (double)drone[i].charge_time / 60);
                 }
             }
             else if (drone[i].free_mode == TRUE && drone[i].FtoDiscenter_mode == TRUE && drone[i].delivery_mode == FALSE) // ドローンが集積所に医療物資を補充しに行くモードに移行したら
@@ -1576,7 +1615,7 @@ int main(void)
                     // printf("t=%.2lf : 集積所にて ドローン[%d] が医療物資を積載完了\n", total_t, i);
                 }
             }
-            else if (drone[i].free_mode == TRUE && drone[i].FtoDiscenter_mode == FALSE && drone[i].delivery_mode == TRUE && drone[i].TV_wait_flag == FALSE && drone[i].stay_Medload_time == 0) // ドローンが避難所に医療物資を届けるモードに移行したら
+            else if (drone[i].free_mode == TRUE && drone[i].FtoDiscenter_mode == FALSE && drone[i].delivery_mode == TRUE && drone[i].stay_Medload_time == 0) // ドローンが避難所に医療物資を届けるモードに移行したら
             {
                 // ドローンが避難所に向かって飛行
                 d_d[i] = sqrt(pow(drone[i].xt - drone[i].x, 2) + pow(drone[i].yt - drone[i].y, 2));
@@ -1621,6 +1660,11 @@ int main(void)
 
                     fprintf(fp_Med_re_collect_to_delivery_delay, "%lf\n", total_t - v[drone[i].follow_num].inf_med[drone[i].target_shelter_num][v[drone[i].follow_num].i_med_ptr[drone[i].target_shelter_num] - 1][2]); // 医療品の収集から配送への遅延時間                                                                                                                                               // 医療品の収集から配送への遅延時間
                     // fprintf(fp_Med_re_collect_to_delivery_delay, "t=%lf drone[%d] -> new_p[%d] : %lf\n", total_t, i, drone[i].target_shelter_num, total_t - v[drone[i].follow_num].inf_med[drone[i].target_shelter_num][v[drone[i].follow_num].i_med_ptr[drone[i].target_shelter_num] - 1][2]); // 医療品の収集から配送への遅延時間
+
+                    if (drone[i].TV_wait_flag == TRUE) // ドローンが避難所で配送車を待機する必要があるとき
+                    {
+                        printf("t=%.2lf : 避難所[%d]にて ドローン[%d] が配送車 [%d] を待機開始\n", total_t, drone[i].target_shelter_num, i, drone[i].follow_num);
+                    }
                 }
             }
 #if 0
