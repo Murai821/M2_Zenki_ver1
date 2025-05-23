@@ -40,9 +40,10 @@ int main(void)
     srand(821); // シード値
     // srand(57); // シード値
 
-    point p[N];   // 避難所と配送センターの宣言
-    vehicle v[M]; // 配送車の宣言
-    dro drone[D]; // ドローンの宣言
+    point p[N];          // 避難所と配送センターの宣言
+    vehicle v[M];        // 配送車の宣言
+    dro drone[D];        // ドローンの宣言
+    dro infC_drone[C_D]; // 避難所の要求情報を回収するドローンの宣言
 
     // 配送センターの座標初期化
     p[0].x = L / 2;
@@ -282,6 +283,57 @@ int main(void)
         drone[i].TV_wait_flag = FALSE;
 
         drone[i].cannot_fly_judge_flag = FALSE;
+    }
+
+    // 要求情報回収ドローン初期化
+    for (i = 0; i < C_D; i++)
+    {
+        infC_drone[i].x = L / 2;
+        infC_drone[i].y = L / 2;
+
+        infC_drone[i].xt = 0;
+        infC_drone[i].yt = 0;
+
+        infC_drone[i].re = 0;
+
+        infC_drone[i].wait_flag = FALSE;
+
+        for (j = 0; j < N; j++)
+        {
+            infC_drone[i].i_ptr[j] = 0;
+        }
+
+        for (j = 0; j < N; j++)
+        {
+            for (k = 0; k < I_SIZE; k++)
+            {
+                infC_drone[i].inf[j][k] = 0;
+            }
+        }
+
+        infC_drone[i].follow_num = i % M;
+
+        infC_drone[i].target_num = 1;
+
+        infC_drone[i].free_mode = FALSE;
+
+        infC_drone[i].charge_time = 0;
+
+        infC_drone[i].flight_start_time = 0;
+
+        infC_drone[i].FtoDiscenter_mode = FALSE; // ドローンが配送センターに向かうモード(避難所から集積所)（FALSE:配送車に従う、TRUE:ドローン単独で配送センターへ向かう）
+
+        infC_drone[i].delivery_mode = FALSE; // ドローンの配達モード(集積所から避難所)（FALSE:配送車に従う、TRUE:ドローン単独で配達)
+
+        infC_drone[i].Med_re = 0;
+
+        infC_drone[i].target_shelter_num = 0;
+
+        infC_drone[i].stay_Medload_time = 0;
+
+        infC_drone[i].TV_wait_flag = FALSE;
+
+        infC_drone[i].cannot_fly_judge_flag = FALSE;
     }
 
     /*********************************************** pythonの出力ファイルから点の「座標」と「隣接行列」を読み込む **************************************************************************/
@@ -648,6 +700,34 @@ int main(void)
         printf("size[%d]:%d\n", i, size[i]);
     }
 
+    /***************** 巡回路を逆順に格納する配列 reverse_cir[][] を定義 ****************/
+    // reverse_cir[M][]の各配列を逆順に格納するため動的確保
+    int **reverse_cir = (int **)calloc(M, sizeof(int *));
+    for (i = 0; i < M; i++)
+    {
+        reverse_cir[i] = (int *)calloc(size[i], sizeof(int));
+    }
+
+    // cir[M][]の各配列を逆順にしてreverse_cir[M][]に格納
+    for (i = 0; i < M; i++)
+    {
+        for (j = 0; j < size[i]; j++)
+        {
+            reverse_cir[i][j] = cir[i][size[i] - 1 - j];
+        }
+    }
+
+    // reverse_cir[][]の配列を表示
+    for (i = 0; i < M; i++)
+    {
+        printf("reverse_cir[%d]: ", i);
+        for (j = 0; j < size[i]; j++)
+        {
+            printf("%d ", reverse_cir[i][j]);
+        }
+        printf("\n");
+    }
+
     /***************************************************************************************************************************************************************************/
 
     /******************各小回線の最後に物資を下ろす避難所のindex*********************************/
@@ -850,7 +930,7 @@ int main(void)
     fprintf(gp, "unset key\n");
 
     // fprintf(gp, "set term gif animate delay 5 optimize size 640,480\n");
-    fprintf(gp, "set term gif animate delay 5 optimize size 640,480 font 'DejaVu Sans,12'\n");
+    fprintf(gp, "set term gif animate delay 15 optimize size 640,480 font 'DejaVu Sans,12'\n");
     fprintf(gp, "set output 'drone_datafile/test.gif'\n");
 
     // ラベルの表示
@@ -864,14 +944,22 @@ int main(void)
     double total_t = 0;                                  // シミュレーションの合計時間
     double termination_t = 500000;                       // シミュレーション強制終了時間
     double r_velo = 360;                                 // 速度の逆数
-    double part_t[M] = {0};                              // 二点間の経過時間
+    double part_t[M] = {0};                              // 二点間の経過時間(配送車)
+    double part_t_dro[M] = {0};                          // 二点間の経過時間(ドローン)
     int current[M] = {0};                                // 始点
     int target[M];                                       // 終点
-    double d[M];                                         // ２点間の距離
+    int current_dro[C_D] = {0};                          // ドローンの始点
+    int target_dro[C_D];                                 // ドローンの終点
+    double d[M];                                         // ２点間の距離(配送車)
+    double d_dro[C_D];                                   // ２点間の距離(ドローン)
     double n_sin[M];                                     // サイン
     double n_cos[M];                                     // コサイン
     double n_tan[M];                                     // タンジェント
-    int ind[M] = {0};                                    // targetのindex
+    double n_sin_dro[C_D];                               // ドローンのサイン
+    double n_cos_dro[C_D];                               // ドローンのコサイン
+    double n_tan_dro[C_D];                               // ドローンのタンジェント
+    int ind[M] = {0};                                    // targetのindex(配送車)
+    int ind_dro[C_D] = {0};                              // targetのindex(ドローン)
     double time_span = 10;                               // 増加時間
     double stay_t[M] = {0};                              // 避難所待機時間カウンター
     double stay = 1800;                                  // 避難所,配送センターでの物資積載時間
@@ -972,6 +1060,7 @@ int main(void)
     double m_v_f = 60 * 14.5;                                                        // ドローンの配送車間の平均飛行時間（分）mean_value_flight 14分
     double flight_time_lag = removeOnePlace((m_v_f * M + m_v_f * 2 * (M - 1)) / SD); // ドローンの飛行開始時間の時間差(60秒 * 分)導出用
     int drone_next_target[M] = {1, 2, 3, 4, 0};                                      // ドローンが巡回路をまたいで向かう配送車の番号の対応配列：
+    double infC_drone_flight_time[C_D] = {0};                                        // 要求情報回収ドローンの飛行時間
 
     // ドローンの合流点を決める際のパラメータ
     int answerFlag = 0;    // 関数の戻り値を格納
@@ -997,16 +1086,28 @@ int main(void)
     double TV_chargeAmount = 0;        // 各TVにおけるドローン総充電時間(一巡回):単位は[min]
     double ave_TV_chargeAmount;        // 各TVにおけるドローン総充電時間の平均値(一巡回)
 
+    // target について（配送車）
     // targetのindex初期化
     for (i = 0; i < M; i++)
     {
         ind[i] = 1;
     }
-
     // targetの初期化
     for (i = 0; i < M; i++)
     {
         target[i] = cir[i][1];
+    }
+
+    // target_dro について（ドローン）
+    //  target_droのindex初期化
+    for (i = 0; i < C_D; i++)
+    {
+        ind_dro[i] = 1;
+    }
+    // target_droの初期化
+    for (i = 0; i < C_D; i++)
+    {
+        target_dro[i] = reverse_cir[i % M][1];
     }
 
     // 配送車の物資を初期化
@@ -1046,6 +1147,7 @@ int main(void)
     /************************************ ループ処理 ***********************************************************/
     while (1)
     {
+        // 配送車のサインコサイン
         for (i = 0; i < M; i++)
         {
             d[i] = sqrt(pow(new_p[target[i]].x - new_p[current[i]].x, 2) + pow(new_p[target[i]].y - new_p[current[i]].y, 2));
@@ -1053,9 +1155,17 @@ int main(void)
             n_cos[i] = (new_p[target[i]].y - new_p[current[i]].y) / d[i];
             n_tan[i] = n_sin[i] / n_cos[i];
         }
+        // ドローンのサインコサイン
+        for (i = 0; i < C_D; i++)
+        {
+            d_dro[i] = sqrt(pow(new_p[target_dro[i]].x - new_p[current_dro[i]].x, 2) + pow(new_p[target_dro[i]].y - new_p[current_dro[i]].y, 2));
+            n_sin_dro[i] = (new_p[target_dro[i]].x - new_p[current_dro[i]].x) / d_dro[i];
+            n_cos_dro[i] = (new_p[target_dro[i]].y - new_p[current_dro[i]].y) / d_dro[i];
+            n_tan_dro[i] = n_sin_dro[i] / n_cos_dro[i];
+        }
 
         // if (total_t >= 0 && total_t <= 70000)
-        if (total_t >= 160000 && total_t <= 200000)
+        if (total_t >= 0 && total_t <= 20000)
         {
             if ((int)(total_t) % 50 == 0)
             { // 50sごとに描画
@@ -1117,7 +1227,8 @@ int main(void)
                 fprintf(gp, "set title 't = %f'\n", total_t);
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'gold','-' pt 5 lt rgbcolor'dark-turquoise'\n", new_data_file, new_ad_file);
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta'\n", new_data_file, new_ad_file);
-                fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta'\n", new_data_file, new_ad_file);
+                // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta'\n", new_data_file, new_ad_file);
+                fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red'\n", new_data_file, new_ad_file);
 
                 fprintf(gp, "%f %f\n", v[0].x, v[0].y);
                 fprintf(gp, "e\n");
@@ -1144,6 +1255,16 @@ int main(void)
                 fprintf(gp, "%f %f\n", drone[6].x + 0.1, drone[6].y + 0.1);
                 fprintf(gp, "e\n");
                 fprintf(gp, "%f %f\n", drone[7].x + 0.1, drone[7].y + 0.1);
+                fprintf(gp, "e\n");
+                fprintf(gp, "%f %f\n", infC_drone[0].x - 0.1, infC_drone[0].y - 0.1);
+                fprintf(gp, "e\n");
+                fprintf(gp, "%f %f\n", infC_drone[1].x - 0.1, infC_drone[1].y - 0.1);
+                fprintf(gp, "e\n");
+                fprintf(gp, "%f %f\n", infC_drone[2].x - 0.1, infC_drone[2].y - 0.1);
+                fprintf(gp, "e\n");
+                fprintf(gp, "%f %f\n", infC_drone[3].x - 0.1, infC_drone[3].y - 0.1);
+                fprintf(gp, "e\n");
+                fprintf(gp, "%f %f\n", infC_drone[4].x - 0.1, infC_drone[4].y - 0.1);
                 fprintf(gp, "e\n");
 
                 /*
@@ -1182,6 +1303,46 @@ int main(void)
             else if (stay_t[i] == 0 && dis_stay_t[i] != 0)
             { // 配送センターで待機中なら待機時間カウンターを減らす
                 dis_stay_t[i] -= time_span;
+            }
+        }
+        /**************ドローンの座標更新*****************/
+        for (i = 0; i < SD; i++)
+        {
+            // 充電する必要ないなら目的の避難所へ飛行
+            if (infC_drone[i].charge_time == 0)
+            {
+                infC_drone[i].x = new_p[current_dro[i]].x + n_sin_dro[i] * part_t_dro[i] / r_d_velo;
+                infC_drone[i].y = new_p[current_dro[i]].y + n_cos_dro[i] * part_t_dro[i] / r_d_velo;
+
+                infC_drone_flight_time[i] += time_span; // ドローンの飛行時間を加算
+            }
+        }
+
+        /*****************(追加 5/23)各ドローンにおいて始点から終点へ到達したときの処理****************************/
+        for (i = 0; i < C_D; i++)
+        {
+            if ((ind_dro[i] == size[i % M] - 1 && n_cos_dro[i] < 0 && infC_drone[i].y < new_p[reverse_cir[i % M][0]].y) || (ind_dro[i] == size[i % M] - 1 && n_cos_dro[i] > 0 && infC_drone[i].y > new_p[reverse_cir[i % M][0]].y))
+            { // ①一周したら、ループを初期化してもう一周
+                ind_dro[i] = 1;
+                current_dro[i] = 0;
+                target_dro[i] = reverse_cir[i % M][ind_dro[i]]; // 目的避難所変更
+                infC_drone[i].x = new_p[current_dro[i]].x;      // 座標修正
+                infC_drone[i].y = new_p[current_dro[i]].y;
+                part_t_dro[i] = 0;
+
+                infC_drone_flight_time[i] = 0; // ドローンの飛行時間を初期化
+                // 周回時間の計算
+            }
+            else if ((n_cos_dro[i] < 0 && infC_drone[i].y < new_p[target_dro[i]].y) || (n_cos_dro[i] > 0 && infC_drone[i].y > new_p[target_dro[i]].y))
+            { // ③それ以外において、targetに到達したらcurrentとtarget更新
+                ind_dro[i] += 1;
+                current_dro[i] = target_dro[i];
+                target_dro[i] = reverse_cir[i % M][ind_dro[i]]; // 目的避難所変更
+                infC_drone[i].x = new_p[current_dro[i]].x;      // 座標修正
+                infC_drone[i].y = new_p[current_dro[i]].y;
+                part_t_dro[i] = 0;
+
+                // 避難所との薬の情報配列の交換(避難所→ドローン)
             }
         }
 
@@ -2316,13 +2477,18 @@ int main(void)
 
         total_t += time_span; // 総合計時間を更新
 
-        // 部分時間を更新(待機していないなら更新)
+        // 部分時間を更新(待機していないなら更新)：配送車
         for (i = 0; i < M; i++)
         {
             if (stay_t[i] == 0 && dis_stay_t[i] == 0 && re_wait_flag[i] == FALSE)
             {
                 part_t[i] += time_span;
             }
+        }
+        // 部分時間を更新：ドローン
+        for (i = 0; i < C_D; i++)
+        {
+            part_t_dro[i] += time_span;
         }
     }
     /*********************************** while文処理終了 ********************************************************************/
@@ -2873,6 +3039,13 @@ int main(void)
         free(cir[i]);
     }
     free(cir);
+
+    // 使用後にfree
+    for (i = 0; i < M; i++)
+    {
+        free(reverse_cir[i]);
+    }
+    free(reverse_cir);
 
     return 0;
 }
