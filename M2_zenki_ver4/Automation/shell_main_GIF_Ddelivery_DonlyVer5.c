@@ -850,6 +850,15 @@ int main(int argc, char *argv[])
     fprintf(fp_totaldi_data, "%f\n", total_di_ave);
     fclose(fp_totaldi_data);
 
+    // 各巡回路上の情報収集ドローンが一巡回するのにかかる時間の平均
+    double vd = 20.0; // ドローンの速度[km/h]
+    FILE *fp_drone_trip_data;
+    char *drone_trip_data_file = "drone_datafile/txtfile/drone_trip_ave_data.txt";
+
+    fp_drone_trip_data = fopen(drone_trip_data_file, "a+");
+    fprintf(fp_drone_trip_data, "%f\n", total_di_ave / vd * 60); // ドローンの巡回路の平均所要時間をファイルに格納
+    fclose(fp_drone_trip_data);
+
     /***********************************各小回線の一周の所要時間********************************************/
     for (i = 0; i < M; i++)
     {

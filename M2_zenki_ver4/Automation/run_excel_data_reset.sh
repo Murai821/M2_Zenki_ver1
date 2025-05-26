@@ -9,3 +9,5 @@
 > drone_datafile/txtfile/excel_data/Shell_MedInf_average.txt
 > drone_datafile/txtfile/excel_data/Shell_Medinf_collect_average.txt
 > drone_datafile/txtfile/excel_data/Shell_DroneDeliveryProbability_average.txt
+> drone_datafile/txtfile/excel_data/Shell_Etc_dro_average.txt
+> drone_datafile/txtfile/excel_data/Shell_InfCdrone_TripTime.txt
