@@ -11,3 +11,4 @@
 > drone_datafile/txtfile/excel_data/Shell_DroneDeliveryProbability_average.txt
 > drone_datafile/txtfile/excel_data/Shell_Etc_dro_average.txt
 > drone_datafile/txtfile/excel_data/Shell_InfCdrone_TripTime.txt
+> drone_datafile/txtfile/excel_data/Shell_Jyunkai_time_Infd_ave.txt

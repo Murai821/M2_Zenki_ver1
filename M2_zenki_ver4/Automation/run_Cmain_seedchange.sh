@@ -20,6 +20,7 @@ gcc shell_main_GIF_Ddelivery_DonlyVer5.c module.c -o my_program -lm
 
 > drone_datafile/txtfile/Mean_ETC_dro.txt
 > drone_datafile/txtfile/drone_trip_ave_data.txt
+> drone_datafile/txtfile/Mean_Jyunkai_time_InfCdrone.txt
 
 for i in $(seq $start_seed $end_seed)
 do
@@ -37,6 +38,8 @@ gcc Etg_average_shell.c
 gcc Etc_dro_average_shell.c
 ./a.out
 gcc E_InfCdrone_TripTime_shell.c
+./a.out
+gcc E_Jyunkai_time_InfCdrone_shell.c
 ./a.out
 
 # Cプログラムをコンパイル

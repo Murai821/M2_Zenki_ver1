@@ -8,7 +8,7 @@
 #include "header.h"
 
 /**************************************メイン関数******************************************************/
-int main(int argc, char *argv[])
+int main(void)
 {
     int i, j, k, m, n;
     char *data_file;     // 座標プロット用
@@ -38,10 +38,8 @@ int main(int argc, char *argv[])
     int VIA[N];     /*経由点*/
     char USED[N];   /*確定か未確定か*/
 
-    int seed = atoi(argv[1]);
-    srand(seed); // シード値
-    // srand(821); // シード値
-    //  srand(57); // シード値
+    srand(821); // シード値
+    // srand(57); // シード値
 
     point p[N];          // 避難所と配送センターの宣言
     vehicle v[M];        // 配送車の宣言
@@ -850,7 +848,7 @@ int main(int argc, char *argv[])
     fprintf(fp_totaldi_data, "%f\n", total_di_ave);
     fclose(fp_totaldi_data);
 
-    // 各巡回路上の情報収集ドローンが一巡回するのにかかる時間の平均
+    // 各巡回路上の情報収集ドローンが一巡回するのにかかる時間の平均（純粋に飛行だけした場合の時間（充電などは考慮なし））
     double vd = 20.0; // ドローンの速度[km/h]
     FILE *fp_drone_trip_data;
     char *drone_trip_data_file = "drone_datafile/txtfile/drone_trip_ave_data.txt";
@@ -964,7 +962,7 @@ int main(int argc, char *argv[])
     fprintf(gp, "unset key\n");
 
     // fprintf(gp, "set term gif animate delay 5 optimize size 640,480\n");
-    fprintf(gp, "set term gif animate delay 20 optimize size 640,480 font 'DejaVu Sans,12'\n");
+    fprintf(gp, "set term gif animate delay 15 optimize size 640,480 font 'DejaVu Sans,12'\n");
     fprintf(gp, "set output 'drone_datafile/test.gif'\n");
 
     // ラベルの表示
@@ -1054,6 +1052,9 @@ int main(int argc, char *argv[])
     // 医療品の配送遅延時間（要求情報発生が回収されてから実際に医療品が避難所へ届けられるまでの遅延時間）
     FILE *fp_Med_re_collect_to_delivery_delay;
     Med_re_collect_to_delivery_delay_file = "drone_datafile/txtfile/Med_re_collect_to_delivery_delay.txt";
+    // 各ドローンの一巡回にかかる時間をファイルに書き込む
+    FILE *fp_infC_jyunkai_time;
+    char *infC_jyunkai_time_file = "drone_datafile/txtfile/infC_jyunkai_time.txt";
 
     // 平均配送車マッチング数
     double meet_vehicle_num[M] = {0};
@@ -1071,7 +1072,7 @@ int main(int argc, char *argv[])
     // 物資数が100の避難所のカウンター
     int relief_count;
     // ドローンに関する変数
-    double r_d_velo = 180;                    // 配送車の2倍
+    double r_d_velo = 180;                    // 配送車の2倍（ドローンの時速の逆数：）一キロ飛行するのにかかる秒数
     double v_d_ratio = r_velo / r_d_velo;     // 配送車の速度とドローンの速度の比率
     double capable_flight_time = 60 * 30;     // ドローンの最大飛行時間(３０分)
     double drone_Med_loding_time = 60 * 10;   // ドローンの医療物資積載時間(10分) 60*10
@@ -1098,6 +1099,7 @@ int main(int argc, char *argv[])
     double flight_time_lag = removeOnePlace((m_v_f * M + m_v_f * 2 * (M - 1)) / SD); // ドローンの飛行開始時間の時間差(60秒 * 分)導出用
     int drone_next_target[M] = {1, 2, 3, 4, 0};                                      // ドローンが巡回路をまたいで向かう配送車の番号の対応配列：
     double infC_drone_flight_time[C_D] = {0};                                        // 要求情報回収ドローンの飛行時間
+    double infC_drone_jyunkai_time[C_D] = {0};                                       // 要求情報回収ドローンの巡回時間
 
     // ドローンの合流点を決める際のパラメータ
     int answerFlag = 0;    // 関数の戻り値を格納
@@ -1181,6 +1183,7 @@ int main(int argc, char *argv[])
     fp_Medinf_collect_delay = fopen(Medinf_collect_delay_file, "w");                         // 医療品情報の収集遅延間隔ファイルのオープン
     fp_ETC_dro = fopen(ETC_dro_data_file, "w");                                              // ドローンの避難所からの配送遅延間隔ファイルのオープン
     fp_Med_re_collect_to_delivery_delay = fopen(Med_re_collect_to_delivery_delay_file, "w"); // 医療品の収集から配送への遅延間隔ファイルのオープン
+    fp_infC_jyunkai_time = fopen(infC_jyunkai_time_file, "w");                               // ドローンの巡回時間ファイルのオープン
 
     /************************************ ループ処理 ***********************************************************/
     while (1)
@@ -1203,7 +1206,7 @@ int main(int argc, char *argv[])
         }
 #if 0
         // if (total_t >= 0 && total_t <= 20000)
-        if (total_t >= 21200 && total_t <= 22000)
+        if (total_t >= 0 && total_t <= 30000)
         {
             if ((int)(total_t) % 50 == 0)
             { // 50sごとに描画
@@ -1353,6 +1356,14 @@ int main(int argc, char *argv[])
                 infC_drone[i].y = new_p[current_dro[i]].y + n_cos_dro[i] * part_t_dro[i] / r_d_velo;
 
                 infC_drone_flight_time[i] += time_span; // ドローンの飛行時間を加算
+
+                infC_drone_jyunkai_time[i] += time_span; // ドローンの巡回時間を加算
+            }
+            else if (infC_drone[i].charge_time != 0) // 充電する必要があるなら
+            {
+                infC_drone[i].charge_time -= time_span; // ドローンの充電時間を減らす
+
+                infC_drone_jyunkai_time[i] += time_span; // ドローンの巡回時間を加算
             }
         }
 
@@ -1369,9 +1380,18 @@ int main(int argc, char *argv[])
                 infC_drone[i].y = new_p[current_dro[i]].y;
                 part_t_dro[i] = 0;
 
-                // printf(" fff 収集ドローン[%d]の周回時間: %lf[s]\n", i, infC_drone_flight_time[i]);
-                infC_drone_flight_time[i] = 0; // ドローンの飛行時間を初期化
-                // 周回時間の計算
+                // printf(" fff 収集ドローン[%d]の周回時間: %lf[min]\n", i, infC_drone_jyunkai_time[i] / 60);
+                //  各ドローンの一巡回にかかる時間をファイルに書き込む
+                fprintf(fp_infC_jyunkai_time, "%lf\n", infC_drone_jyunkai_time[i] / 60);
+                infC_drone_jyunkai_time[i] = 0; // ドローンの飛行時間を初期化
+
+                // 次の避難所へ行く間に充電量が不足する場合はその避難所で充電する
+                if (infC_drone_flight_time[i] + new_di[current_dro[i]][target_dro[i]] * r_d_velo > capable_flight_time)
+                {
+                    infC_drone[i].charge_time = infC_drone_flight_time[i] * charge_constant; // 充電時間を設定
+                    infC_drone_flight_time[i] = 0;                                           // ドローンの飛行時間を初期化
+                    // printf("ドローン[%d]は集積所で充電開始  充電時間: %lf[min]\n", i, (double)infC_drone[i].charge_time / 60);
+                }
             }
             else if ((n_cos_dro[i] < 0 && infC_drone[i].y < new_p[target_dro[i]].y) || (n_cos_dro[i] > 0 && infC_drone[i].y > new_p[target_dro[i]].y))
             { // ③それ以外において、targetに到達したらcurrentとtarget更新
@@ -1382,39 +1402,51 @@ int main(int argc, char *argv[])
                 infC_drone[i].y = new_p[current_dro[i]].y;
                 part_t_dro[i] = 0;
 
+                // 次の避難所へ行く間に充電量が不足する場合はその避難所で充電する
+                if (infC_drone_flight_time[i] + new_di[current_dro[i]][target_dro[i]] * r_d_velo > capable_flight_time)
+                {
+                    infC_drone[i].charge_time = infC_drone_flight_time[i] * charge_constant; // 充電時間を設定
+                    infC_drone_flight_time[i] = 0;                                           // ドローンの飛行時間を初期化
+                    // printf("ドローン[%d]は避難所[%d]で充電開始  充電時間: %lf[min]\n", i, current_dro[i], (double)infC_drone[i].charge_time / 60);
+                }
+
                 /***********避難所 ↔ ドローン間情報交換**********/
+
+                // 避難所との薬の情報配列の交換(避難所→ドローン)
                 for (j = 0; j < N; j++)
                 {
-                    // 避難所との薬の情報配列の交換(避難所→ドローン)
                     if (new_p[current_dro[i]].i_med_ptr[j] > infC_drone[i].i_med_ptr[j] && current_dro[i] >= (i % M) * 10 + 1 && current_dro[i] <= ((i % M) + 1) * 10) // 同じ巡回路内の避難所の要求情報を回収
                     {
                         for (k = infC_drone[i].i_med_ptr[j]; k < new_p[current_dro[i]].i_med_ptr[j]; k++)
                         {
-                            // v[i].inf_med[j][v[i].i_med_ptr[j]][0] = new_p[current[i]].inf_med[j][k][0]; // 情報の生成時間
-                            // v[i].inf_med[j][v[i].i_med_ptr[j]][1] = new_p[current[i]].inf_med[j][k][1]; // 薬の緊急度
-                            for (m = 0; m < Z_SIZE; m++)
+                            if (new_p[current_dro[i]].inf_med[j][k][5] == FALSE) // 既に他の配送車やドローンに要求情報が回収されていなければ
                             {
-                                infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j]][m] = new_p[current_dro[i]].inf_med[j][k][m]; // 薬の情報コピー
+                                new_p[current_dro[i]].inf_med[j][k][5] = TRUE; // 回収済みのフラグを立てる
+
+                                for (m = 0; m < Z_SIZE; m++)
+                                {
+                                    infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j]][m] = new_p[current_dro[i]].inf_med[j][k][m]; // 薬の情報コピー
+                                }
+                                infC_drone[i].i_med_ptr[j] += 1;
+
+                                // 医療品の配送先をキューに保存
+                                // v[i].Med_delivery_queue[v[i].queue_ptr] = current[i]; // 医療品の配送先をキューに格納
+                                // v[i].queue_ptr += 1;                                  // キューのポインタを進める
+                                /*if (v[i].queue_ptr == QUEUE_SIZE)
+                                {
+                                    printf("キューの要素数オーバー\n");
+                                    break;
+                                }*/
+
+                                printf(" **** t=%lf : 避難所[%d]の情報を ドローン[%d]が回収\n", total_t, current_dro[i], i);
+
+                                // ファイルへの書き込み
+                                // fprintf(fp_Medinf_delay, "t=%lf generate_time:%lf new_p[%d]->drone[%d]\n", total_t, infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0], current_dro[i], i);
+                                // fprintf(fp_Medinf_delay, "%lf\n", total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]); // 生成されてからドローンで回収されるまでの遅延時間
+                                // fprintf(fp_ETC_dro, "t=%lf generate_time:%lf new_p[%d]->drone[%d] %lf\n", total_t, infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0], current_dro[i], i, total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]);
+                                fprintf(fp_ETC_dro, "%lf\n", total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]); // 生成されてからドローンで回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
+                                infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][4] = total_t;
                             }
-                            infC_drone[i].i_med_ptr[j] += 1;
-
-                            // 医療品の配送先をキューに保存
-                            // v[i].Med_delivery_queue[v[i].queue_ptr] = current[i]; // 医療品の配送先をキューに格納
-                            // v[i].queue_ptr += 1;                                  // キューのポインタを進める
-                            /*if (v[i].queue_ptr == QUEUE_SIZE)
-                            {
-                                printf("キューの要素数オーバー\n");
-                                break;
-                            }*/
-
-                            printf(" **** t=%lf : 避難所[%d]の情報を ドローン[%d]が回収\n", total_t, current_dro[i], i);
-
-                            // ファイルへの書き込み
-                            // fprintf(fp_Medinf_delay, "t=%lf generate_time:%lf new_p[%d]->drone[%d]\n", total_t, infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0], current_dro[i], i);
-                            // fprintf(fp_Medinf_delay, "%lf\n", total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]); // 生成されてからドローンで回収されるまでの遅延時間
-                            // fprintf(fp_ETC_dro, "t=%lf generate_time:%lf new_p[%d]->drone[%d] %lf\n", total_t, infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0], current_dro[i], i, total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]);
-                            fprintf(fp_ETC_dro, "%lf\n", total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]); // 生成されてからドローンで回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
-                            infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][4] = total_t;
                         }
                     }
                 }
@@ -1660,7 +1692,7 @@ int main(int argc, char *argv[])
                             }
 
                             // printf("drone[%d]が集積所へ医療物資を補給しに飛行を開始\n", k);
-                            printf("t=%.2lf : 避難所[%d]にて 配送車[%d] 上の ドローン[%d] が集積所へ飛行開始\n", total_t, v[i].Med_delivery_queue[v[i].queue_Notdelivery_ptr], i, k);
+                            // printf("t=%.2lf : 避難所[%d]にて 配送車[%d] 上の ドローン[%d] が集積所へ飛行開始\n", total_t, v[i].Med_delivery_queue[v[i].queue_Notdelivery_ptr], i, k);
                             drone[k].free_mode = TRUE;         // ドローンのフリーモードを有効にする
                             drone[k].FtoDiscenter_mode = TRUE; // ドローンの配送モードを有効にする
 
@@ -1671,8 +1703,8 @@ int main(int argc, char *argv[])
                         {
                             stay_t[i] += drone_Med_Unloding_time; // ドローンの荷降ろし時間を考慮して配送車の待機時間を延長する
 
-                            printf("t=%.2lf : 避難所[%d]にて 配送車[%d] 上の ドローン[%d] が集積所へ飛行開始\n", total_t, v[i].Med_delivery_queue[v[i].queue_Notdelivery_ptr], i, k);
-                            printf("-> 配送車[%d]の待機時間 %.2lf を %.2lf [min]延長 :延長後待機時間%.2lf\n", i, stay_t[i] / 60, ((2 * d_d[k] * r_d_velo + drone_Med_loding_time) - stay) / 60, (stay_t[i] + ((2 * d_d[k] * r_d_velo + drone_Med_loding_time) - stay)) / 60);
+                            // printf("t=%.2lf : 避難所[%d]にて 配送車[%d] 上の ドローン[%d] が集積所へ飛行開始\n", total_t, v[i].Med_delivery_queue[v[i].queue_Notdelivery_ptr], i, k);
+                            // printf("-> 配送車[%d]の待機時間 %.2lf を %.2lf [min]延長 :延長後待機時間%.2lf\n", i, stay_t[i] / 60, ((2 * d_d[k] * r_d_velo + drone_Med_loding_time) - stay) / 60, (stay_t[i] + ((2 * d_d[k] * r_d_velo + drone_Med_loding_time) - stay)) / 60);
 
                             addtional_time = (2 * d_d[k] * r_d_velo + drone_Med_loding_time) - stay;
                             stay_t[i] += (double)((int)(addtional_time) - (int)(addtional_time) % 10); // ドローンの飛行時間を考慮して配送車の待機時間を延長する
@@ -1715,7 +1747,7 @@ int main(int argc, char *argv[])
 
                         if ((d_d[k] * r_d_velo) + (d_s_dis * r_d_velo) <= capable_flight_time) // 配送車の移動により、集積所へ近づいて避難所へ飛行可能になった場合（集積所-避難所間の飛行は可能な場合）
                         {
-                            printf("t=%.2lf : 配送車[%d] で待機中の ドローン[%d] が集積所へ飛行開始：避難所[%d] のため\n", total_t, i, k, v[i].Med_delivery_queue[v[i].queue_Notdelivery_ptr]);
+                            // printf("t=%.2lf : 配送車[%d] で待機中の ドローン[%d] が集積所へ飛行開始：避難所[%d] のため\n", total_t, i, k, v[i].Med_delivery_queue[v[i].queue_Notdelivery_ptr]);
 
                             drone[k].free_mode = TRUE;              // ドローンのフリーモードを有効にする
                             drone[k].FtoDiscenter_mode = TRUE;      // ドローンの配送モードを有効にする
@@ -1802,7 +1834,7 @@ int main(int argc, char *argv[])
                 if (drone[i].x == v[drone[i].follow_num].x && drone[i].y == v[drone[i].follow_num].y)
                 {
                     drone[i].TV_wait_flag = FALSE; // 配送車と合流したら充電開始（ドローンの避難所待機フラグを無効にする）
-                    printf("t=%.2lf : ドローン[%d] が避難所[%d] で配送車 [%d]と合流完了. 充電時間：%lf [min]\n", total_t, i, drone[i].target_shelter_num, drone[i].follow_num, (double)drone[i].charge_time / 60);
+                    // printf("t=%.2lf : ドローン[%d] が避難所[%d] で配送車 [%d]と合流完了. 充電時間：%lf [min]\n", total_t, i, drone[i].target_shelter_num, drone[i].follow_num, (double)drone[i].charge_time / 60);
                 }
             }
             else if (drone[i].free_mode == TRUE && drone[i].FtoDiscenter_mode == TRUE && drone[i].delivery_mode == FALSE) // ドローンが集積所に医療物資を補充しに行くモードに移行したら
@@ -1881,7 +1913,7 @@ int main(int argc, char *argv[])
                     // ドローンの充電時間処理
                     drone[i].charge_time = flight_time[i] * charge_constant; // ドローンの配送車での充電時間
 
-                    printf("t=%.2lf : 避難所[%d]にて ドローン[%d] が医療物資を届けた 充電時間 : %lf[min]\n", total_t, drone[i].target_shelter_num, i, (double)drone[i].charge_time / 60);
+                    // printf("t=%.2lf : 避難所[%d]にて ドローン[%d] が医療物資を届けた 充電時間 : %lf[min]\n", total_t, drone[i].target_shelter_num, i, (double)drone[i].charge_time / 60);
 
                     flight_time[i] = 0; // ドローンの飛行時間初期化
 
@@ -1899,7 +1931,7 @@ int main(int argc, char *argv[])
 
                     if (drone[i].TV_wait_flag == TRUE) // ドローンが避難所で配送車を待機する必要があるとき
                     {
-                        printf("t=%.2lf : 避難所[%d]にて ドローン[%d] が配送車 [%d] を待機開始\n", total_t, drone[i].target_shelter_num, i, drone[i].follow_num);
+                        // printf("t=%.2lf : 避難所[%d]にて ドローン[%d] が配送車 [%d] を待機開始\n", total_t, drone[i].target_shelter_num, i, drone[i].follow_num);
                     }
                 }
             }
@@ -2577,6 +2609,7 @@ int main(int argc, char *argv[])
     fclose(fp_Medinf_collect_delay);
     fclose(fp_ETC_dro);
     fclose(fp_Med_re_collect_to_delivery_delay);
+    fclose(fp_infC_jyunkai_time);
     pclose(gp);
 
     /*********平均値の導出**********/
@@ -2918,6 +2951,41 @@ int main(int argc, char *argv[])
     fp_Mean_Med_re_DdeliveryCount_data = fopen(Mean_Med_re_DdeliveryCount_file, "a+");
     fprintf(fp_Mean_Med_re_DdeliveryCount_data, "%f\n", (double)counter_Med_re_Drone_delivery / (double)counter_Med_re_delivery);
     fclose(fp_Mean_Med_re_DdeliveryCount_data);
+
+    /******** 医療品情報の回収から配達における平均情報遅延時間 *********/
+    value8 = 0;
+    sum8 = 0;
+    count8 = 0;
+    average8 = 0;
+
+    fp_infC_jyunkai_time = fopen(infC_jyunkai_time_file, "r"); // 平均情報遅延間隔ファイルのオープン
+    if (fp_infC_jyunkai_time == NULL)
+    {
+        printf("ファイルを開くことができませんでした\n");
+        return 1;
+    }
+    while (fscanf(fp_infC_jyunkai_time, "%lf", &value8) == 1)
+    {
+        sum8 += value8;
+        count8++;
+    }
+    fclose(fp_infC_jyunkai_time); // 平均情報遅延時間ファイルクローズ
+
+    if (count8 > 0)
+    {
+        average8 = sum8 / count8;
+        printf("ドローンの一巡回にかかる時間（充電など含む）：%f [h]\n", average8 / 60);
+        // データを格納する
+        FILE *fp_Mean_InfCdrone_jyunkai_data;
+        char *Mean_InfCdrone_jyunkai_file = "drone_datafile/txtfile/Mean_Jyunkai_time_InfCdrone.txt";
+        fp_Mean_InfCdrone_jyunkai_data = fopen(Mean_InfCdrone_jyunkai_file, "a+");
+        fprintf(fp_Mean_InfCdrone_jyunkai_data, "%f\n", average8 / 60);
+        fclose(fp_Mean_InfCdrone_jyunkai_data);
+    }
+    else
+    {
+        printf("データがありません\n");
+    }
 
     // ドローンの平均飛行時間の導出とファイルへの書き込み
 
