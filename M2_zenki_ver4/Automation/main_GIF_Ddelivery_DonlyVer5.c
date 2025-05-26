@@ -1364,6 +1364,11 @@ int main(void)
                 infC_drone[i].charge_time -= time_span; // ドローンの充電時間を減らす
 
                 infC_drone_jyunkai_time[i] += time_span; // ドローンの巡回時間を加算
+
+                if (infC_drone[i].charge_time == 0 && infC_drone[i].x == new_p[0].x && infC_drone[i].y == new_p[0].y) // 集積所にいながら飛行時間加算してしまっている場合
+                {
+                    infC_drone_jyunkai_time[i] = 0;
+                }
             }
         }
 
@@ -1380,7 +1385,7 @@ int main(void)
                 infC_drone[i].y = new_p[current_dro[i]].y;
                 part_t_dro[i] = 0;
 
-                // printf(" fff 収集ドローン[%d]の周回時間: %lf[min]\n", i, infC_drone_jyunkai_time[i] / 60);
+                printf(" fff 収集ドローン[%d]の周回時間: %lf[min]\n", i, infC_drone_jyunkai_time[i] / 60);
                 //  各ドローンの一巡回にかかる時間をファイルに書き込む
                 fprintf(fp_infC_jyunkai_time, "%lf\n", infC_drone_jyunkai_time[i] / 60);
                 infC_drone_jyunkai_time[i] = 0; // ドローンの飛行時間を初期化
@@ -1662,6 +1667,8 @@ int main(void)
             }
         }
 
+        // ドローンがTVから飛行して医療物資届ける手法（5月23日報告会までの手法）
+        // #if 0
         /************************************ドローンの医療物資運搬のための飛行開始に関する処理**************************************************/
         for (i = 0; i < M; i++)
         {
@@ -1761,6 +1768,7 @@ int main(void)
                 }
             }
         }
+        // #endif
 
         /******************************************** ドローンの制御 **********************************************************/
 #if 0
@@ -2592,10 +2600,13 @@ int main(void)
                 part_t[i] += time_span;
             }
         }
-        // 部分時間を更新：ドローン
+        // 部分時間を更新（充電中でないなら）：ドローン
         for (i = 0; i < C_D; i++)
         {
-            part_t_dro[i] += time_span;
+            if (infC_drone[i].charge_time == 0)
+            {
+                part_t_dro[i] += time_span;
+            }
         }
     }
     /*********************************** while文処理終了 ********************************************************************/

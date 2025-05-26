@@ -8,7 +8,7 @@
 #include "header.h"
 
 /**************************************メイン関数******************************************************/
-int main(void)
+int main(int argc, char *argv[])
 {
     int i, j, k, m, n;
     char *data_file;     // 座標プロット用
@@ -38,8 +38,10 @@ int main(void)
     int VIA[N];     /*経由点*/
     char USED[N];   /*確定か未確定か*/
 
-    srand(821); // シード値
-    // srand(57); // シード値
+    int seed = atoi(argv[1]);
+    srand(seed); // シード値
+    // srand(821); // シード値
+    //  srand(57); // シード値
 
     point p[N];          // 避難所と配送センターの宣言
     vehicle v[M];        // 配送車の宣言
@@ -1364,6 +1366,11 @@ int main(void)
                 infC_drone[i].charge_time -= time_span; // ドローンの充電時間を減らす
 
                 infC_drone_jyunkai_time[i] += time_span; // ドローンの巡回時間を加算
+
+                if (infC_drone[i].charge_time == 0 && infC_drone[i].x == new_p[0].x && infC_drone[i].y == new_p[0].y) // 集積所にいながら飛行時間加算してしまっている場合
+                {
+                    infC_drone_jyunkai_time[i] = 0;
+                }
             }
         }
 
@@ -1661,7 +1668,7 @@ int main(void)
                 }
             }
         }
-
+#if 0
         /************************************ドローンの医療物資運搬のための飛行開始に関する処理**************************************************/
         for (i = 0; i < M; i++)
         {
@@ -1761,7 +1768,7 @@ int main(void)
                 }
             }
         }
-
+#endif
         /******************************************** ドローンの制御 **********************************************************/
 #if 0
         // 配送車0（ドローン積載）が一番始めの避難所１に到達したら
@@ -2592,10 +2599,13 @@ int main(void)
                 part_t[i] += time_span;
             }
         }
-        // 部分時間を更新：ドローン
+        // 部分時間を更新（充電中でないなら）：ドローン
         for (i = 0; i < C_D; i++)
         {
-            part_t_dro[i] += time_span;
+            if (infC_drone[i].charge_time == 0)
+            {
+                part_t_dro[i] += time_span;
+            }
         }
     }
     /*********************************** while文処理終了 ********************************************************************/
