@@ -2,10 +2,10 @@
 
 # シード値の範囲を設定(100回)
 start_seed=41
-end_seed=140
+end_seed=50
 
 #gcc shell_main_GIF_ver2.c module.c -o my_program -lm
-gcc shell_main_GIF_Ddelivery_DonlyVer3.c module.c -o my_program -lm
+gcc shell_main_GIF_Ddelivery_DonlyVer5.c module.c -o my_program -lm
 
 # 特定ディレクトリ内のファイルを初期化
 > drone_datafile/txtfile/Mean_Medinf_delay.txt
@@ -17,6 +17,8 @@ gcc shell_main_GIF_Ddelivery_DonlyVer3.c module.c -o my_program -lm
 > drone_datafile/txtfile/Etd_data.txt
 > drone_datafile/txtfile/Eti_data.txt
 > drone_datafile/txtfile/Etg_data.txt
+
+> drone_datafile/txtfile/Mean_ETC_dro.txt
 
 for i in $(seq $start_seed $end_seed)
 do
@@ -30,6 +32,8 @@ gcc Etd_average_shell.c
 gcc Eti_average_shell.c
 ./a.out
 gcc Etg_average_shell.c
+./a.out
+gcc Etc_dro_average_shell.c
 ./a.out
 
 # Cプログラムをコンパイル
