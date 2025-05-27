@@ -1,11 +1,12 @@
 #!/bin/bash
 
 # シード値の範囲を設定(100回)
-start_seed=41
-end_seed=60
+start_seed=40
+end_seed=141
 
 #gcc shell_main_GIF_ver2.c module.c -o my_program -lm
 gcc shell_main_GIF_Ddelivery_DonlyVer5.c module.c -o my_program -lm
+#gcc shell_main_GIF_Ddelivery_DonlyVer5_nocharge.c module.c -o my_program -lm
 
 # 特定ディレクトリ内のファイルを初期化
 > drone_datafile/txtfile/Mean_Medinf_delay.txt

@@ -1,4 +1,4 @@
-// 新手法２　ドローンが独立して避難所間を飛行しながら要求情報を回収する手法における基本プログラ厶（ドローンの充電量無制限）
+// 新手法２　ドローンが独立して避難所間を飛行しながら要求情報を回収する手法における基本プログラ厶（避難所で充電できる場合）
 // GIFアニメーションで表示するプログラム
 // コンパイル方法「gcc -o my_program main.c module.c -lm」
 #include <stdio.h>
@@ -1206,7 +1206,7 @@ int main(void)
         }
 
         // if (total_t >= 0 && total_t <= 20000)
-        if (total_t >= 0 && total_t <= 30000)
+        if (total_t >= 278000 && total_t <= 280000)
         {
             if ((int)(total_t) % 50 == 0)
             { // 50sごとに描画
@@ -1385,8 +1385,8 @@ int main(void)
                 infC_drone[i].y = new_p[current_dro[i]].y;
                 part_t_dro[i] = 0;
 
-                printf(" fff 収集ドローン[%d]の周回時間: %lf[min]\n", i, infC_drone_jyunkai_time[i] / 60);
-                //  各ドローンの一巡回にかかる時間をファイルに書き込む
+                // printf(" fff 収集ドローン[%d]の周回時間: %lf[min]\n", i, infC_drone_jyunkai_time[i] / 60);
+                //   各ドローンの一巡回にかかる時間をファイルに書き込む
                 fprintf(fp_infC_jyunkai_time, "%lf\n", infC_drone_jyunkai_time[i] / 60);
                 infC_drone_jyunkai_time[i] = 0; // ドローンの飛行時間を初期化
 
@@ -1451,6 +1451,9 @@ int main(void)
                                 // fprintf(fp_ETC_dro, "t=%lf generate_time:%lf new_p[%d]->drone[%d] %lf\n", total_t, infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0], current_dro[i], i, total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]);
                                 fprintf(fp_ETC_dro, "%lf\n", total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]); // 生成されてからドローンで回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
                                 infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][4] = total_t;
+
+                                fprintf(fp_Medinf_collect_delay, "t=%lf generate_time:%lf new_p[%d]->drone[%d] %lf\n", total_t, infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0], current_dro[i], i, total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]);
+                                // fprintf(fp_Medinf_collect_delay, "%lf\n", total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]); // 生成されてからドローンで回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
                             }
                         }
                     }
@@ -1568,33 +1571,37 @@ int main(void)
                         {
                             for (k = v[i].i_med_ptr[j]; k < new_p[current[i]].i_med_ptr[j]; k++)
                             {
-                                // v[i].inf_med[j][v[i].i_med_ptr[j]][0] = new_p[current[i]].inf_med[j][k][0]; // 情報の生成時間
-                                // v[i].inf_med[j][v[i].i_med_ptr[j]][1] = new_p[current[i]].inf_med[j][k][1]; // 薬の緊急度
-                                for (m = 0; m < Z_SIZE; m++)
+                                // 既に他の配送車やドローンに要求情報が回収されていなければ(TV or ドローンが避難所から初めて要求情報を取得するときのみ)
+                                if (new_p[current[i]].inf_med[j][k][5] == FALSE)
                                 {
-                                    v[i].inf_med[j][v[i].i_med_ptr[j]][m] = new_p[current[i]].inf_med[j][k][m]; // 薬の情報
+                                    new_p[current[i]].inf_med[j][k][5] = TRUE; // 回収済みのフラグを立てる
+
+                                    for (m = 0; m < Z_SIZE; m++)
+                                    {
+                                        v[i].inf_med[j][v[i].i_med_ptr[j]][m] = new_p[current[i]].inf_med[j][k][m]; // 薬の情報コピー
+                                    }
+                                    v[i].i_med_ptr[j] += 1;
+
+                                    // 医療品の配送先をキューに保存
+                                    v[i].Med_delivery_queue[v[i].queue_ptr] = current[i]; // 医療品の配送先をキューに格納
+                                    v[i].queue_ptr += 1;                                  // キューのポインタを進める
+                                    if (v[i].queue_ptr == QUEUE_SIZE)
+                                    {
+                                        printf("キューの要素数オーバー\n");
+                                        break;
+                                    }
+
+                                    // debug
+                                    // printf("%d:%d********p[%d]toV[%d]%lf\n", v[i].i_med_ptr[j] - 1, new_p[current[i]].i_med_ptr[j], current[i], i, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]);
+                                    printf("t=%lf : 避難所[%d]の情報を 配送車[%d]が回収\n", total_t, current[i], i);
+
+                                    // ファイルへの書き込み
+                                    // fprintf(fp_Medinf_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
+                                    fprintf(fp_Medinf_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間
+                                    fprintf(fp_Medinf_collect_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
+                                    // fprintf(fp_Medinf_collect_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
+                                    v[i].inf_med[j][v[i].i_med_ptr[j] - 1][2] = total_t; // 要求情報発生から回収までの遅延時間（避難所→TV）
                                 }
-                                v[i].i_med_ptr[j] += 1;
-
-                                // 医療品の配送先をキューに保存
-                                v[i].Med_delivery_queue[v[i].queue_ptr] = current[i]; // 医療品の配送先をキューに格納
-                                v[i].queue_ptr += 1;                                  // キューのポインタを進める
-                                if (v[i].queue_ptr == QUEUE_SIZE)
-                                {
-                                    printf("キューの要素数オーバー\n");
-                                    break;
-                                }
-
-                                // debug
-                                // printf("%d:%d********p[%d]toV[%d]%lf\n", v[i].i_med_ptr[j] - 1, new_p[current[i]].i_med_ptr[j], current[i], i, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]);
-                                printf("t=%lf : 避難所[%d]の情報を 配送車[%d]が回収\n", total_t, current[i], i);
-
-                                // ファイルへの書き込み
-                                // fprintf(fp_Medinf_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
-                                fprintf(fp_Medinf_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間
-                                // fprintf(fp_Medinf_collect_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
-                                fprintf(fp_Medinf_collect_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
-                                v[i].inf_med[j][v[i].i_med_ptr[j] - 1][2] = total_t;
                             }
                         }
                     }
@@ -1667,8 +1674,8 @@ int main(void)
             }
         }
 
-        // ドローンがTVから飛行して医療物資届ける手法（5月23日報告会までの手法）
-        // #if 0
+// ドローンがTVから飛行して医療物資届ける手法（5月23日報告会までの手法）
+#if 0
         /************************************ドローンの医療物資運搬のための飛行開始に関する処理**************************************************/
         for (i = 0; i < M; i++)
         {
@@ -1768,7 +1775,7 @@ int main(void)
                 }
             }
         }
-        // #endif
+#endif
 
         /******************************************** ドローンの制御 **********************************************************/
 #if 0
