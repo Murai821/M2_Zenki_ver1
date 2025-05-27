@@ -979,7 +979,7 @@ int main(int argc, char *argv[])
     double termination_t = 500000;                       // シミュレーション強制終了時間
     double r_velo = 360;                                 // 速度の逆数
     double part_t[M] = {0};                              // 二点間の経過時間(配送車)
-    double part_t_dro[M] = {0};                          // 二点間の経過時間(ドローン)
+    double part_t_dro[C_D] = {0};                        // 二点間の経過時間(ドローン)
     int current[M] = {0};                                // 始点
     int target[M];                                       // 終点
     int current_dro[C_D] = {0};                          // ドローンの始点
@@ -1076,7 +1076,7 @@ int main(int argc, char *argv[])
     // ドローンに関する変数
     double r_d_velo = 180;                    // 配送車の2倍（ドローンの時速の逆数：）一キロ飛行するのにかかる秒数
     double v_d_ratio = r_velo / r_d_velo;     // 配送車の速度とドローンの速度の比率
-    double capable_flight_time = 60 * 30;     // ドローンの最大飛行時間(３０分)
+    double capable_flight_time = 60 * 40;     // ドローンの最大飛行時間(３０分)
     double drone_Med_loding_time = 60 * 10;   // ドローンの医療物資積載時間(10分) 60*10
     double drone_Med_Unloding_time = 60 * 10; // ドローンの避難所での医療物資荷降ろし時間(10分) 60*10
     double addtional_time = 0;                // ドローンの配送による配送車の避難所での追加待機時間

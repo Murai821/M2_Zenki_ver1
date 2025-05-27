@@ -1,4 +1,4 @@
-// 新手法２　ドローンが独立して避難所間を飛行しながら要求情報を回収する手法における基本プログラ厶（ドローンの充電量無制限）
+// 新手法２　ドローンが独立して避難所間を飛行しながら要求情報を回収する手法における基本プログラ厶（避難所で充電できる場合）ドローン複数
 // GIFアニメーションで表示するプログラム
 // コンパイル方法「gcc -o my_program main.c module.c -lm」
 #include <stdio.h>
@@ -8,7 +8,7 @@
 #include "header.h"
 
 /**************************************メイン関数******************************************************/
-int main(int argc, char *argv[])
+int main(void)
 {
     int i, j, k, m, n;
     char *data_file;     // 座標プロット用
@@ -38,8 +38,7 @@ int main(int argc, char *argv[])
     int VIA[N];     /*経由点*/
     char USED[N];   /*確定か未確定か*/
 
-    int seed = atoi(argv[1]);
-    srand(seed); // シード値
+    srand(821); // シード値
     // srand(57); // シード値
 
     point p[N];          // 避難所と配送センターの宣言
@@ -981,7 +980,7 @@ int main(int argc, char *argv[])
     double part_t_dro[C_D] = {0};                        // 二点間の経過時間(ドローン)
     int current[M] = {0};                                // 始点
     int target[M];                                       // 終点
-    int current_dro[C_D] = {0};                          // ドローンの始点
+    int current_dro[C_D];                                // ドローンの始点
     int target_dro[C_D];                                 // ドローンの終点
     double d[M];                                         // ２点間の距離(配送車)
     double d_dro[C_D];                                   // ２点間の距離(ドローン)
@@ -1147,7 +1146,25 @@ int main(int argc, char *argv[])
     // target_droの初期化
     for (i = 0; i < C_D; i++)
     {
+        current_dro[i] = 0;
         target_dro[i] = reverse_cir[i % M][1];
+    }
+
+    // 情報回収用ドローンの出発時間初期化
+    double devision = C_D / M;     // ドローンの数を配送車の数で割る
+    double total_di_time[M] = {0}; // 各小回線の総時間
+    double f_s_time = 0;
+    for (i = 0; i < M; i++)
+    {
+        total_di_time[i] = total_di[i] * r_velo;                     // 各小回線の総時間を計算
+        total_di_time[i] = total_di_time[i] * (charge_constant + 1); // 充電時間も考慮した飛行間隔に（充電なしの場合*(充電係数+1)）
+        printf("total_di_time[%d]: %f\n", i, total_di_time[i]);
+    }
+    for (i = 0; i < C_D; i++)
+    {
+        f_s_time = total_di_time[i % M] / (double)devision * (double)(i - i % M) / M;
+        infC_drone[i].flight_start_time = (int)f_s_time - (int)f_s_time % 10; // ドローンの出発時間を設定(少数第一位を0にする)
+        printf("infC_drone[%d].flight_start_time: %f\n", i, infC_drone[i].flight_start_time);
     }
 
     // 配送車の物資を初期化
@@ -1189,6 +1206,8 @@ int main(int argc, char *argv[])
     /************************************ ループ処理 ***********************************************************/
     while (1)
     {
+        // debug
+        // printf("total_t: %f\n", total_t);
         // 配送車のサインコサイン
         for (i = 0; i < M; i++)
         {
@@ -1200,14 +1219,25 @@ int main(int argc, char *argv[])
         // ドローンのサインコサイン
         for (i = 0; i < C_D; i++)
         {
+            if (current_dro[i] > INF)
+            {
+                // current_dro[i] = reverse_cir[i % M][ind_dro[i] - 1]; // ドローンの始点が異常値な場合は適切な値にセット
+            }
+            current_dro[i] = reverse_cir[i % M][ind_dro[i] - 1];
+            target_dro[i] = reverse_cir[i % M][ind_dro[i]]; // ドローンの終点を設定
+            //  debug
+            if (total_t >= 0 && total_t <= 20)
+            {
+                printf("current_dro[%d]: %d, target_dro[%d]: %d\n", i, current_dro[i], i, target_dro[i]);
+            }
             d_dro[i] = sqrt(pow(new_p[target_dro[i]].x - new_p[current_dro[i]].x, 2) + pow(new_p[target_dro[i]].y - new_p[current_dro[i]].y, 2));
             n_sin_dro[i] = (new_p[target_dro[i]].x - new_p[current_dro[i]].x) / d_dro[i];
             n_cos_dro[i] = (new_p[target_dro[i]].y - new_p[current_dro[i]].y) / d_dro[i];
             n_tan_dro[i] = n_sin_dro[i] / n_cos_dro[i];
         }
-#if 0
+
         // if (total_t >= 0 && total_t <= 20000)
-        if (total_t >= 0 && total_t <= 30000)
+        if (total_t >= 0 && total_t <= 16000)
         {
             if ((int)(total_t) % 50 == 0)
             { // 50sごとに描画
@@ -1270,7 +1300,8 @@ int main(int argc, char *argv[])
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'gold','-' pt 5 lt rgbcolor'dark-turquoise'\n", new_data_file, new_ad_file);
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta'\n", new_data_file, new_ad_file);
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta'\n", new_data_file, new_ad_file);
-                fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red'\n", new_data_file, new_ad_file);
+                // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red'\n", new_data_file, new_ad_file); // ５台
+                fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green'\n", new_data_file, new_ad_file); // １０台
 
                 fprintf(gp, "%f %f\n", v[0].x, v[0].y);
                 fprintf(gp, "e\n");
@@ -1308,6 +1339,16 @@ int main(int argc, char *argv[])
                 fprintf(gp, "e\n");
                 fprintf(gp, "%f %f\n", infC_drone[4].x - 0.1, infC_drone[4].y - 0.1);
                 fprintf(gp, "e\n");
+                fprintf(gp, "%f %f\n", infC_drone[5].x - 0.1, infC_drone[5].y - 0.1);
+                fprintf(gp, "e\n");
+                fprintf(gp, "%f %f\n", infC_drone[6].x - 0.1, infC_drone[6].y - 0.1);
+                fprintf(gp, "e\n");
+                fprintf(gp, "%f %f\n", infC_drone[7].x - 0.1, infC_drone[7].y - 0.1);
+                fprintf(gp, "e\n");
+                fprintf(gp, "%f %f\n", infC_drone[8].x - 0.1, infC_drone[8].y - 0.1);
+                fprintf(gp, "e\n");
+                fprintf(gp, "%f %f\n", infC_drone[9].x - 0.1, infC_drone[9].y - 0.1);
+                fprintf(gp, "e\n");
 
                 /*
                 // ドローン1台
@@ -1328,7 +1369,7 @@ int main(int argc, char *argv[])
                 */
             }
         }
-#endif
+
         /**************配送車の座標更新*****************/
         for (i = 0; i < M; i++)
         {
@@ -1348,10 +1389,19 @@ int main(int argc, char *argv[])
             }
         }
         /**************ドローンの座標更新*****************/
-        for (i = 0; i < SD; i++)
+        for (i = 0; i < C_D; i++)
         {
-            // 充電する必要ないなら目的の避難所へ飛行
-            if (infC_drone[i].charge_time == 0)
+            // 飛行開始時間まで待機
+            if (infC_drone[i].flight_start_time != 0)
+            {
+                infC_drone[i].flight_start_time -= time_span; // ドローンの飛行開始時間を減らす
+                if (infC_drone[i].flight_start_time == 0)     // 飛行開始時間が0以下になったら
+                {
+                    infC_drone[i].flight_start_time = 0; // 飛行開始時間を0にする
+                    printf("drone[%d]の飛行開始時間: %lf\n", i, total_t);
+                }
+            }
+            else if (infC_drone[i].charge_time == 0) // 充電する必要ないなら目的の避難所へ飛行
             {
                 infC_drone[i].x = new_p[current_dro[i]].x + n_sin_dro[i] * part_t_dro[i] / r_d_velo;
                 infC_drone[i].y = new_p[current_dro[i]].y + n_cos_dro[i] * part_t_dro[i] / r_d_velo;
@@ -1359,6 +1409,13 @@ int main(int argc, char *argv[])
                 infC_drone_flight_time[i] += time_span; // ドローンの飛行時間を加算
 
                 infC_drone_jyunkai_time[i] += time_span; // ドローンの巡回時間を加算
+
+                // debug
+                if (total_t >= 9400 && total_t <= 9600 && i == 9)
+                {
+                    printf("ドローン[%d]の座標: %lf,%lf\n", i, infC_drone[i].x, infC_drone[i].y);
+                    printf("current_dro[%d]: %d, target_dro[%d]: %d\n", i, current_dro[i], i, target_dro[i]);
+                }
             }
             else if (infC_drone[i].charge_time != 0) // 充電する必要があるなら
             {
@@ -1386,16 +1443,16 @@ int main(int argc, char *argv[])
                 infC_drone[i].y = new_p[current_dro[i]].y;
                 part_t_dro[i] = 0;
 
-                printf(" fff 収集ドローン[%d]の周回時間: %lf[min]\n", i, infC_drone_jyunkai_time[i] / 60);
-                //  各ドローンの一巡回にかかる時間をファイルに書き込む
+                // printf(" fff 収集ドローン[%d]の周回時間: %lf[min]\n", i, infC_drone_jyunkai_time[i] / 60);
+                //   各ドローンの一巡回にかかる時間をファイルに書き込む
                 fprintf(fp_infC_jyunkai_time, "%lf\n", infC_drone_jyunkai_time[i] / 60);
                 infC_drone_jyunkai_time[i] = 0; // ドローンの飛行時間を初期化
 
                 // 次の避難所へ行く間に充電量が不足する場合はその避難所で充電する
                 if (infC_drone_flight_time[i] + new_di[current_dro[i]][target_dro[i]] * r_d_velo > capable_flight_time)
                 {
-                    // infC_drone[i].charge_time = infC_drone_flight_time[i] * charge_constant; // 充電時間を設定
-                    infC_drone_flight_time[i] = 0; // ドローンの飛行時間を初期化
+                    infC_drone[i].charge_time = infC_drone_flight_time[i] * charge_constant; // 充電時間を設定
+                    infC_drone_flight_time[i] = 0;                                           // ドローンの飛行時間を初期化
                     // printf("ドローン[%d]は集積所で充電開始  充電時間: %lf[min]\n", i, (double)infC_drone[i].charge_time / 60);
                 }
             }
@@ -1411,8 +1468,8 @@ int main(int argc, char *argv[])
                 // 次の避難所へ行く間に充電量が不足する場合はその避難所で充電する
                 if (infC_drone_flight_time[i] + new_di[current_dro[i]][target_dro[i]] * r_d_velo > capable_flight_time)
                 {
-                    // infC_drone[i].charge_time = infC_drone_flight_time[i] * charge_constant; // 充電時間を設定
-                    infC_drone_flight_time[i] = 0; // ドローンの飛行時間を初期化
+                    infC_drone[i].charge_time = infC_drone_flight_time[i] * charge_constant; // 充電時間を設定
+                    infC_drone_flight_time[i] = 0;                                           // ドローンの飛行時間を初期化
                     // printf("ドローン[%d]は避難所[%d]で充電開始  充電時間: %lf[min]\n", i, current_dro[i], (double)infC_drone[i].charge_time / 60);
                 }
 
@@ -1452,6 +1509,9 @@ int main(int argc, char *argv[])
                                 // fprintf(fp_ETC_dro, "t=%lf generate_time:%lf new_p[%d]->drone[%d] %lf\n", total_t, infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0], current_dro[i], i, total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]);
                                 fprintf(fp_ETC_dro, "%lf\n", total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]); // 生成されてからドローンで回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
                                 infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][4] = total_t;
+
+                                fprintf(fp_Medinf_collect_delay, "t=%lf generate_time:%lf new_p[%d]->drone[%d] %lf\n", total_t, infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0], current_dro[i], i, total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]);
+                                // fprintf(fp_Medinf_collect_delay, "%lf\n", total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]); // 生成されてからドローンで回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
                             }
                         }
                     }
@@ -1569,33 +1629,37 @@ int main(int argc, char *argv[])
                         {
                             for (k = v[i].i_med_ptr[j]; k < new_p[current[i]].i_med_ptr[j]; k++)
                             {
-                                // v[i].inf_med[j][v[i].i_med_ptr[j]][0] = new_p[current[i]].inf_med[j][k][0]; // 情報の生成時間
-                                // v[i].inf_med[j][v[i].i_med_ptr[j]][1] = new_p[current[i]].inf_med[j][k][1]; // 薬の緊急度
-                                for (m = 0; m < Z_SIZE; m++)
+                                // 既に他の配送車やドローンに要求情報が回収されていなければ(TV or ドローンが避難所から初めて要求情報を取得するときのみ)
+                                if (new_p[current[i]].inf_med[j][k][5] == FALSE)
                                 {
-                                    v[i].inf_med[j][v[i].i_med_ptr[j]][m] = new_p[current[i]].inf_med[j][k][m]; // 薬の情報
+                                    new_p[current[i]].inf_med[j][k][5] = TRUE; // 回収済みのフラグを立てる
+
+                                    for (m = 0; m < Z_SIZE; m++)
+                                    {
+                                        v[i].inf_med[j][v[i].i_med_ptr[j]][m] = new_p[current[i]].inf_med[j][k][m]; // 薬の情報コピー
+                                    }
+                                    v[i].i_med_ptr[j] += 1;
+
+                                    // 医療品の配送先をキューに保存
+                                    v[i].Med_delivery_queue[v[i].queue_ptr] = current[i]; // 医療品の配送先をキューに格納
+                                    v[i].queue_ptr += 1;                                  // キューのポインタを進める
+                                    if (v[i].queue_ptr == QUEUE_SIZE)
+                                    {
+                                        printf("キューの要素数オーバー\n");
+                                        break;
+                                    }
+
+                                    // debug
+                                    // printf("%d:%d********p[%d]toV[%d]%lf\n", v[i].i_med_ptr[j] - 1, new_p[current[i]].i_med_ptr[j], current[i], i, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]);
+                                    printf("t=%lf : 避難所[%d]の情報を 配送車[%d]が回収\n", total_t, current[i], i);
+
+                                    // ファイルへの書き込み
+                                    // fprintf(fp_Medinf_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
+                                    fprintf(fp_Medinf_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間
+                                    fprintf(fp_Medinf_collect_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
+                                    // fprintf(fp_Medinf_collect_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
+                                    v[i].inf_med[j][v[i].i_med_ptr[j] - 1][2] = total_t; // 要求情報発生から回収までの遅延時間（避難所→TV）
                                 }
-                                v[i].i_med_ptr[j] += 1;
-
-                                // 医療品の配送先をキューに保存
-                                v[i].Med_delivery_queue[v[i].queue_ptr] = current[i]; // 医療品の配送先をキューに格納
-                                v[i].queue_ptr += 1;                                  // キューのポインタを進める
-                                if (v[i].queue_ptr == QUEUE_SIZE)
-                                {
-                                    printf("キューの要素数オーバー\n");
-                                    break;
-                                }
-
-                                // debug
-                                // printf("%d:%d********p[%d]toV[%d]%lf\n", v[i].i_med_ptr[j] - 1, new_p[current[i]].i_med_ptr[j], current[i], i, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]);
-                                printf("t=%lf : 避難所[%d]の情報を 配送車[%d]が回収\n", total_t, current[i], i);
-
-                                // ファイルへの書き込み
-                                // fprintf(fp_Medinf_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
-                                fprintf(fp_Medinf_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間
-                                // fprintf(fp_Medinf_collect_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
-                                fprintf(fp_Medinf_collect_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
-                                v[i].inf_med[j][v[i].i_med_ptr[j] - 1][2] = total_t;
                             }
                         }
                     }
@@ -1668,8 +1732,8 @@ int main(int argc, char *argv[])
             }
         }
 
-        // ドローンがTVから飛行して医療物資届ける手法（5月23日報告会までの手法）
-        // #if 0
+// ドローンがTVから飛行して医療物資届ける手法（5月23日報告会までの手法）
+#if 0
         /************************************ドローンの医療物資運搬のための飛行開始に関する処理**************************************************/
         for (i = 0; i < M; i++)
         {
@@ -1769,7 +1833,7 @@ int main(int argc, char *argv[])
                 }
             }
         }
-        // #endif
+#endif
 
         /******************************************** ドローンの制御 **********************************************************/
 #if 0
@@ -2601,7 +2665,7 @@ int main(int argc, char *argv[])
                 part_t[i] += time_span;
             }
         }
-        // 部分時間を更新（充電中でないなら）：ドローン
+        // 部分時間を更新（充電中でないかつ飛行開始しているのなら）：ドローン
         for (i = 0; i < C_D; i++)
         {
             if (infC_drone[i].charge_time == 0 && infC_drone[i].flight_start_time == 0)
@@ -2902,7 +2966,7 @@ int main(int argc, char *argv[])
         FILE *fp_Mean_ETC_dro_data;
         char *Mean_ETC_dro_file = "drone_datafile/txtfile/Mean_ETC_dro.txt";
         fp_Mean_ETC_dro_data = fopen(Mean_ETC_dro_file, "a+");
-        fprintf(fp_Mean_ETC_dro_data, "%f\n", average7 / 3600);
+        fprintf(fp_Mean_ETC_dro_data, "%f\n", average7 / 60);
         fclose(fp_Mean_ETC_dro_data);
     }
     else

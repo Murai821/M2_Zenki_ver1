@@ -977,7 +977,7 @@ int main(void)
     double termination_t = 500000;                       // シミュレーション強制終了時間
     double r_velo = 360;                                 // 速度の逆数
     double part_t[M] = {0};                              // 二点間の経過時間(配送車)
-    double part_t_dro[M] = {0};                          // 二点間の経過時間(ドローン)
+    double part_t_dro[C_D] = {0};                        // 二点間の経過時間(ドローン)
     int current[M] = {0};                                // 始点
     int target[M];                                       // 終点
     int current_dro[C_D] = {0};                          // ドローンの始点
@@ -2603,7 +2603,7 @@ int main(void)
         // 部分時間を更新（充電中でないなら）：ドローン
         for (i = 0; i < C_D; i++)
         {
-            if (infC_drone[i].charge_time == 0)
+            if (infC_drone[i].charge_time == 0 && infC_drone[i].flight_start_time == 0)
             {
                 part_t_dro[i] += time_span;
             }
