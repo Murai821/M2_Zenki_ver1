@@ -420,6 +420,10 @@ int main(void)
         batDel_drone[i].TV_wait_flag = FALSE;
 
         batDel_drone[i].cannot_fly_judge_flag = FALSE;
+
+        batDel_drone[i].FtoShelter_mode = TRUE;
+
+        batDel_drone[i].Battery_Unload_time = 0;
     }
 
     /*********************************************** pythonの出力ファイルから点の「座標」と「隣接行列」を読み込む **************************************************************************/
@@ -1274,9 +1278,18 @@ int main(void)
                 batDel_drone[i + Num_batDeldro[i] * M].target_shelter_num = reverse_cir[i][j]; // バッテリー配布ドローンの目的避難所を設定
                 printf("バッテリー配布ドローン[%d]の目的避難所: %d\n", i + Num_batDeldro[i] * M, batDel_drone[i + Num_batDeldro[i] * M].target_shelter_num);
 
+                // バッテリー配布フラグを有効化
+                batDel_drone[i + Num_batDeldro[i] * M].batDel_flag = TRUE; // バッテリー配布ドローンのフラグを立てる
+                batDel_drone[i + Num_batDeldro[i] * M].follow_num = i;     // 追従する配送車の番号を設定
+
                 Num_batDeldro[i]++; // バッテリー配布ドローンの台数を増やす
             }
         }
+        printf("バッテリー配布ドローン[%d]の目的避難所: %d\n", i + Num_batDeldro[i] * M, batDel_drone[i + Num_batDeldro[i] * M].target_shelter_num);
+        // バッテリー配布フラグを有効化
+        batDel_drone[i + Num_batDeldro[i] * M].batDel_flag = TRUE; // バッテリー配布ドローンのフラグを立てる
+        batDel_drone[i + Num_batDeldro[i] * M].follow_num = i;     // 追従する配送車の番号を設定
+
         Num_batDeldro[i]++; // バッテリー配布ドローンの台数を増やす(集積所へは確定で配布)
     }
 
@@ -1326,7 +1339,7 @@ int main(void)
         }
 
         // if (total_t >= 0 && total_t <= 20000)
-        if (total_t >= 0 && total_t <= 16000)
+        if (total_t >= 0 && total_t <= 26000)
         {
             if ((int)(total_t) % 50 == 0)
             { // 50sごとに描画
@@ -1390,7 +1403,7 @@ int main(void)
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta'\n", new_data_file, new_ad_file);
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta'\n", new_data_file, new_ad_file);
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red'\n", new_data_file, new_ad_file); // ５台
-                fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green'\n", new_data_file, new_ad_file); // １０台
+                fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'cyan','-' pt 5 lt rgbcolor'cyan','-' pt 5 lt rgbcolor'cyan'\n", new_data_file, new_ad_file); // １０台
 
                 fprintf(gp, "%f %f\n", v[0].x, v[0].y);
                 fprintf(gp, "e\n");
@@ -1437,6 +1450,12 @@ int main(void)
                 fprintf(gp, "%f %f\n", infC_drone[8].x - 0.1, infC_drone[8].y - 0.1);
                 fprintf(gp, "e\n");
                 fprintf(gp, "%f %f\n", infC_drone[9].x - 0.1, infC_drone[9].y - 0.1);
+                fprintf(gp, "e\n");
+                fprintf(gp, "%f %f\n", batDel_drone[0].x + 0.1, batDel_drone[0].y - 0.1);
+                fprintf(gp, "e\n");
+                fprintf(gp, "%f %f\n", batDel_drone[5].x + 0.1, batDel_drone[5].y - 0.1);
+                fprintf(gp, "e\n");
+                fprintf(gp, "%f %f\n", batDel_drone[10].x + 0.1, batDel_drone[10].y - 0.1);
                 fprintf(gp, "e\n");
 
                 /*
@@ -2227,19 +2246,34 @@ int main(void)
         /************************************************* バッテリー配布ドローンの飛行に関する処理（ free_mode によって場合分け） ******************************************************************/
         for (i = 0; i < B_D; i++)
         {
-            if (batDel_drone[i].free_mode == FALSE) // free_modeオフの時
-            {                                       // 自由飛行モードでないなら配送車に従う
-                batDel_drone[i].x = v[drone[i].follow_num].x;
-                batDel_drone[i].y = v[drone[i].follow_num].y;
+            if (batDel_drone[i].batDel_flag == TRUE) // バッテリー配布ドローンの配達フラグがオンのとき
+            {
+                if (batDel_drone[i].free_mode == FALSE) // free_modeオフの時
+                {                                       // 自由飛行モードでないなら配送車に従う
+                    batDel_drone[i].x = v[batDel_drone[i].follow_num].x;
+                    batDel_drone[i].y = v[batDel_drone[i].follow_num].y;
 
-                if (batDel_drone[i].charge_time != 0)
-                {
-                    batDel_drone[i].charge_time -= time_span; // 充電が終わっていなければ充電
+                    if (batDel_drone[i].charge_time != 0)
+                    {
+                        batDel_drone[i].charge_time -= time_span; // 充電が終わっていなければ充電
+                    }
+
+                    if (batDel_drone[i].flight_start_time != 0)
+                    {
+                        batDel_drone[i].flight_start_time -= time_span; // 飛行開始時間の時間差の減算
+                    }
                 }
-
-                if (batDel_drone[i].flight_start_time != 0)
+                else if (batDel_drone[i].FtoShelter_mode == TRUE) // ドローンが避難所へ向かうモードなら
                 {
-                    batDel_drone[i].flight_start_time -= time_span; // 飛行開始時間の時間差の減算
+                    //
+                }
+                else if (batDel_drone[i].Battery_Unload_time != 0) // 　ドローンが避難所でバッテリーを荷下ろししているなら
+                {
+                    batDel_drone[i].Battery_Unload_time -= time_span;
+                }
+                else if (batDel_drone[i].FtoShelter_mode == FALSE) // ドローンが避難所からTVへ帰ってくるモードなら
+                {
+                    //
                 }
             }
         }
