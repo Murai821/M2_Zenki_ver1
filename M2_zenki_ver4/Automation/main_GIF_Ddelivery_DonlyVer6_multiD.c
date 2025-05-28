@@ -45,6 +45,7 @@ int main(void)
     vehicle v[M];        // 配送車の宣言
     dro drone[D];        // ドローンの宣言
     dro infC_drone[C_D]; // 避難所の要求情報を回収するドローンの宣言
+    dro batDel_drone[D]; // バッテリーデリバリードローンの宣言
 
     // 配送センターの座標初期化
     p[0].x = L / 2;
@@ -357,6 +358,68 @@ int main(void)
         infC_drone[i].TV_wait_flag = FALSE;
 
         infC_drone[i].cannot_fly_judge_flag = FALSE;
+    }
+
+    // バッテリー配布ドローン初期化
+    for (i = 0; i < B_D; i++)
+    {
+        batDel_drone[i].x = L / 2;
+        batDel_drone[i].y = L / 2;
+
+        batDel_drone[i].xt = 0;
+        batDel_drone[i].yt = 0;
+
+        batDel_drone[i].re = 0;
+
+        batDel_drone[i].wait_flag = FALSE;
+
+        for (j = 0; j < N; j++)
+        {
+            batDel_drone[i].i_ptr[j] = 0;
+        }
+
+        for (j = 0; j < N; j++)
+        {
+            for (k = 0; k < I_SIZE; k++)
+            {
+                batDel_drone[i].inf[j][k] = 0;
+            }
+        }
+
+        for (j = 0; j < N; j++)
+        {
+            for (k = 0; k < Y_SIZE; k++)
+            {
+                for (m = 0; m < Z_SIZE; m++)
+                {
+                    batDel_drone[i].inf_med[j][k][m] = 0.0;
+                }
+            }
+        }
+
+        batDel_drone[i].follow_num = i % M;
+
+        batDel_drone[i].target_num = 1;
+
+        batDel_drone[i].free_mode = FALSE;
+
+        batDel_drone[i].charge_time = 0;
+
+        batDel_drone[i].flight_start_time = 0;
+
+        batDel_drone[i].FtoDiscenter_mode = FALSE; // ドローンが配送センターに向かうモード(避難所から集積所)（FALSE:配送車に従う、TRUE:ドローン単独で配送センターへ向かう）
+
+        batDel_drone[i].delivery_mode = FALSE; // ドローンの配達モード(集積所から避難所)（FALSE:配送車に従う、TRUE:ドローン単独で配達)
+
+        batDel_drone[i].Med_re = 0;
+
+        batDel_drone[i].target_shelter_num = 0;
+
+        batDel_drone[i].stay_Medload_time = 0;
+
+        batDel_drone[i].TV_wait_flag = FALSE;
+
+        batDel_drone[i].cannot_fly_judge_flag = FALSE;
     }
 
     /*********************************************** pythonの出力ファイルから点の「座標」と「隣接行列」を読み込む **************************************************************************/
@@ -1191,6 +1254,32 @@ int main(void)
         current_returnnum[i] = 0;
     }
 
+    /************************************************** バッテリー配布ドローンがどの避難所を往復してバッテリーを配布するか決める処理 *********************************************************/
+    int Num_batDeldro[M] = {0}; // 各順回路における導入するバッテリー配布ドローンの台数
+    double comp_time[M] = {0};
+    for (i = 0; i < M; i++)
+    {
+        printf("巡回路[%d]\n", i);
+        for (j = 0; j < size[i] - 1; j++)
+        {
+            // printf("避難所[%d]と避難所[%d]の距離: %f\n", reverse_cir[i][j], reverse_cir[i][j + 1], new_di[reverse_cir[i][j]][reverse_cir[i][j + 1]]);
+            //  comp_time[i] += new_di[reverse_cir[i][now_ind[i]]][reverse_cir[i][now_ind[i] + 1]] * r_d_velo; // 各小回線の総時間を計算
+            comp_time[i] += new_di[reverse_cir[i][j]][reverse_cir[i][j + 1]] * r_d_velo; // 各小回線の総時間を計算
+            if (comp_time[i] > capable_flight_time)
+            { // ドローンの最大飛行時間を超えたら
+                printf("巡回路[%d]: 避難所[%d]から避難所[%d]へ飛行できません \n", i, reverse_cir[i][j], reverse_cir[i][j + 1]);
+                comp_time[i] = 0; // 時間をリセット
+
+                // バッテリー配布ドローンの目的避難所を決定
+                batDel_drone[i + Num_batDeldro[i] * M].target_shelter_num = reverse_cir[i][j]; // バッテリー配布ドローンの目的避難所を設定
+                printf("バッテリー配布ドローン[%d]の目的避難所: %d\n", i + Num_batDeldro[i] * M, batDel_drone[i + Num_batDeldro[i] * M].target_shelter_num);
+
+                Num_batDeldro[i]++; // バッテリー配布ドローンの台数を増やす
+            }
+        }
+        Num_batDeldro[i]++; // バッテリー配布ドローンの台数を増やす(集積所へは確定で配布)
+    }
+
     fp_inf_interval = fopen(inf_interval_file, "w"); // 平均情報到着間隔ファイルのオープン
     fp_inf_delay = fopen(inf_delay_file, "w");       // 平均情報遅延間隔ファイルのオープン
     fp_inf_delay_part = fopen(inf_delay_part_file, "w");
@@ -1216,7 +1305,7 @@ int main(void)
             n_cos[i] = (new_p[target[i]].y - new_p[current[i]].y) / d[i];
             n_tan[i] = n_sin[i] / n_cos[i];
         }
-        // ドローンのサインコサイン
+        // 情報収集ドローンのサインコサイン
         for (i = 0; i < C_D; i++)
         {
             if (current_dro[i] > INF)
@@ -1388,7 +1477,7 @@ int main(void)
                 dis_stay_t[i] -= time_span;
             }
         }
-        /**************ドローンの座標更新*****************/
+        /**************情報収集ドローンの座標更新*****************/
         for (i = 0; i < C_D; i++)
         {
             // 飛行開始時間まで待機
@@ -2133,6 +2222,26 @@ int main(void)
                 }
             }
 #endif
+        }
+
+        /************************************************* バッテリー配布ドローンの飛行に関する処理（ free_mode によって場合分け） ******************************************************************/
+        for (i = 0; i < B_D; i++)
+        {
+            if (batDel_drone[i].free_mode == FALSE) // free_modeオフの時
+            {                                       // 自由飛行モードでないなら配送車に従う
+                batDel_drone[i].x = v[drone[i].follow_num].x;
+                batDel_drone[i].y = v[drone[i].follow_num].y;
+
+                if (batDel_drone[i].charge_time != 0)
+                {
+                    batDel_drone[i].charge_time -= time_span; // 充電が終わっていなければ充電
+                }
+
+                if (batDel_drone[i].flight_start_time != 0)
+                {
+                    batDel_drone[i].flight_start_time -= time_span; // 飛行開始時間の時間差の減算
+                }
+            }
         }
 
         /**************** 配送センターにすべての配送車が集まった場合 ********************/
