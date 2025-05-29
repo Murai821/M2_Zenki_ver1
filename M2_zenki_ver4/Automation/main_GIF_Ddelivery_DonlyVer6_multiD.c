@@ -426,6 +426,8 @@ int main(void)
         batDel_drone[i].FtoShelter_mode = TRUE;
 
         batDel_drone[i].Battery_Unload_time = 0;
+
+        batDel_drone[i].Battery_load_time = 0;
     }
 
     /*********************************************** pythonの出力ファイルから点の「座標」と「隣接行列」を読み込む **************************************************************************/
@@ -1031,7 +1033,7 @@ int main(void)
     fprintf(gp, "unset key\n");
 
     // fprintf(gp, "set term gif animate delay 5 optimize size 640,480\n");
-    fprintf(gp, "set term gif animate delay 15 optimize size 640,480 font 'DejaVu Sans,12'\n");
+    fprintf(gp, "set term gif animate delay 20 optimize size 640,480 font 'DejaVu Sans,12'\n");
     fprintf(gp, "set output 'drone_datafile/test.gif'\n");
 
     // ラベルの表示
@@ -1289,7 +1291,9 @@ int main(void)
                 comp_time[i] = 0; // 時間をリセット
 
                 // バッテリー配布ドローンの目的避難所を決定
-                batDel_drone[i + Num_batDeldro[i] * M].target_shelter_num = reverse_cir[i][j]; // バッテリー配布ドローンの目的避難所を設定
+                batDel_drone[i + Num_batDeldro[i] * M].target_shelter_num = reverse_cir[i][j];                                  // バッテリー配布ドローンの目的避難所を設定
+                batDel_drone[i + Num_batDeldro[i] * M].xt = new_p[batDel_drone[i + Num_batDeldro[i] * M].target_shelter_num].x; // バッテリー配布ドローンの目的避難所の座標を設定
+                batDel_drone[i + Num_batDeldro[i] * M].yt = new_p[batDel_drone[i + Num_batDeldro[i] * M].target_shelter_num].y;
                 printf("バッテリー配布ドローン[%d]の目的避難所: %d\n", i + Num_batDeldro[i] * M, batDel_drone[i + Num_batDeldro[i] * M].target_shelter_num);
 
                 // バッテリー配布フラグを有効化
@@ -1299,7 +1303,12 @@ int main(void)
                 Num_batDeldro[i]++; // バッテリー配布ドローンの台数を増やす
             }
         }
+        // 集積所へのバッテリー配布は確定で行う
         printf("バッテリー配布ドローン[%d]の目的避難所: %d\n", i + Num_batDeldro[i] * M, batDel_drone[i + Num_batDeldro[i] * M].target_shelter_num);
+        // バッテリー配布ドローンの目的避難所を決定
+        batDel_drone[i + Num_batDeldro[i] * M].target_shelter_num = 0;                                                  // バッテリー配布ドローンの目的を集積所に設定
+        batDel_drone[i + Num_batDeldro[i] * M].xt = new_p[batDel_drone[i + Num_batDeldro[i] * M].target_shelter_num].x; // バッテリー配布ドローンの目的の座標を設定
+        batDel_drone[i + Num_batDeldro[i] * M].yt = new_p[batDel_drone[i + Num_batDeldro[i] * M].target_shelter_num].y;
         // バッテリー配布フラグを有効化
         batDel_drone[i + Num_batDeldro[i] * M].batDel_flag = TRUE; // バッテリー配布ドローンのフラグを立てる
         batDel_drone[i + Num_batDeldro[i] * M].follow_num = i;     // 追従する配送車の番号を設定
@@ -1368,16 +1377,34 @@ int main(void)
         {
             if (batDel_drone[i].batDel_flag == TRUE) // 配布するドローンのみ処理
             {
-                if (batDel_drone[i].FtoShelter_mode == TRUE && batDel_drone[i].free_mode == TRUE) // 避難所へバッテリーを届けに行くとき
+                if (batDel_drone[i].free_mode == TRUE) // 避難所へバッテリーを届けに行くとき//if (batDel_drone[i].FtoShelter_mode == TRUE && batDel_drone[i].free_mode == TRUE)
                 {
+                    /*
                     d_BatDdro[i] = sqrt(pow(new_p[batDel_drone[i].target_shelter_num].x - batDel_drone[i].x, 2) + pow(new_p[batDel_drone[i].target_shelter_num].y - batDel_drone[i].y, 2));
                     n_sin_BatDdro[i] = (new_p[batDel_drone[i].target_shelter_num].x - batDel_drone[i].x) / d_BatDdro[i];
                     n_cos_BatDdro[i] = (new_p[batDel_drone[i].target_shelter_num].y - batDel_drone[i].y) / d_BatDdro[i];
+                    n_tan_BatDdro[i] = n_sin_BatDdro[i] / n_cos_BatDdro[i];
+                    */
+                    d_BatDdro[i] = sqrt(pow(batDel_drone[i].xt - batDel_drone[i].x, 2) + pow(batDel_drone[i].yt - batDel_drone[i].y, 2));
+                    n_sin_BatDdro[i] = (batDel_drone[i].xt - batDel_drone[i].x) / d_BatDdro[i];
+                    n_cos_BatDdro[i] = (batDel_drone[i].yt - batDel_drone[i].y) / d_BatDdro[i];
                     n_tan_BatDdro[i] = n_sin_BatDdro[i] / n_cos_BatDdro[i];
                 }
                 else if (batDel_drone[i].FtoShelter_mode == FALSE && batDel_drone[i].free_mode == TRUE) // 避難所からTVへ戻るとき
                 {
                     //
+                }
+            }
+        }
+
+        // バッテリー配布ドローンの飛行開始タイミング決定処理
+        if (total_t == 1500)
+        {
+            for (i = 0; i < B_D; i++)
+            {
+                if (batDel_drone[i].batDel_flag == TRUE) // 配布するドローンのみ処理
+                {
+                    batDel_drone[i].free_mode = TRUE; // ドローンのフリー状態を有効化
                 }
             }
         }
@@ -1450,7 +1477,8 @@ int main(void)
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red'\n", new_data_file, new_ad_file); // ５台
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green'\n", new_data_file, new_ad_file); // 情報収集ドローンのみ(配送用ドローンも)
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'cyan','-' pt 5 lt rgbcolor'cyan','-' pt 5 lt rgbcolor'red'\n", new_data_file, new_ad_file); // １０台
-                fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 9 lt rgbcolor'green','-' pt 9 lt rgbcolor'red','-' pt 9 lt rgbcolor'blue','-' pt 9 lt rgbcolor'orange','-' pt 9 lt rgbcolor'black','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'cyan','-' pt 5 lt rgbcolor'cyan','-' pt 5 lt rgbcolor'cyan'\n", new_data_file, new_ad_file); // 情報収集ドローンとバッテリー配布ドローン
+                // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 9 lt rgbcolor'green','-' pt 9 lt rgbcolor'red','-' pt 9 lt rgbcolor'blue','-' pt 9 lt rgbcolor'orange','-' pt 9 lt rgbcolor'black','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'cyan','-' pt 5 lt rgbcolor'cyan'\n", new_data_file, new_ad_file); // 情報収集ドローンとバッテリー配布ドローン
+                fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 9 lt rgbcolor'green','-' pt 9 lt rgbcolor'red','-' pt 9 lt rgbcolor'blue','-' pt 9 lt rgbcolor'orange','-' pt 9 lt rgbcolor'black','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'cyan'\n", new_data_file, new_ad_file); // 情報収集ドローンとバッテリー配布ドローン(TV[0]]上の利用するドローンのみ表示)
 
                 fprintf(gp, "%f %f\n", v[0].x, v[0].y);
                 fprintf(gp, "e\n");
@@ -1504,8 +1532,8 @@ int main(void)
                 fprintf(gp, "e\n");
                 fprintf(gp, "%f %f\n", batDel_drone[5].x + 0.1, batDel_drone[5].y - 0.1);
                 fprintf(gp, "e\n");
-                fprintf(gp, "%f %f\n", batDel_drone[10].x + 0.1, batDel_drone[10].y - 0.1);
-                fprintf(gp, "e\n");
+                // fprintf(gp, "%f %f\n", batDel_drone[10].x + 0.1, batDel_drone[10].y - 0.1);
+                // fprintf(gp, "e\n");
 
                 /*
                 // ドローン1台
@@ -2315,25 +2343,83 @@ int main(void)
                 else if (batDel_drone[i].FtoShelter_mode == TRUE && batDel_drone[i].free_mode == TRUE) // ドローンが避難所へ向かうモードなら
                 {
                     //
-                    batDel_drone[i].x = batDel_drone[i].x + n_sin_BatDdro[i] * part_t_BatDdro[i] / r_d_velo;
-                    batDel_drone[i].y = batDel_drone[i].y + n_cos_BatDdro[i] * part_t_BatDdro[i] / r_d_velo;
+                    batDel_drone[i].x = batDel_drone[i].x + n_sin_BatDdro[i] * time_span / r_d_velo;
+                    batDel_drone[i].y = batDel_drone[i].y + n_cos_BatDdro[i] * time_span / r_d_velo;
+
+                    // バッテリー配布ドローンが目的の避難所に到達した場合
+                    if ((n_cos_BatDdro[i] < 0 && batDel_drone[i].y < batDel_drone[i].yt) || (n_cos_BatDdro[i] > 0 && batDel_drone[i].y > batDel_drone[i].yt))
+                    {
+                        batDel_drone[i].x = batDel_drone[i].xt; // 座標修正
+                        batDel_drone[i].y = batDel_drone[i].yt;
+
+                        part_t_BatDdro[i] = 0; // 部分時間初期化
+
+                        // バッテリー荷下ろし時間セット
+                        batDel_drone[i].Battery_Unload_time = 10 * 60; // バッテリー荷下ろし時間
+
+                        // バッテリー配布ドローンの避難所へ向かうモードを無効にする
+                        batDel_drone[i].FtoShelter_mode = FALSE;
+
+                        // printf("t=%.2lf : 避難所[%d]にて バッテリー配布ドローン[%d] がバッテリー荷下ろし開始\n", total_t, batDel_drone[i].target_shelter_num, i);
+                    }
                 }
-                else if (batDel_drone[i].Battery_Unload_time != 0 && batDel_drone[i].free_mode == TRUE) // 　ドローンが避難所でバッテリーを荷下ろししているなら
+                else if (batDel_drone[i].FtoShelter_mode == FALSE && batDel_drone[i].Battery_Unload_time != 0 && batDel_drone[i].free_mode == TRUE) // 　ドローンが避難所でバッテリーを荷下ろししているなら
                 {
                     batDel_drone[i].Battery_Unload_time -= time_span;
 
                     if (batDel_drone[i].Battery_Unload_time == 0) // バッテリー荷下ろし時間が終了したら
                     {
                         batDel_drone[i].Battery_Unload_time = 0; // バッテリー荷下ろし時間初期化
-                        batDel_drone[i].FtoShelter_mode = FALSE; // ドローンの避難所へ向かうモードを無効にする
+
+                        // 避難所のバッテリー量を更新
 
                         // ドローンと配送車の合流地点算出
                         // solveConfluence(v[batDel_drone[i].target_num].x, v[batDel_drone[i].target_num].y, batDel_drone[i].x, batDel_drone[i].y, 1.0, v_d_ratio, new_p[target[batDel_drone[i].target_num]].x, new_p[target[batDel_drone[i].target_num]].y, &batDel_drone[i].xt, &batDel_drone[i].yt, v_d_ratio, r_d_velo, r_velo, stay_t, new_p, batDel_drone, i, v, batDel_drone[i].target_num, current, target, cir, cir_flag, ind, ind_last, ind_relief, size);
+                        // debug 用
+                        batDel_drone[i].xt = 6.0;
+                        batDel_drone[i].yt = 6.0;
                     }
                 }
-                else if (batDel_drone[i].FtoShelter_mode == FALSE && batDel_drone[i].free_mode == TRUE) // ドローンが避難所からTVへ帰ってくるモードなら
+                else if (batDel_drone[i].FtoShelter_mode == FALSE && batDel_drone[i].Battery_Unload_time == 0 && batDel_drone[i].free_mode == TRUE && batDel_drone[i].Battery_load_time == 0) // ドローンが避難所からTVへ帰ってくるモードなら
                 {
-                    //
+                    // TVへの飛行のための座標更新処理
+                    batDel_drone[i].x = batDel_drone[i].x + n_sin_BatDdro[i] * time_span / r_d_velo;
+                    batDel_drone[i].y = batDel_drone[i].y + n_cos_BatDdro[i] * time_span / r_d_velo;
+
+                    // 目的の配送車に到着したら
+                    if ((n_cos_BatDdro[i] < 0 && batDel_drone[i].y < batDel_drone[i].yt) || (n_cos_BatDdro[i] > 0 && batDel_drone[i].y > batDel_drone[i].yt))
+                    {
+                        batDel_drone[i].x = batDel_drone[i].xt; // 座標修正
+                        batDel_drone[i].y = batDel_drone[i].yt;
+
+                        part_t_BatDdro[i] = 0; // 部分時間初期化
+
+                        batDel_drone[i].Battery_load_time = 10 * 60; // バッテリー積載時間セット
+                    }
+                }
+                else if (batDel_drone[i].FtoShelter_mode == FALSE && batDel_drone[i].Battery_Unload_time == 0 && batDel_drone[i].free_mode == TRUE && batDel_drone[i].Battery_load_time != 0) // ドローンがTVでバッテリーを積載中のとき
+                {
+                    batDel_drone[i].Battery_load_time -= time_span; // バッテリー積載時間減算
+
+                    batDel_drone[i].x = v[batDel_drone[i].follow_num].x; // TVに従う
+                    batDel_drone[i].y = v[batDel_drone[i].follow_num].y;
+
+                    if (batDel_drone[i].Battery_load_time == 0) // バッテリー積載時間が終了したら
+                    {
+                        batDel_drone[i].Battery_load_time = 0; // バッテリー積載時間初期化
+                        // printf("t=%.2lf : TV[%d]にて バッテリー配布ドローン[%d] がバッテリー積載完了\n", total_t, batDel_drone[i].follow_num, i);
+
+                        batDel_drone[i].FtoShelter_mode = TRUE; // ドローンの避難所へ向かうモードを有効にする
+
+                        batDel_drone[i].xt = new_p[batDel_drone[i].target_shelter_num].x; // ドローンの目的地を避難所に設定
+                        batDel_drone[i].yt = new_p[batDel_drone[i].target_shelter_num].y;
+
+                        // debug
+                        if (i == 0 || i == 5)
+                        {
+                            printf("t=%.2lf : バッテリー配布ドローン[%d] の目的避難所を [%d]に設定\n", total_t, i, batDel_drone[i].target_shelter_num);
+                        }
+                    }
                 }
             }
         }
@@ -2882,7 +2968,7 @@ int main(void)
         {
             if (batDel_drone[i].batDel_flag == TRUE)
             {
-                if (batDel_drone[i].Battery_Unload_time == 0 && batDel_drone[i].charge_time == 0 && batDel_drone[i].free_mode == TRUE) // TVで充電中でないかつ、避難所でバッテリー配布を行っていないとき
+                if (batDel_drone[i].Battery_Unload_time == 0 && batDel_drone[i].Battery_load_time == 0 && batDel_drone[i].charge_time == 0 && batDel_drone[i].free_mode == TRUE) // TVで充電中でないかつ、避難所でバッテリー配布を行っていないとき
                 {
                     part_t_BatDdro[i] += time_span;
                 }
