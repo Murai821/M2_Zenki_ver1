@@ -14,9 +14,9 @@
 #define M 5         /*配送車数*/
 #define D 8         /*ドローン数*/
 #define SD 5        /*シミュレーションで用いるドローン数*/
-#define C_D 5       /* 要求情報を回収するドローンの台数 */
+#define C_D 15      /* 要求情報を回収するドローンの台数 */
 #define B_D 20      /* バッテリー配布ドローン */
-#define I_SIZE 150  /*情報配列の要素数*/
+#define I_SIZE 100  /*情報配列の要素数*/
 #define Y_SIZE 10   /*薬の情報配列の二次元要素数*/
 #define Z_SIZE 6    /*薬の情報配列の三次元要素数*/
 #define INF 9999    /*無限大*/
