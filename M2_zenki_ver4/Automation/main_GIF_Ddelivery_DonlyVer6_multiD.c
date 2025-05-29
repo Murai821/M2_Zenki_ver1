@@ -1042,25 +1042,39 @@ int main(void)
 
     /************************************シミュレーション******************************************/
 
-    double total_t = 0;                                  // シミュレーションの合計時間
-    double termination_t = 500000;                       // シミュレーション強制終了時間
-    double r_velo = 360;                                 // 速度の逆数
-    double part_t[M] = {0};                              // 二点間の経過時間(配送車)
-    double part_t_dro[C_D] = {0};                        // 二点間の経過時間(ドローン)
-    int current[M] = {0};                                // 始点
-    int target[M];                                       // 終点
-    int current_dro[C_D];                                // ドローンの始点
-    int target_dro[C_D];                                 // ドローンの終点
-    double d[M];                                         // ２点間の距離(配送車)
-    double d_dro[C_D];                                   // ２点間の距離(ドローン)
-    double n_sin[M];                                     // サイン
-    double n_cos[M];                                     // コサイン
-    double n_tan[M];                                     // タンジェント
-    double n_sin_dro[C_D];                               // ドローンのサイン
-    double n_cos_dro[C_D];                               // ドローンのコサイン
-    double n_tan_dro[C_D];                               // ドローンのタンジェント
-    int ind[M] = {0};                                    // targetのindex(配送車)
-    int ind_dro[C_D] = {0};                              // targetのindex(ドローン)
+    double total_t = 0;                        // シミュレーションの合計時間
+    double termination_t = 500000;             // シミュレーション強制終了時間
+    double r_velo = 360;                       // 速度の逆数
+    double part_t[M] = {0};                    // 二点間の経過時間(配送車)
+    double part_t_infCdro[C_D] = {0};          // 二点間の経過時間(情報収集ドローン)
+    int current[M] = {0};                      // 始点
+    int target[M];                             // 終点
+    int current_infCdro[C_D];                  // 情報収集ドローンの始点
+    int target_infCdro[C_D];                   // 情報収集ドローンの終点
+    double d[M];                               // ２点間の距離(配送車)
+    double d_infCdro[C_D];                     // ２点間の距離(ドローン)
+    double n_sin[M];                           // サイン(配送車)
+    double n_cos[M];                           // コサイン
+    double n_tan[M];                           // タンジェント
+    double n_sin_infCdro[C_D];                 // 情報収集ドローンのサイン
+    double n_cos_infCdro[C_D];                 // 情報収集ドローンのコサイン
+    double n_tan_infCdro[C_D];                 // 情報収集ドローンのタンジェント
+    int ind[M] = {0};                          // targetのindex(配送車)
+    int ind_infCdro[C_D] = {0};                // targetのindex(ドローン)
+    double infC_drone_flight_time[C_D] = {0};  // 情報回収ドローンの飛行時間
+    double infC_drone_jyunkai_time[C_D] = {0}; // 情報回収ドローンの巡回時間
+    // バッテリー配布ドローンの変数
+    double part_t_BatDdro[B_D] = {0};          // 二点間の経過時間(バッテリー配布ドローン)
+    int current_BatDdro[B_D];                  // ドローンの始点
+    int target_BatDdro[B_D];                   // ドローンの終点
+    int ind_BatDdro[B_D] = {0};                // targetのindex(ドローン)
+    double d_BatDdro[B_D];                     // ２点間の距離(ドローン)
+    double n_sin_BatDdro[B_D];                 // ドローンのサイン
+    double n_cos_BatDdro[B_D];                 // ドローンのコサイン
+    double n_tan_BatDdro[B_D];                 // ドローンのタンジェント
+    double batD_drone_flight_time[C_D] = {0};  // ドローンの飛行時間
+    double batD_drone_jyunkai_time[C_D] = {0}; // ドローンの巡回時間
+    //
     double time_span = 10;                               // 増加時間
     double stay_t[M] = {0};                              // 避難所待機時間カウンター
     double stay = 1800;                                  // 避難所,配送センターでの物資積載時間
@@ -1167,8 +1181,6 @@ int main(void)
     double m_v_f = 60 * 14.5;                                                        // ドローンの配送車間の平均飛行時間（分）mean_value_flight 14分
     double flight_time_lag = removeOnePlace((m_v_f * M + m_v_f * 2 * (M - 1)) / SD); // ドローンの飛行開始時間の時間差(60秒 * 分)導出用
     int drone_next_target[M] = {1, 2, 3, 4, 0};                                      // ドローンが巡回路をまたいで向かう配送車の番号の対応配列：
-    double infC_drone_flight_time[C_D] = {0};                                        // 要求情報回収ドローンの飛行時間
-    double infC_drone_jyunkai_time[C_D] = {0};                                       // 要求情報回収ドローンの巡回時間
 
     // ドローンの合流点を決める際のパラメータ
     int answerFlag = 0;    // 関数の戻り値を格納
@@ -1210,13 +1222,13 @@ int main(void)
     //  target_droのindex初期化
     for (i = 0; i < C_D; i++)
     {
-        ind_dro[i] = 1;
+        ind_infCdro[i] = 1;
     }
     // target_droの初期化
     for (i = 0; i < C_D; i++)
     {
-        current_dro[i] = 0;
-        target_dro[i] = reverse_cir[i % M][1];
+        current_infCdro[i] = 0;
+        target_infCdro[i] = reverse_cir[i % M][1];
     }
 
     // 情報回収用ドローンの出発時間初期化
@@ -1303,9 +1315,7 @@ int main(void)
         // printf("infC_drone[%d].follow_num: %d\n", i, infC_drone[i].follow_num);
     }
 
-    // debug
-    // printf("batDel_drone[10]のfollow_num: %d\n", batDel_drone[10].follow_num);
-
+    // ファイルポインタのオープン
     fp_inf_interval = fopen(inf_interval_file, "w"); // 平均情報到着間隔ファイルのオープン
     fp_inf_delay = fopen(inf_delay_file, "w");       // 平均情報遅延間隔ファイルのオープン
     fp_inf_delay_part = fopen(inf_delay_part_file, "w");
@@ -1323,7 +1333,8 @@ int main(void)
     {
         // debug
         // printf("total_t: %f\n", total_t);
-        // 配送車のサインコサイン
+
+        /***** 配送車のサインコサイン ******/
         for (i = 0; i < M; i++)
         {
             d[i] = sqrt(pow(new_p[target[i]].x - new_p[current[i]].x, 2) + pow(new_p[target[i]].y - new_p[current[i]].y, 2));
@@ -1331,26 +1342,47 @@ int main(void)
             n_cos[i] = (new_p[target[i]].y - new_p[current[i]].y) / d[i];
             n_tan[i] = n_sin[i] / n_cos[i];
         }
-        // 情報収集ドローンのサインコサイン
+
+        /***** 情報収集ドローンのサインコサイン ******/
         for (i = 0; i < C_D; i++)
         {
-            if (current_dro[i] > INF)
+            if (current_infCdro[i] > INF)
             {
                 // current_dro[i] = reverse_cir[i % M][ind_dro[i] - 1]; // ドローンの始点が異常値な場合は適切な値にセット
             }
-            current_dro[i] = reverse_cir[i % M][ind_dro[i] - 1];
-            target_dro[i] = reverse_cir[i % M][ind_dro[i]]; // ドローンの終点を設定
+            current_infCdro[i] = reverse_cir[i % M][ind_infCdro[i] - 1];
+            target_infCdro[i] = reverse_cir[i % M][ind_infCdro[i]]; // ドローンの終点を設定
             //  debug
             if (total_t >= 0 && total_t <= 20)
             {
                 // printf("current_dro[%d]: %d, target_dro[%d]: %d\n", i, current_dro[i], i, target_dro[i]);
             }
-            d_dro[i] = sqrt(pow(new_p[target_dro[i]].x - new_p[current_dro[i]].x, 2) + pow(new_p[target_dro[i]].y - new_p[current_dro[i]].y, 2));
-            n_sin_dro[i] = (new_p[target_dro[i]].x - new_p[current_dro[i]].x) / d_dro[i];
-            n_cos_dro[i] = (new_p[target_dro[i]].y - new_p[current_dro[i]].y) / d_dro[i];
-            n_tan_dro[i] = n_sin_dro[i] / n_cos_dro[i];
+            d_infCdro[i] = sqrt(pow(new_p[target_infCdro[i]].x - new_p[current_infCdro[i]].x, 2) + pow(new_p[target_infCdro[i]].y - new_p[current_infCdro[i]].y, 2));
+            n_sin_infCdro[i] = (new_p[target_infCdro[i]].x - new_p[current_infCdro[i]].x) / d_infCdro[i];
+            n_cos_infCdro[i] = (new_p[target_infCdro[i]].y - new_p[current_infCdro[i]].y) / d_infCdro[i];
+            n_tan_infCdro[i] = n_sin_infCdro[i] / n_cos_infCdro[i];
         }
 
+        /***** バッテリー配布ドローンのサインコサイン ******/
+        for (i = 0; i < B_D; i++)
+        {
+            if (batDel_drone[i].batDel_flag == TRUE) // 配布するドローンのみ処理
+            {
+                if (batDel_drone[i].FtoShelter_mode == TRUE && batDel_drone[i].free_mode == TRUE) // 避難所へバッテリーを届けに行くとき
+                {
+                    d_BatDdro[i] = sqrt(pow(new_p[batDel_drone[i].target_shelter_num].x - batDel_drone[i].x, 2) + pow(new_p[batDel_drone[i].target_shelter_num].y - batDel_drone[i].y, 2));
+                    n_sin_BatDdro[i] = (new_p[batDel_drone[i].target_shelter_num].x - batDel_drone[i].x) / d_BatDdro[i];
+                    n_cos_BatDdro[i] = (new_p[batDel_drone[i].target_shelter_num].y - batDel_drone[i].y) / d_BatDdro[i];
+                    n_tan_BatDdro[i] = n_sin_BatDdro[i] / n_cos_BatDdro[i];
+                }
+                else if (batDel_drone[i].FtoShelter_mode == FALSE && batDel_drone[i].free_mode == TRUE) // 避難所からTVへ戻るとき
+                {
+                    //
+                }
+            }
+        }
+
+        /***************** gnuplotによるシミュレーション描画処理 *******************/
         // if (total_t >= 0 && total_t <= 20000)
         if (total_t >= 0 && total_t <= 26000)
         {
@@ -1528,8 +1560,8 @@ int main(void)
             }
             else if (infC_drone[i].charge_time == 0) // 充電する必要ないなら目的の避難所へ飛行
             {
-                infC_drone[i].x = new_p[current_dro[i]].x + n_sin_dro[i] * part_t_dro[i] / r_d_velo;
-                infC_drone[i].y = new_p[current_dro[i]].y + n_cos_dro[i] * part_t_dro[i] / r_d_velo;
+                infC_drone[i].x = new_p[current_infCdro[i]].x + n_sin_infCdro[i] * part_t_infCdro[i] / r_d_velo;
+                infC_drone[i].y = new_p[current_infCdro[i]].y + n_cos_infCdro[i] * part_t_infCdro[i] / r_d_velo;
 
                 infC_drone_flight_time[i] += time_span; // ドローンの飛行時間を加算
 
@@ -1555,18 +1587,18 @@ int main(void)
             }
         }
 
-        /********************************************** 情報回収ドローンの避難所間飛行処理 **************************************************************************************************/
+        /********************************************** 情報収集ドローンの避難所間飛行処理 **************************************************************************************************/
         /*****************(追加 5/23)各ドローンにおいて始点から終点へ到達したときの処理****************************/
         for (i = 0; i < C_D; i++)
         {
-            if ((ind_dro[i] == size[i % M] - 1 && n_cos_dro[i] < 0 && infC_drone[i].y < new_p[reverse_cir[i % M][0]].y) || (ind_dro[i] == size[i % M] - 1 && n_cos_dro[i] > 0 && infC_drone[i].y > new_p[reverse_cir[i % M][0]].y))
+            if ((ind_infCdro[i] == size[i % M] - 1 && n_cos_infCdro[i] < 0 && infC_drone[i].y < new_p[reverse_cir[i % M][0]].y) || (ind_infCdro[i] == size[i % M] - 1 && n_cos_infCdro[i] > 0 && infC_drone[i].y > new_p[reverse_cir[i % M][0]].y))
             { // ①一周したら、ループを初期化してもう一周
-                ind_dro[i] = 1;
-                current_dro[i] = 0;
-                target_dro[i] = reverse_cir[i % M][ind_dro[i]]; // 目的避難所変更
-                infC_drone[i].x = new_p[current_dro[i]].x;      // 座標修正
-                infC_drone[i].y = new_p[current_dro[i]].y;
-                part_t_dro[i] = 0;
+                ind_infCdro[i] = 1;
+                current_infCdro[i] = 0;
+                target_infCdro[i] = reverse_cir[i % M][ind_infCdro[i]]; // 目的避難所変更
+                infC_drone[i].x = new_p[current_infCdro[i]].x;          // 座標修正
+                infC_drone[i].y = new_p[current_infCdro[i]].y;
+                part_t_infCdro[i] = 0;
 
                 // printf(" fff 収集ドローン[%d]の周回時間: %lf[min]\n", i, infC_drone_jyunkai_time[i] / 60);
                 //   各ドローンの一巡回にかかる時間をファイルに書き込む
@@ -1574,24 +1606,24 @@ int main(void)
                 infC_drone_jyunkai_time[i] = 0; // ドローンの飛行時間を初期化
 
                 // 次の避難所へ行く間に充電量が不足する場合はその避難所で充電する
-                if (infC_drone_flight_time[i] + new_di[current_dro[i]][target_dro[i]] * r_d_velo > capable_flight_time)
+                if (infC_drone_flight_time[i] + new_di[current_infCdro[i]][target_infCdro[i]] * r_d_velo > capable_flight_time)
                 {
                     infC_drone[i].charge_time = infC_drone_flight_time[i] * charge_constant; // 充電時間を設定
                     infC_drone_flight_time[i] = 0;                                           // ドローンの飛行時間を初期化
                     // printf("ドローン[%d]は集積所で充電開始  充電時間: %lf[min]\n", i, (double)infC_drone[i].charge_time / 60);
                 }
             }
-            else if ((n_cos_dro[i] < 0 && infC_drone[i].y < new_p[target_dro[i]].y) || (n_cos_dro[i] > 0 && infC_drone[i].y > new_p[target_dro[i]].y))
+            else if ((n_cos_infCdro[i] < 0 && infC_drone[i].y < new_p[target_infCdro[i]].y) || (n_cos_infCdro[i] > 0 && infC_drone[i].y > new_p[target_infCdro[i]].y))
             { // ③それ以外において、targetに到達したらcurrentとtarget更新
-                ind_dro[i] += 1;
-                current_dro[i] = target_dro[i];
-                target_dro[i] = reverse_cir[i % M][ind_dro[i]]; // 目的避難所変更
-                infC_drone[i].x = new_p[current_dro[i]].x;      // 座標修正
-                infC_drone[i].y = new_p[current_dro[i]].y;
-                part_t_dro[i] = 0;
+                ind_infCdro[i] += 1;
+                current_infCdro[i] = target_infCdro[i];
+                target_infCdro[i] = reverse_cir[i % M][ind_infCdro[i]]; // 目的避難所変更
+                infC_drone[i].x = new_p[current_infCdro[i]].x;          // 座標修正
+                infC_drone[i].y = new_p[current_infCdro[i]].y;
+                part_t_infCdro[i] = 0;
 
                 // 次の避難所へ行く間に充電量が不足する場合はその避難所で充電する
-                if (infC_drone_flight_time[i] + new_di[current_dro[i]][target_dro[i]] * r_d_velo > capable_flight_time)
+                if (infC_drone_flight_time[i] + new_di[current_infCdro[i]][target_infCdro[i]] * r_d_velo > capable_flight_time)
                 {
                     infC_drone[i].charge_time = infC_drone_flight_time[i] * charge_constant; // 充電時間を設定
                     infC_drone_flight_time[i] = 0;                                           // ドローンの飛行時間を初期化
@@ -1603,17 +1635,17 @@ int main(void)
                 // 避難所との薬の情報配列の交換(避難所→ドローン)
                 for (j = 0; j < N; j++)
                 {
-                    if (new_p[current_dro[i]].i_med_ptr[j] > infC_drone[i].i_med_ptr[j] && current_dro[i] >= (i % M) * 10 + 1 && current_dro[i] <= ((i % M) + 1) * 10) // 同じ巡回路内の避難所の要求情報を回収
+                    if (new_p[current_infCdro[i]].i_med_ptr[j] > infC_drone[i].i_med_ptr[j] && current_infCdro[i] >= (i % M) * 10 + 1 && current_infCdro[i] <= ((i % M) + 1) * 10) // 同じ巡回路内の避難所の要求情報を回収
                     {
-                        for (k = infC_drone[i].i_med_ptr[j]; k < new_p[current_dro[i]].i_med_ptr[j]; k++)
+                        for (k = infC_drone[i].i_med_ptr[j]; k < new_p[current_infCdro[i]].i_med_ptr[j]; k++)
                         {
-                            if (new_p[current_dro[i]].inf_med[j][k][5] == FALSE) // 既に他の配送車やドローンに要求情報が回収されていなければ
+                            if (new_p[current_infCdro[i]].inf_med[j][k][5] == FALSE) // 既に他の配送車やドローンに要求情報が回収されていなければ
                             {
-                                new_p[current_dro[i]].inf_med[j][k][5] = TRUE; // 回収済みのフラグを立てる
+                                new_p[current_infCdro[i]].inf_med[j][k][5] = TRUE; // 回収済みのフラグを立てる
 
                                 for (m = 0; m < Z_SIZE; m++)
                                 {
-                                    infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j]][m] = new_p[current_dro[i]].inf_med[j][k][m]; // 薬の情報コピー
+                                    infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j]][m] = new_p[current_infCdro[i]].inf_med[j][k][m]; // 薬の情報コピー
                                 }
                                 infC_drone[i].i_med_ptr[j] += 1;
 
@@ -1626,7 +1658,7 @@ int main(void)
                                     break;
                                 }*/
 
-                                printf(" **** t=%lf : 避難所[%d]の情報を ドローン[%d]が回収\n", total_t, current_dro[i], i);
+                                printf(" **** t=%lf : 避難所[%d]の情報を ドローン[%d]が回収\n", total_t, current_infCdro[i], i);
 
                                 // ファイルへの書き込み
                                 // fprintf(fp_Medinf_delay, "t=%lf generate_time:%lf new_p[%d]->drone[%d]\n", total_t, infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0], current_dro[i], i);
@@ -1635,7 +1667,7 @@ int main(void)
                                 fprintf(fp_ETC_dro, "%lf\n", total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]); // 生成されてからドローンで回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
                                 infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][4] = total_t;
 
-                                fprintf(fp_Medinf_collect_delay, "t=%lf generate_time:%lf new_p[%d]->drone[%d] %lf\n", total_t, infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0], current_dro[i], i, total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]);
+                                fprintf(fp_Medinf_collect_delay, "t=%lf generate_time:%lf new_p[%d]->drone[%d] %lf\n", total_t, infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0], current_infCdro[i], i, total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]);
                                 // fprintf(fp_Medinf_collect_delay, "%lf\n", total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]); // 生成されてからドローンで回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
                             }
                         }
@@ -2283,10 +2315,21 @@ int main(void)
                 else if (batDel_drone[i].FtoShelter_mode == TRUE && batDel_drone[i].free_mode == TRUE) // ドローンが避難所へ向かうモードなら
                 {
                     //
+                    batDel_drone[i].x = batDel_drone[i].x + n_sin_BatDdro[i] * part_t_BatDdro[i] / r_d_velo;
+                    batDel_drone[i].y = batDel_drone[i].y + n_cos_BatDdro[i] * part_t_BatDdro[i] / r_d_velo;
                 }
                 else if (batDel_drone[i].Battery_Unload_time != 0 && batDel_drone[i].free_mode == TRUE) // 　ドローンが避難所でバッテリーを荷下ろししているなら
                 {
                     batDel_drone[i].Battery_Unload_time -= time_span;
+
+                    if (batDel_drone[i].Battery_Unload_time == 0) // バッテリー荷下ろし時間が終了したら
+                    {
+                        batDel_drone[i].Battery_Unload_time = 0; // バッテリー荷下ろし時間初期化
+                        batDel_drone[i].FtoShelter_mode = FALSE; // ドローンの避難所へ向かうモードを無効にする
+
+                        // ドローンと配送車の合流地点算出
+                        // solveConfluence(v[batDel_drone[i].target_num].x, v[batDel_drone[i].target_num].y, batDel_drone[i].x, batDel_drone[i].y, 1.0, v_d_ratio, new_p[target[batDel_drone[i].target_num]].x, new_p[target[batDel_drone[i].target_num]].y, &batDel_drone[i].xt, &batDel_drone[i].yt, v_d_ratio, r_d_velo, r_velo, stay_t, new_p, batDel_drone, i, v, batDel_drone[i].target_num, current, target, cir, cir_flag, ind, ind_last, ind_relief, size);
+                    }
                 }
                 else if (batDel_drone[i].FtoShelter_mode == FALSE && batDel_drone[i].free_mode == TRUE) // ドローンが避難所からTVへ帰ってくるモードなら
                 {
@@ -2825,12 +2868,24 @@ int main(void)
                 part_t[i] += time_span;
             }
         }
-        // 部分時間を更新（充電中でないかつ飛行開始しているのなら）：ドローン
+        // 部分時間を更新（充電中でないかつ飛行開始しているのなら）：情報収集ドローン
         for (i = 0; i < C_D; i++)
         {
             if (infC_drone[i].charge_time == 0 && infC_drone[i].flight_start_time == 0)
             {
-                part_t_dro[i] += time_span;
+                part_t_infCdro[i] += time_span;
+            }
+        }
+
+        // 部分時間を更新：バッテリー配布ドローン
+        for (i = 0; i < B_D; i++)
+        {
+            if (batDel_drone[i].batDel_flag == TRUE)
+            {
+                if (batDel_drone[i].Battery_Unload_time == 0 && batDel_drone[i].charge_time == 0 && batDel_drone[i].free_mode == TRUE) // TVで充電中でないかつ、避難所でバッテリー配布を行っていないとき
+                {
+                    part_t_BatDdro[i] += time_span;
+                }
             }
         }
     }

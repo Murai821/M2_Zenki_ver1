@@ -1,4 +1,4 @@
-// 新手法２　ドローンが独立して避難所間を飛行しながら要求情報を回収する手法における基本プログラ厶（避難所で充電できる場合）
+// 新手法２　ドローンが独立して避難所間を飛行しながら要求情報を回収する手法における基本プログラ厶（避難所で充電できる場合）ドローン複数
 // GIFアニメーションで表示するプログラム
 // コンパイル方法「gcc -o my_program main.c module.c -lm」
 #include <stdio.h>
@@ -980,7 +980,7 @@ int main(void)
     double part_t_dro[C_D] = {0};                        // 二点間の経過時間(ドローン)
     int current[M] = {0};                                // 始点
     int target[M];                                       // 終点
-    int current_dro[C_D] = {0};                          // ドローンの始点
+    int current_dro[C_D];                                // ドローンの始点
     int target_dro[C_D];                                 // ドローンの終点
     double d[M];                                         // ２点間の距離(配送車)
     double d_dro[C_D];                                   // ２点間の距離(ドローン)
@@ -1146,7 +1146,25 @@ int main(void)
     // target_droの初期化
     for (i = 0; i < C_D; i++)
     {
+        current_dro[i] = 0;
         target_dro[i] = reverse_cir[i % M][1];
+    }
+
+    // 情報回収用ドローンの出発時間初期化
+    double devision = C_D / M;     // ドローンの数を配送車の数で割る
+    double total_di_time[M] = {0}; // 各小回線の総時間
+    double f_s_time = 0;
+    for (i = 0; i < M; i++)
+    {
+        total_di_time[i] = total_di[i] * r_d_velo;                   // 各小回線の総時間を計算
+        total_di_time[i] = total_di_time[i] * (charge_constant + 1); // 充電時間も考慮した飛行間隔に（充電なしの場合*(充電係数+1)）
+        printf("total_di_time[%d]: %f\n", i, total_di_time[i]);
+    }
+    for (i = 0; i < C_D; i++)
+    {
+        f_s_time = total_di_time[i % M] / (double)devision * (double)(i - i % M) / M;
+        infC_drone[i].flight_start_time = (int)f_s_time - (int)f_s_time % 10; // ドローンの出発時間を設定(少数第一位を0にする)
+        printf("infC_drone[%d].flight_start_time: %f\n", i, infC_drone[i].flight_start_time);
     }
 
     // 配送車の物資を初期化
@@ -1188,6 +1206,8 @@ int main(void)
     /************************************ ループ処理 ***********************************************************/
     while (1)
     {
+        // debug
+        // printf("total_t: %f\n", total_t);
         // 配送車のサインコサイン
         for (i = 0; i < M; i++)
         {
@@ -1199,6 +1219,17 @@ int main(void)
         // ドローンのサインコサイン
         for (i = 0; i < C_D; i++)
         {
+            if (current_dro[i] > INF)
+            {
+                // current_dro[i] = reverse_cir[i % M][ind_dro[i] - 1]; // ドローンの始点が異常値な場合は適切な値にセット
+            }
+            current_dro[i] = reverse_cir[i % M][ind_dro[i] - 1];
+            target_dro[i] = reverse_cir[i % M][ind_dro[i]]; // ドローンの終点を設定
+            //  debug
+            if (total_t >= 0 && total_t <= 20)
+            {
+                // printf("current_dro[%d]: %d, target_dro[%d]: %d\n", i, current_dro[i], i, target_dro[i]);
+            }
             d_dro[i] = sqrt(pow(new_p[target_dro[i]].x - new_p[current_dro[i]].x, 2) + pow(new_p[target_dro[i]].y - new_p[current_dro[i]].y, 2));
             n_sin_dro[i] = (new_p[target_dro[i]].x - new_p[current_dro[i]].x) / d_dro[i];
             n_cos_dro[i] = (new_p[target_dro[i]].y - new_p[current_dro[i]].y) / d_dro[i];
@@ -1206,7 +1237,7 @@ int main(void)
         }
 
         // if (total_t >= 0 && total_t <= 20000)
-        if (total_t >= 278000 && total_t <= 280000)
+        if (total_t >= 0 && total_t <= 16000)
         {
             if ((int)(total_t) % 50 == 0)
             { // 50sごとに描画
@@ -1269,7 +1300,8 @@ int main(void)
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'gold','-' pt 5 lt rgbcolor'dark-turquoise'\n", new_data_file, new_ad_file);
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta'\n", new_data_file, new_ad_file);
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta'\n", new_data_file, new_ad_file);
-                fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red'\n", new_data_file, new_ad_file);
+                // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red'\n", new_data_file, new_ad_file); // ５台
+                fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green'\n", new_data_file, new_ad_file); // １０台
 
                 fprintf(gp, "%f %f\n", v[0].x, v[0].y);
                 fprintf(gp, "e\n");
@@ -1306,6 +1338,16 @@ int main(void)
                 fprintf(gp, "%f %f\n", infC_drone[3].x - 0.1, infC_drone[3].y - 0.1);
                 fprintf(gp, "e\n");
                 fprintf(gp, "%f %f\n", infC_drone[4].x - 0.1, infC_drone[4].y - 0.1);
+                fprintf(gp, "e\n");
+                fprintf(gp, "%f %f\n", infC_drone[5].x - 0.1, infC_drone[5].y - 0.1);
+                fprintf(gp, "e\n");
+                fprintf(gp, "%f %f\n", infC_drone[6].x - 0.1, infC_drone[6].y - 0.1);
+                fprintf(gp, "e\n");
+                fprintf(gp, "%f %f\n", infC_drone[7].x - 0.1, infC_drone[7].y - 0.1);
+                fprintf(gp, "e\n");
+                fprintf(gp, "%f %f\n", infC_drone[8].x - 0.1, infC_drone[8].y - 0.1);
+                fprintf(gp, "e\n");
+                fprintf(gp, "%f %f\n", infC_drone[9].x - 0.1, infC_drone[9].y - 0.1);
                 fprintf(gp, "e\n");
 
                 /*
@@ -1347,10 +1389,19 @@ int main(void)
             }
         }
         /**************ドローンの座標更新*****************/
-        for (i = 0; i < SD; i++)
+        for (i = 0; i < C_D; i++)
         {
-            // 充電する必要ないなら目的の避難所へ飛行
-            if (infC_drone[i].charge_time == 0)
+            // 飛行開始時間まで待機
+            if (infC_drone[i].flight_start_time != 0)
+            {
+                infC_drone[i].flight_start_time -= time_span; // ドローンの飛行開始時間を減らす
+                if (infC_drone[i].flight_start_time == 0)     // 飛行開始時間が0以下になったら
+                {
+                    infC_drone[i].flight_start_time = 0; // 飛行開始時間を0にする
+                    printf("drone[%d]の飛行開始時間: %lf\n", i, total_t);
+                }
+            }
+            else if (infC_drone[i].charge_time == 0) // 充電する必要ないなら目的の避難所へ飛行
             {
                 infC_drone[i].x = new_p[current_dro[i]].x + n_sin_dro[i] * part_t_dro[i] / r_d_velo;
                 infC_drone[i].y = new_p[current_dro[i]].y + n_cos_dro[i] * part_t_dro[i] / r_d_velo;
@@ -1358,6 +1409,13 @@ int main(void)
                 infC_drone_flight_time[i] += time_span; // ドローンの飛行時間を加算
 
                 infC_drone_jyunkai_time[i] += time_span; // ドローンの巡回時間を加算
+
+                // debug
+                if (total_t >= 9400 && total_t <= 9600 && i == 9)
+                {
+                    // printf("ドローン[%d]の座標: %lf,%lf\n", i, infC_drone[i].x, infC_drone[i].y);
+                    // printf("current_dro[%d]: %d, target_dro[%d]: %d\n", i, current_dro[i], i, target_dro[i]);
+                }
             }
             else if (infC_drone[i].charge_time != 0) // 充電する必要があるなら
             {
@@ -2607,10 +2665,10 @@ int main(void)
                 part_t[i] += time_span;
             }
         }
-        // 部分時間を更新（充電中でないなら）：ドローン
+        // 部分時間を更新（充電中でないかつ飛行開始しているのなら）：ドローン
         for (i = 0; i < C_D; i++)
         {
-            if (infC_drone[i].charge_time == 0)
+            if (infC_drone[i].charge_time == 0 && infC_drone[i].flight_start_time == 0)
             {
                 part_t_dro[i] += time_span;
             }
