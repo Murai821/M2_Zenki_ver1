@@ -885,6 +885,201 @@ int solveConfluence(double xv, double yv, double xd, double yd, double vv, doubl
 }
 #endif
 
+// solveConfluence2関数（バッテリー配布ドローンと帰還するTVとの合流地点導出）
+int solveConfluenceVer2(double xv, double yv, double xd, double yd, double vv, double vd, double xs, double ys, double *x, double *y, double v_d_ratio, double r_d_velo, double r_velo, double stay_t[], double dis_stay_t[], point *new_p, dro *drone, int dnum, vehicle *v, int vnum, int current[], int target[], int **cir, int **cir_flag, int ind[], int ind_last[], int ind_relief[], int *size)
+{
+    double d_sol = 0;                      // 避難所間で追いつけない場合の補正距離
+    double d_com = 0;                      // ドローンが追いつけるか比較するための距離
+    double v_com = 0;                      // 比較用（車）
+    double d_d_v = retDis(xd, yd, xv, yv); // ドローン-目的の避難所間の距離
+    double xs_dash, ys_dash, xs_dash_dash, ys_dash_dash, xs_dash_dash_dash, ys_dash_dash_dash, sin_sol, cos_sol;
+    int answerFlag;
+
+    /*
+    if ((ind[drone[dnum].follow_num] > ind_last[drone[dnum].follow_num]) || ((ind[vnum] > ind_last[vnum]) && stay_t[vnum] == 0) || ((ind[vnum] - 1 == ind_last[vnum]) && stay_t[vnum] != 0 && (stay_t[vnum] < (d_d_v * r_d_velo)))) // ドローンの飛行をやめる条件(今の巡回路がすべての避難所を回り終わった、または次の巡回路の最後の避難所に追いつけない)
+    {
+        drone[dnum].free_mode = FALSE; // free_modeオフ
+    }*/
+
+    /**************目的TVが集積所にいる*************/
+    if (dis_stay_t[vnum] != 0 && dis_stay_t[vnum] > d_d_v * r_d_velo) // 目的の配送車が集積所で物資を積載中で,かつ ドローンが追いつける時
+    {
+        drone[dnum].xt = new_p[0].x; // ドローンの目的地を集積所に設定
+        drone[dnum].yt = new_p[0].y;
+    }
+    else if (dis_stay_t[vnum] != 0 && dis_stay_t[vnum] < d_d_v * r_d_velo) // 目的の配送車が避難所で物資をおろし中で,かつ ドローンが追いつけない時
+    {
+        d_sol = dis_stay_t[vnum] / r_velo; // 戻す距離を算出
+
+        xs = new_p[current[vnum]].x;
+        ys = new_p[current[vnum]].y;
+
+        int next_index = ind[vnum];
+        while (1)
+        {
+            xs_dash = new_p[cir[vnum][next_index]].x;
+            ys_dash = new_p[cir[vnum][next_index]].y;
+
+            sin_sol = retSin(xs_dash, ys_dash, xs, ys);
+            cos_sol = retCos(xs_dash, ys_dash, xs, ys);
+
+            answerFlag = solveSystem(xs - (d_sol * sin_sol), ys - (d_sol * cos_sol), drone[dnum].x, drone[dnum].y, 1.0, v_d_ratio, xs_dash, ys_dash, &drone[dnum].xt, &drone[dnum].yt);
+
+            if (answerFlag == -1)
+            {
+                if (cir_flag[vnum][next_index] == TRUE || (cir[vnum][next_index] == 0 && next_index == size[vnum] - 1))
+                {
+                    drone[dnum].xt = new_p[cir[vnum][next_index]].x;
+                    drone[dnum].yt = new_p[cir[vnum][next_index]].y;
+                    break;
+                }
+            }
+            else if (answerFlag == -2)
+            {
+                printf("エラー終了\n");
+                break;
+            }
+            else
+            {
+                break;
+            }
+
+            d_sol += retDis(xs, ys, xs_dash, ys_dash);
+
+            xs = xs_dash;
+            ys = ys_dash;
+
+            next_index++;
+        }
+    }
+    else /******************************************* 目的TVが集積所にいない *****************************************************/
+    {
+        if (stay_t[vnum] != 0 && stay_t[vnum] > d_d_v * r_d_velo) // 目的の配送車が避難所で物資をおろし中で,かつ ドローンが追いつける時
+        {
+            // drone[dnum].xt = new_p[current[drone[dnum].target_num]].x;
+            // drone[dnum].yt = new_p[current[drone[dnum].target_num]].y;
+            drone[dnum].xt = new_p[current[drone[dnum].follow_num]].x; // 追従する配送車の現在避難所に目的地を設定
+            drone[dnum].yt = new_p[current[drone[dnum].follow_num]].y;
+        }
+        else if (stay_t[vnum] != 0 && stay_t[vnum] < d_d_v * r_d_velo) // 目的の配送車が避難所で物資をおろし中で,かつ ドローンが追いつけない時
+        {
+            d_sol = stay_t[vnum] / r_velo; // 戻す距離を算出
+
+            xs = new_p[current[vnum]].x;
+            ys = new_p[current[vnum]].y;
+
+            int next_index = ind[vnum];
+            while (1)
+            {
+                xs_dash = new_p[cir[vnum][next_index]].x;
+                ys_dash = new_p[cir[vnum][next_index]].y;
+
+                sin_sol = retSin(xs_dash, ys_dash, xs, ys);
+                cos_sol = retCos(xs_dash, ys_dash, xs, ys);
+
+                answerFlag = solveSystem(xs - (d_sol * sin_sol), ys - (d_sol * cos_sol), drone[dnum].x, drone[dnum].y, 1.0, v_d_ratio, xs_dash, ys_dash, &drone[dnum].xt, &drone[dnum].yt);
+
+                if (answerFlag == -1)
+                {
+                    if (cir_flag[vnum][next_index] == TRUE || (cir[vnum][next_index] == 0 && next_index == size[vnum] - 1))
+                    {
+                        drone[dnum].xt = new_p[cir[vnum][next_index]].x;
+                        drone[dnum].yt = new_p[cir[vnum][next_index]].y;
+                        break;
+                    }
+                }
+                else if (answerFlag == -2)
+                {
+                    printf("エラー終了\n");
+                    break;
+                }
+                else
+                {
+                    break;
+                }
+
+                // d_sol += retDis(xs, ys, v[vnum].x, v[vnum].y);
+                /*
+                if (next_index - ind[vnum] == 0)
+                {
+                    d_sol += retDis(xs, ys, v[vnum].x, v[vnum].y);
+                }
+                else
+                {
+                    d_sol += retDis(xs, ys, xs_dash, ys_dash);
+                }
+                    */
+                d_sol += retDis(xs, ys, xs_dash, ys_dash);
+
+                xs = xs_dash;
+                ys = ys_dash;
+
+                next_index++;
+            }
+        }
+        else if (stay_t[vnum] == 0) // 目的の配送車が巡回路を巡回中の時
+        {
+            answerFlag = solveSystem(v[vnum].x, v[vnum].y, drone[dnum].x, drone[dnum].y, 1.0, v_d_ratio, new_p[target[vnum]].x, new_p[target[vnum]].y, &drone[dnum].xt, &drone[dnum].yt);
+
+            if (answerFlag == -2) // 関数の導出エラー
+            {
+                printf("solveSystem関数のエラー\n");
+                return -1;
+            }
+            else if (answerFlag == -1) // ドローンが追いつけない時
+            {
+                if (cir_flag[vnum][ind[vnum]] == TRUE || (cir[vnum][ind[vnum]] == 0 && ind[vnum] == size[vnum] - 1)) // 配送車の目的避難所が物資を下ろす避難所なら or 集積所（物資を補給するための帰還なら）
+                {
+                    drone[dnum].xt = new_p[cir[vnum][ind[vnum]]].x;
+                    drone[dnum].yt = new_p[cir[vnum][ind[vnum]]].y;
+                }
+                else
+                {
+                    int next_index = ind[vnum] + 1;
+
+                    xs = new_p[target[vnum]].x;
+                    ys = new_p[target[vnum]].y;
+
+                    while (next_index < size[vnum])
+                    {
+                        xs_dash = new_p[cir[vnum][next_index]].x;
+                        ys_dash = new_p[cir[vnum][next_index]].y;
+
+                        d_sol += (next_index == ind[vnum] + 1) ? retDis(xs, ys, v[vnum].x, v[vnum].y) : retDis(xs, ys, xs_dash, ys_dash);
+                        sin_sol = retSin(xs_dash, ys_dash, xs, ys);
+                        cos_sol = retCos(xs_dash, ys_dash, xs, ys);
+
+                        answerFlag = solveSystem(xs - (d_sol * sin_sol), ys - (d_sol * cos_sol), drone[dnum].x, drone[dnum].y, 1.0, v_d_ratio, xs_dash, ys_dash, &drone[dnum].xt, &drone[dnum].yt);
+
+                        if (answerFlag == -1)
+                        {
+                            if (cir_flag[vnum][next_index - 1] == TRUE || (cir[vnum][next_index - 1] == 0 && next_index == size[vnum] - 1))
+                            {
+                                drone[dnum].xt = xs_dash;
+                                drone[dnum].yt = ys_dash;
+                                break;
+                            }
+                        }
+                        else if (answerFlag == -2)
+                        {
+                            printf("エラー終了\n");
+                            return -1;
+                        }
+                        else
+                        {
+                            break;
+                        }
+
+                        xs = xs_dash;
+                        ys = ys_dash;
+                        next_index++;
+                    }
+                }
+            }
+        }
+    }
+}
+
 // 配列を分割する関数
 void split_array(int *new_jyunkai_keiro, int new_jyunkai_keiro_size, int **cir, int *size)
 {

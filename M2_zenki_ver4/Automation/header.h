@@ -153,8 +153,11 @@ double retDis(double xt, double yt, double xc, double yc);
 // 引数の１の位を０にして返す関数
 double removeOnePlace(double x);
 
-// 巡回路に応じてドローンと配送車の合流地点を導出する関数
+// 巡回路に応じてドローンと配送車の合流地点を導出する関数（M1までの提案手法用）
 int solveConfluence(double xv, double yv, double xd, double yd, double vv, double vd, double xs, double ys, double *x, double *y, double v_d_ratio, double r_d_velo, double r_velo, double stay_t[], point *new_p, dro *drone, int dnum, vehicle *v, int vnum, int current[], int target[], int **cir, int **cir_flag, int ind[], int ind_last[], int ind_relief[], int *size);
+
+// 巡回路に応じてドローンと配送車の合流地点を導出する関数（バッテリー配布ドローン用）
+int solveConfluenceVer2(double xv, double yv, double xd, double yd, double vv, double vd, double xs, double ys, double *x, double *y, double v_d_ratio, double r_d_velo, double r_velo, double stay_t[], double dis_stay_t[], point *new_p, dro *drone, int dnum, vehicle *v, int vnum, int current[], int target[], int **cir, int **cir_flag, int ind[], int ind_last[], int ind_relief[], int *size);
 
 // 配列を分割する関数
 void split_array(int *new_jyunkai_keiro, int new_jyunkai_keiro_size, int **cir, int *size);

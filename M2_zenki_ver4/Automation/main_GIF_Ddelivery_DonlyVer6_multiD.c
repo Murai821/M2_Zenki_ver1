@@ -1033,7 +1033,7 @@ int main(void)
     fprintf(gp, "unset key\n");
 
     // fprintf(gp, "set term gif animate delay 5 optimize size 640,480\n");
-    fprintf(gp, "set term gif animate delay 20 optimize size 640,480 font 'DejaVu Sans,12'\n");
+    fprintf(gp, "set term gif animate delay 25 optimize size 640,480 font 'DejaVu Sans,12'\n");
     fprintf(gp, "set output 'drone_datafile/test.gif'\n");
 
     // ラベルの表示
@@ -1074,8 +1074,8 @@ int main(void)
     double n_sin_BatDdro[B_D];                 // ドローンのサイン
     double n_cos_BatDdro[B_D];                 // ドローンのコサイン
     double n_tan_BatDdro[B_D];                 // ドローンのタンジェント
-    double batD_drone_flight_time[C_D] = {0};  // ドローンの飛行時間
-    double batD_drone_jyunkai_time[C_D] = {0}; // ドローンの巡回時間
+    double batD_drone_flight_time[B_D] = {0};  // ドローンの飛行時間
+    double batD_drone_jyunkai_time[B_D] = {0}; // ドローンの巡回時間
     //
     double time_span = 10;                               // 増加時間
     double stay_t[M] = {0};                              // 避難所待機時間カウンター
@@ -2342,16 +2342,10 @@ int main(void)
                 }
                 else if (batDel_drone[i].FtoShelter_mode == TRUE && batDel_drone[i].free_mode == TRUE) // ドローンが避難所へ向かうモードなら
                 {
-                    //
-                    batDel_drone[i].x = batDel_drone[i].x + n_sin_BatDdro[i] * time_span / r_d_velo;
-                    batDel_drone[i].y = batDel_drone[i].y + n_cos_BatDdro[i] * time_span / r_d_velo;
-
-                    // バッテリー配布ドローンが目的の避難所に到達した場合
-                    if ((n_cos_BatDdro[i] < 0 && batDel_drone[i].y < batDel_drone[i].yt) || (n_cos_BatDdro[i] > 0 && batDel_drone[i].y > batDel_drone[i].yt))
+                    // ドローン現在地と目的避難所の座標が一致しているとき
+                    if (new_p[batDel_drone[i].target_shelter_num].x == batDel_drone[i].x && new_p[batDel_drone[i].target_shelter_num].y == batDel_drone[i].y)
                     {
-                        batDel_drone[i].x = batDel_drone[i].xt; // 座標修正
-                        batDel_drone[i].y = batDel_drone[i].yt;
-
+                        // 避難所への飛行スキップ
                         part_t_BatDdro[i] = 0; // 部分時間初期化
 
                         // バッテリー荷下ろし時間セット
@@ -2359,8 +2353,31 @@ int main(void)
 
                         // バッテリー配布ドローンの避難所へ向かうモードを無効にする
                         batDel_drone[i].FtoShelter_mode = FALSE;
+                    }
+                    else
+                    {
+                        //
+                        batDel_drone[i].x = batDel_drone[i].x + n_sin_BatDdro[i] * time_span / r_d_velo;
+                        batDel_drone[i].y = batDel_drone[i].y + n_cos_BatDdro[i] * time_span / r_d_velo;
 
-                        // printf("t=%.2lf : 避難所[%d]にて バッテリー配布ドローン[%d] がバッテリー荷下ろし開始\n", total_t, batDel_drone[i].target_shelter_num, i);
+                        batD_drone_flight_time[i] += time_span; // バッテリー配布ドローンの飛行時間加算
+
+                        // バッテリー配布ドローンが目的の避難所に到達した場合
+                        if ((n_cos_BatDdro[i] < 0 && batDel_drone[i].y < batDel_drone[i].yt) || (n_cos_BatDdro[i] > 0 && batDel_drone[i].y > batDel_drone[i].yt))
+                        {
+                            batDel_drone[i].x = batDel_drone[i].xt; // 座標修正
+                            batDel_drone[i].y = batDel_drone[i].yt;
+
+                            part_t_BatDdro[i] = 0; // 部分時間初期化
+
+                            // バッテリー荷下ろし時間セット
+                            batDel_drone[i].Battery_Unload_time = 10 * 60; // バッテリー荷下ろし時間
+
+                            // バッテリー配布ドローンの避難所へ向かうモードを無効にする
+                            batDel_drone[i].FtoShelter_mode = FALSE;
+
+                            // printf("t=%.2lf : 避難所[%d]にて バッテリー配布ドローン[%d] がバッテリー荷下ろし開始\n", total_t, batDel_drone[i].target_shelter_num, i);
+                        }
                     }
                 }
                 else if (batDel_drone[i].FtoShelter_mode == FALSE && batDel_drone[i].Battery_Unload_time != 0 && batDel_drone[i].free_mode == TRUE) // 　ドローンが避難所でバッテリーを荷下ろししているなら
@@ -2373,28 +2390,43 @@ int main(void)
 
                         // 避難所のバッテリー量を更新
 
-                        // ドローンと配送車の合流地点算出
-                        // solveConfluence(v[batDel_drone[i].target_num].x, v[batDel_drone[i].target_num].y, batDel_drone[i].x, batDel_drone[i].y, 1.0, v_d_ratio, new_p[target[batDel_drone[i].target_num]].x, new_p[target[batDel_drone[i].target_num]].y, &batDel_drone[i].xt, &batDel_drone[i].yt, v_d_ratio, r_d_velo, r_velo, stay_t, new_p, batDel_drone, i, v, batDel_drone[i].target_num, current, target, cir, cir_flag, ind, ind_last, ind_relief, size);
                         // debug 用
-                        batDel_drone[i].xt = 6.0;
-                        batDel_drone[i].yt = 6.0;
+                        // batDel_drone[i].xt = 6.0;
+                        // batDel_drone[i].yt = 6.0;
+
+                        // ドローンと配送車の合流地点算出
+                        // solveConfluence(v[batDel_drone[i].target_num].x, v[batDel_drone[i].target_num].y, batDel_drone[i].x, batDel_drone[i].y, 1.0, v_d_ratio, new_p[target[batDel_drone[i].target_num]].x, new_p[target[batDel_drone[i].target_num]].y, &batDel_drone[i].xt, &batDel_drone[i].yt, v_d_ratio, r_d_velo, r_velo, stay_t, new_p, batDel_drone, i, v, batDel_drone[i].target_num, current, target, cir, cir_flag, ind, ind_last, ind_relief, size);修正前
+                        solveConfluenceVer2(v[batDel_drone[i].follow_num].x, v[batDel_drone[i].follow_num].y, batDel_drone[i].x, batDel_drone[i].y, 1.0, v_d_ratio, new_p[target[batDel_drone[i].follow_num]].x, new_p[target[batDel_drone[i].follow_num]].y, &batDel_drone[i].xt, &batDel_drone[i].yt, v_d_ratio, r_d_velo, r_velo, stay_t, dis_stay_t, new_p, batDel_drone, i, v, batDel_drone[i].follow_num, current, target, cir, cir_flag, ind, ind_last, ind_relief, size); // follow_numにおける配送車との合流地点
                     }
                 }
                 else if (batDel_drone[i].FtoShelter_mode == FALSE && batDel_drone[i].Battery_Unload_time == 0 && batDel_drone[i].free_mode == TRUE && batDel_drone[i].Battery_load_time == 0) // ドローンが避難所からTVへ帰ってくるモードなら
                 {
-                    // TVへの飛行のための座標更新処理
-                    batDel_drone[i].x = batDel_drone[i].x + n_sin_BatDdro[i] * time_span / r_d_velo;
-                    batDel_drone[i].y = batDel_drone[i].y + n_cos_BatDdro[i] * time_span / r_d_velo;
-
-                    // 目的の配送車に到着したら
-                    if ((n_cos_BatDdro[i] < 0 && batDel_drone[i].y < batDel_drone[i].yt) || (n_cos_BatDdro[i] > 0 && batDel_drone[i].y > batDel_drone[i].yt))
+                    // ドローンの現在地と目的TVの座標が一致しているとき
+                    if (v[batDel_drone[i].follow_num].x == batDel_drone[i].x && v[batDel_drone[i].follow_num].y == batDel_drone[i].y)
                     {
-                        batDel_drone[i].x = batDel_drone[i].xt; // 座標修正
-                        batDel_drone[i].y = batDel_drone[i].yt;
+                        // 避難所からの飛行スキップ
+                        batDel_drone[i].Battery_load_time = 10 * 60; // バッテリー積載時間セット
 
                         part_t_BatDdro[i] = 0; // 部分時間初期化
+                    }
+                    else
+                    {
+                        // TVへの飛行のための座標更新処理
+                        batDel_drone[i].x = batDel_drone[i].x + n_sin_BatDdro[i] * time_span / r_d_velo;
+                        batDel_drone[i].y = batDel_drone[i].y + n_cos_BatDdro[i] * time_span / r_d_velo;
 
-                        batDel_drone[i].Battery_load_time = 10 * 60; // バッテリー積載時間セット
+                        batD_drone_flight_time[i] += time_span; // バッテリー配布ドローンの飛行時間加算
+
+                        // 目的の配送車に到着したら
+                        if ((n_cos_BatDdro[i] < 0 && batDel_drone[i].y < batDel_drone[i].yt) || (n_cos_BatDdro[i] > 0 && batDel_drone[i].y > batDel_drone[i].yt))
+                        {
+                            batDel_drone[i].x = batDel_drone[i].xt; // 座標修正
+                            batDel_drone[i].y = batDel_drone[i].yt;
+
+                            part_t_BatDdro[i] = 0; // 部分時間初期化
+
+                            batDel_drone[i].Battery_load_time = 10 * 60; // バッテリー積載時間セット
+                        }
                     }
                 }
                 else if (batDel_drone[i].FtoShelter_mode == FALSE && batDel_drone[i].Battery_Unload_time == 0 && batDel_drone[i].free_mode == TRUE && batDel_drone[i].Battery_load_time != 0) // ドローンがTVでバッテリーを積載中のとき
