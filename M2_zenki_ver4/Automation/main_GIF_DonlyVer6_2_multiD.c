@@ -366,6 +366,8 @@ int main(void)
         infC_drone[i].cannot_fly_judge_flag = FALSE;
 
         infC_drone[i].Battery_Unload_time = 0;
+
+        infC_drone[i].batDel_wait_flag = FALSE;
     }
 
     // バッテリー配布ドローン初期化
@@ -1475,15 +1477,6 @@ int main(void)
                     c_label = 0; // 初期化
                 }
 
-                // 避難所のバッテリー量を表示
-                for (i = 0; i < N; i++)
-                {
-                    if (new_p[i].battery_count > 0)
-                    {
-                        fprintf(gp, "set label %d at first %f,%f 'Bat:%d'\n", i + 651, new_p[i].x + 0.1, new_p[i].y + 0.1, new_p[i].battery_count);
-                    }
-                }
-
                 // ドローン8台
                 fprintf(gp, "set title 't = %f'\n", total_t);
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'gold','-' pt 5 lt rgbcolor'dark-turquoise'\n", new_data_file, new_ad_file);
@@ -1567,6 +1560,20 @@ int main(void)
                 fprintf(gp, "%f %f\n", drone[0].x + 0.1, drone[0].y + 0.1);
                 fprintf(gp, "e\n");
                 */
+
+                // 避難所のバッテリー量を表示
+                // バッテリー配布ドローンがバッテリーを運搬する避難所のみバッテリー量を表示
+                for (i = 0; i < N; i++)
+                {
+                    for (j = 0; j < B_D; j++)
+                    {
+                        if (batDel_drone[j].batDel_flag == TRUE && batDel_drone[j].target_shelter_num == i)
+                        {
+                            // バッテリー配布ドローンの目的避難所の座標を表示
+                            fprintf(gp, "set label %d at first %f,%f 'Bat:%d'\n", i + 651, new_p[i].x - 0.2, new_p[i].y - 0.2, new_p[i].battery_count);
+                        }
+                    }
+                }
             }
         }
 
@@ -1601,6 +1608,24 @@ int main(void)
                     printf("drone[%d]の飛行開始時間: %lf\n", i, total_t);
                 }
             }
+            else if (infC_drone[i].batDel_wait_flag == TRUE) // ドローンがバッテリーが届くのを待っている場合
+            {
+                infC_drone_jyunkai_time[i] += time_span; // ドローンの巡回時間を加算
+
+                // 避難所にバッテリーが届いたら
+                if (new_p[current_infCdro[i]].battery_count > 0)
+                {
+                    new_p[current_infCdro[i]].battery_count -= 1; // バッテリーを1つ消費
+
+                    infC_drone[i].batDel_wait_flag = FALSE; // バッテリー待ちフラグを解除
+                    infC_drone[i].charge_time = 60 * 10;    // 充電時間(バッテリー交換時間)を設定
+
+                    if (infC_drone[i].x == new_p[0].x && infC_drone[i].y == new_p[0].y) // 集積所にいながら巡回時間加算してしまっている場合
+                    {
+                        infC_drone_jyunkai_time[i] = 0;
+                    }
+                }
+            }
             else if (infC_drone[i].charge_time == 0) // 充電する必要ないなら目的の避難所へ飛行
             {
                 infC_drone[i].x = new_p[current_infCdro[i]].x + n_sin_infCdro[i] * part_t_infCdro[i] / r_d_velo;
@@ -1623,7 +1648,7 @@ int main(void)
 
                 infC_drone_jyunkai_time[i] += time_span; // ドローンの巡回時間を加算
 
-                if (infC_drone[i].charge_time == 0 && infC_drone[i].x == new_p[0].x && infC_drone[i].y == new_p[0].y) // 集積所にいながら飛行時間加算してしまっている場合
+                if (infC_drone[i].charge_time == 0 && infC_drone[i].x == new_p[0].x && infC_drone[i].y == new_p[0].y) // 集積所にいながら巡回時間加算してしまっている場合
                 {
                     infC_drone_jyunkai_time[i] = 0;
                 }
@@ -1648,12 +1673,36 @@ int main(void)
                 fprintf(fp_infC_jyunkai_time, "%lf\n", infC_drone_jyunkai_time[i] / 60);
                 infC_drone_jyunkai_time[i] = 0; // ドローンの飛行時間を初期化
 
-                // 次の避難所へ行く間に充電量が不足する場合はその避難所で充電する
+                /*
+                // 次の避難所へ行く間に充電量が不足する場合は集積所で充電する
                 if (infC_drone_flight_time[i] + new_di[current_infCdro[i]][target_infCdro[i]] * r_d_velo > capable_flight_time)
                 {
-                    infC_drone[i].charge_time = infC_drone_flight_time[i] * charge_constant; // 充電時間を設定
-                    infC_drone_flight_time[i] = 0;                                           // ドローンの飛行時間を初期化
-                    // printf("ドローン[%d]は集積所で充電開始  充電時間: %lf[min]\n", i, (double)infC_drone[i].charge_time / 60);
+                    infC_drone_flight_time[i] = 0; // ドローンの飛行時間を初期化
+
+                    if (new_p[current_infCdro[i]].battery_count > 0) // 避難所にバッテリーがある場合
+                    {
+                        new_p[current_infCdro[i]].battery_count -= 1; // バッテリーを1つ消費
+
+                        infC_drone[i].charge_time = 60 * 10; // 充電時間(バッテリー交換時間)を設定
+                    }
+                    else // 避難所にバッテリーがない場合は待機フラグ有効（避難所でバッテリーが届くまで待機）
+                    {
+                        infC_drone[i].batDel_wait_flag = TRUE; // バッテリー配布ドローンが来るまで待機
+                    }
+                }
+                    */
+                // 集積所では確定で充電する
+                infC_drone_flight_time[i] = 0; // ドローンの飛行時間を初期化
+
+                if (new_p[current_infCdro[i]].battery_count > 0) // 避難所にバッテリーがある場合
+                {
+                    new_p[current_infCdro[i]].battery_count -= 1; // バッテリーを1つ消費
+
+                    infC_drone[i].charge_time = 60 * 10; // 充電時間(バッテリー交換時間)を設定
+                }
+                else // 避難所にバッテリーがない場合は待機フラグ有効（避難所でバッテリーが届くまで待機）
+                {
+                    infC_drone[i].batDel_wait_flag = TRUE; // バッテリー配布ドローンが来るまで待機
                 }
             }
             else if ((n_cos_infCdro[i] < 0 && infC_drone[i].y < new_p[target_infCdro[i]].y) || (n_cos_infCdro[i] > 0 && infC_drone[i].y > new_p[target_infCdro[i]].y))
@@ -1668,8 +1717,25 @@ int main(void)
                 // 次の避難所へ行く間に充電量が不足する場合はその避難所で充電する
                 if (infC_drone_flight_time[i] + new_di[current_infCdro[i]][target_infCdro[i]] * r_d_velo > capable_flight_time)
                 {
-                    infC_drone[i].charge_time = infC_drone_flight_time[i] * charge_constant; // 充電時間を設定
-                    infC_drone_flight_time[i] = 0;                                           // ドローンの飛行時間を初期化
+                    infC_drone_flight_time[i] = 0; // ドローンの飛行時間を初期化
+
+                    if (new_p[current_infCdro[i]].battery_count > 0) // 避難所にバッテリーがある場合
+                    {
+                        new_p[current_infCdro[i]].battery_count -= 1; // バッテリーを1つ消費
+
+                        infC_drone[i].charge_time = 60 * 10; // 充電時間(バッテリー交換時間)を設定
+                    }
+                    else // 避難所にバッテリーがない場合は待機フラグ有効（避難所でバッテリーが届くまで待機）
+                    {
+                        infC_drone[i].batDel_wait_flag = TRUE; // バッテリー配布ドローンが来るまで待機
+
+                        // debug
+                        if (i == 0)
+                        {
+                            printf("total_t: %lf ドローン[%d]は避難所[%d]でバッテリー待機開始\n", total_t, i, current_infCdro[i]);
+                        }
+                    }
+
                     // printf("ドローン[%d]は避難所[%d]で充電開始  充電時間: %lf[min]\n", i, current_dro[i], (double)infC_drone[i].charge_time / 60);
                 }
 
@@ -2470,7 +2536,7 @@ int main(void)
                         // debug
                         if (i == 0 || i == 5)
                         {
-                            printf("t=%.2lf : バッテリー配布ドローン[%d] の目的避難所を [%d]に設定\n", total_t, i, batDel_drone[i].target_shelter_num);
+                            // printf("t=%.2lf : バッテリー配布ドローン[%d] の目的避難所を [%d]に設定\n", total_t, i, batDel_drone[i].target_shelter_num);
                         }
                     }
                 }
@@ -3010,7 +3076,7 @@ int main(void)
         // 部分時間を更新（充電中でないかつ飛行開始しているのなら）：情報収集ドローン
         for (i = 0; i < S_C_D; i++)
         {
-            if (infC_drone[i].charge_time == 0 && infC_drone[i].flight_start_time == 0)
+            if (infC_drone[i].charge_time == 0 && infC_drone[i].flight_start_time == 0 && infC_drone[i].batDel_wait_flag == FALSE)
             {
                 part_t_infCdro[i] += time_span;
             }

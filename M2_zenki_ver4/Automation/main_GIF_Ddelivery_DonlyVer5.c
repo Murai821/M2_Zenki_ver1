@@ -1206,7 +1206,7 @@ int main(void)
         }
 
         // if (total_t >= 0 && total_t <= 20000)
-        if (total_t >= 278000 && total_t <= 280000)
+        if (total_t >= 0 && total_t <= 40000)
         {
             if ((int)(total_t) % 50 == 0)
             { // 50sごとに描画
