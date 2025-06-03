@@ -83,6 +83,8 @@ int main(void)
         }
     }
 
+    p[0].battery_count = 0;
+
     // 避難所の要素初期化 i=0は集積所のため省く
     /*中心市街地*/
     for (i = 1; i < C_N; i++)
@@ -134,6 +136,8 @@ int main(void)
                 }
             }
         }
+
+        p[i].battery_count = 0;
     }
     /*山間部の避難所初期化*/
     for (i = C_N; i < N; i++)
@@ -180,6 +184,8 @@ int main(void)
                 }
             }
         }
+
+        p[i].battery_count = 0;
     }
 
     // 配送車初期化
@@ -962,7 +968,7 @@ int main(void)
     fprintf(gp, "unset key\n");
 
     // fprintf(gp, "set term gif animate delay 5 optimize size 640,480\n");
-    fprintf(gp, "set term gif animate delay 15 optimize size 640,480 font 'DejaVu Sans,12'\n");
+    fprintf(gp, "set term gif animate delay 10 optimize size 640,480 font 'DejaVu Sans,12'\n");
     fprintf(gp, "set output 'drone_datafile/test.gif'\n");
 
     // ラベルの表示
@@ -1238,7 +1244,7 @@ int main(void)
         }
 
         // if (total_t >= 0 && total_t <= 20000)
-        if (total_t >= 0 && total_t <= 16000)
+        if (total_t >= 0 && total_t <= 40000)
         {
             if ((int)(total_t) % 50 == 0)
             { // 50sごとに描画
@@ -1249,13 +1255,22 @@ int main(void)
                     // fprintf(gp, "set label %d at first %f,%f '%d'\n", j + 51, new_p[j].x + 0.1, new_p[j].y + 0.1, new_p[j].re);
                 }
 
-                // 薬の情報ラベル(避難所)
+                // 薬の情報ラベル(避難所)ver1
                 for (i = 0; i < N; i++)
                 {
                     if (new_p[i].i_med_ptr[i] != 0)
                     {
                         // Plot a red circle at the coordinates of the shelter with medical information
-                        fprintf(gp, "set object circle at %f,%f size screen 0.01 fillcolor rgb 'red' front linewidth 3\n", new_p[i].x, new_p[i].y);
+                        // fprintf(gp, "set object circle at %f,%f size screen 0.01 fillcolor rgb 'red' front linewidth 3\n", new_p[i].x, new_p[i].y);
+                    }
+                }
+                // 薬の情報ラベル(避難所)ver2
+                for (i = 0; i < N; i++)
+                {
+                    if (new_p[i].i_med_ptr[i] != 0 && new_p[i].inf_med[i][new_p[i].i_med_ptr[i] - 1][5] == FALSE)
+                    {
+                        // Plot a red circle at the coordinates of the shelter with medical information
+                        // fprintf(gp, "set object circle at %f,%f size screen 0.02 fillcolor rgb 'blue' front linewidth 3\n", new_p[i].x, new_p[i].y);
                     }
                 }
                 /*
@@ -1303,7 +1318,7 @@ int main(void)
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta'\n", new_data_file, new_ad_file);
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red'\n", new_data_file, new_ad_file); // ５台
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green'\n", new_data_file, new_ad_file); // 通常ドローンと情報収集ドローン
-                fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 9 lt rgbcolor'green','-' pt 9 lt rgbcolor'red','-' pt 9 lt rgbcolor'blue','-' pt 9 lt rgbcolor'orange','-' pt 9 lt rgbcolor'black','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green'\n", new_data_file, new_ad_file); // 情報収集ドローンのみ
+                fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 9 lt rgbcolor'green','-' pt 9 lt rgbcolor'red','-' pt 9 lt rgbcolor'blue','-' pt 9 lt rgbcolor'orange','-' pt 9 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta'\n", new_data_file, new_ad_file); // 情報収集ドローンのみ(10台)
 
                 fprintf(gp, "%f %f\n", v[0].x, v[0].y);
                 fprintf(gp, "e\n");
@@ -1343,6 +1358,7 @@ int main(void)
                 fprintf(gp, "e\n");
                 fprintf(gp, "%f %f\n", infC_drone[4].x - 0.1, infC_drone[4].y - 0.1);
                 fprintf(gp, "e\n");
+                /*
                 fprintf(gp, "%f %f\n", infC_drone[5].x - 0.1, infC_drone[5].y - 0.1);
                 fprintf(gp, "e\n");
                 fprintf(gp, "%f %f\n", infC_drone[6].x - 0.1, infC_drone[6].y - 0.1);
@@ -1353,6 +1369,7 @@ int main(void)
                 fprintf(gp, "e\n");
                 fprintf(gp, "%f %f\n", infC_drone[9].x - 0.1, infC_drone[9].y - 0.1);
                 fprintf(gp, "e\n");
+                */
 
                 /*
                 // ドローン1台
