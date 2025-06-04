@@ -1055,6 +1055,9 @@ int main(int argc, char *argv[])
     // E(TC)（避難所からドローン）
     FILE *fp_ETC_dro;
     char *ETC_dro_data_file = "drone_datafile/txtfile/ETC_dro_data.txt";
+    // E(TC)（避難所から物資運搬車両（避難所→ドローン→TV）と（避難所→TV）の遅延時間）
+    FILE *fp_ETC_to_Vehicle;
+    char *ETC_to_Vehicle_data_file = "drone_datafile/txtfile/ETC_to_Vehicle_data.txt";
     // 医療品の配送遅延時間（要求情報発生が回収されてから実際に医療品が避難所へ届けられるまでの遅延時間）
     FILE *fp_Med_re_collect_to_delivery_delay;
     Med_re_collect_to_delivery_delay_file = "drone_datafile/txtfile/Med_re_collect_to_delivery_delay.txt";
@@ -1206,6 +1209,7 @@ int main(int argc, char *argv[])
     fp_Med_re_delay = fopen(Med_re_delay_file, "w");                                         // 医療品の配送遅延間隔ファイルのオープン
     fp_Medinf_collect_delay = fopen(Medinf_collect_delay_file, "w");                         // 医療品情報の収集遅延間隔ファイルのオープン
     fp_ETC_dro = fopen(ETC_dro_data_file, "w");                                              // ドローンの避難所からの配送遅延間隔ファイルのオープン
+    fp_ETC_to_Vehicle = fopen(ETC_to_Vehicle_data_file, "w");                                // 避難所から配送車への配送遅延間隔ファイルのオープン
     fp_Med_re_collect_to_delivery_delay = fopen(Med_re_collect_to_delivery_delay_file, "w"); // 医療品の収集から配送への遅延間隔ファイルのオープン
     fp_infC_jyunkai_time = fopen(infC_jyunkai_time_file, "w");                               // ドローンの巡回時間ファイルのオープン
 
@@ -1664,6 +1668,7 @@ int main(int argc, char *argv[])
                                     fprintf(fp_Medinf_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間
                                     // fprintf(fp_Medinf_collect_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
                                     fprintf(fp_Medinf_collect_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
+                                    fprintf(fp_ETC_to_Vehicle, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]);       // 生成されてから配送車で回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
                                     v[i].inf_med[j][v[i].i_med_ptr[j] - 1][2] = total_t;                                            // 要求情報発生から回収までの遅延時間（避難所→TV）
                                 }
                             }
@@ -2477,6 +2482,45 @@ int main(int argc, char *argv[])
             }
         }
 
+        /************************************ 情報収集ドローン → 配送車**************************************/
+        // 情報収集ドローンと配送車が合流したときに、薬情報の配列を共有
+        for (i = 0; i < S_C_D; i++)
+        {
+            if (fabs(infC_drone[i].x - v[infC_drone[i].follow_num].x) < 0.05 && fabs(infC_drone[i].y - v[infC_drone[i].follow_num].y) < 0.05)
+            {
+                // debug
+                if (total_t <= 10000 && stay_t[infC_drone[i].follow_num] == 0)
+                {
+                    // printf("t = %lf : 情報収集ドローン[%d]と配送車[%d]が合流\n", total_t, i, infC_drone[i].follow_num);
+                }
+
+                for (j = 0; j < N; j++)
+                {
+                    if (infC_drone[i].i_med_ptr[j] > v[infC_drone[i].follow_num].i_med_ptr[j])
+                    {
+                        for (k = v[infC_drone[i].follow_num].i_med_ptr[j]; k < infC_drone[i].i_med_ptr[j]; k++)
+                        {
+                            for (m = 0; m < Z_SIZE; m++)
+                            {
+                                v[infC_drone[i].follow_num].inf_med[j][k][m] = infC_drone[i].inf_med[j][k][m];
+                            }
+                            // 遅延時間のファイルへの書き込み
+                            // fprintf(fp_ETC_to_Vehicle, "t = %lf : infC_drone[%d] -> v[%d] shelter[%d]の情報 : %lf\n", total_t, i, infC_drone[i].follow_num, j, total_t - infC_drone[i].inf_med[j][k][0]); // 避難所で生成されてから配送車へ共有されるまでの遅延時間
+                            fprintf(fp_ETC_to_Vehicle, "%lf\n", total_t - infC_drone[i].inf_med[j][k][0]); // 避難所で生成されてから配送車へ共有されるまでの遅延時間
+
+                            v[infC_drone[i].follow_num].i_med_ptr[j] += 1;
+                            // 配列の容量オーバー
+                            if (infC_drone[i].i_med_ptr[j] == Y_SIZE)
+                            {
+                                printf("配列要素数オーバー\n");
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         /*****************避難所への情報の到着******************/
         if (total_t != 0 && (int)(total_t) % ((int)(poisson_inf_total) - (int)(poisson_inf_total) % 10) == 0)
         {
@@ -2690,6 +2734,7 @@ int main(int argc, char *argv[])
     fclose(fp_Med_re_delay);
     fclose(fp_Medinf_collect_delay);
     fclose(fp_ETC_dro);
+    fclose(fp_ETC_to_Vehicle);
     fclose(fp_Med_re_collect_to_delivery_delay);
     fclose(fp_infC_jyunkai_time);
     pclose(gp);
@@ -2917,7 +2962,7 @@ int main(int argc, char *argv[])
     double count7 = 0;
     double average7;
 
-    // 避難所から配送車
+    // 避難所から配送車 or 避難所から情報収集ドローン
     fp_Medinf_collect_delay = fopen(Medinf_collect_delay_file, "r"); // 平均情報遅延間隔ファイルのオープン
     if (fp_Medinf_collect_delay == NULL)
     {
@@ -2974,6 +3019,39 @@ int main(int argc, char *argv[])
         fp_Mean_ETC_dro_data = fopen(Mean_ETC_dro_file, "a+");
         fprintf(fp_Mean_ETC_dro_data, "%f\n", average7 / 60);
         fclose(fp_Mean_ETC_dro_data);
+    }
+    else
+    {
+        printf("データがありません\n");
+    }
+
+    // 避難所から配送車（ドローン経由と配送車直接）
+    count7 = 0; // 初期化
+    sum7 = 0;
+    fp_ETC_to_Vehicle = fopen(ETC_to_Vehicle_data_file, "r"); // 平均情報遅延間隔ファイルのオープン
+    if (fp_ETC_to_Vehicle == NULL)
+    {
+        printf("ファイルを開くことができませんでした\n");
+        return 1;
+    }
+    while (fscanf(fp_ETC_to_Vehicle, "%lf", &value7) == 1)
+    {
+        sum7 += value7;
+        count7++;
+    }
+    fclose(fp_ETC_to_Vehicle); // 平均情報遅延時間ファイルクローズ
+
+    if (count7 > 0)
+    {
+        average7 = sum7 / count7;
+        printf("E(TC) to Vehicle：%f [min]\n", average7 / 60);
+        // printf("sum7: %f, count7: %f\n", sum7, count7);
+        //  各シミュレーションごとのMed_E(TD) のデータを格納する
+        FILE *fp_Mean_ETC_to_Vehicle_data;
+        char *Mean_ETC_to_Vehicle_file = "drone_datafile/txtfile/Mean_ETC_to_Vehicle.txt";
+        fp_Mean_ETC_to_Vehicle_data = fopen(Mean_ETC_to_Vehicle_file, "a+");
+        fprintf(fp_Mean_ETC_to_Vehicle_data, "%f\n", average7 / 3600);
+        fclose(fp_Mean_ETC_to_Vehicle_data);
     }
     else
     {

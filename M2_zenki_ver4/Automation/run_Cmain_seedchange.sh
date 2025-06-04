@@ -7,8 +7,8 @@ end_seed=141
 #gcc shell_main_GIF_ver2.c module.c -o my_program -lm
 #gcc shell_main_GIF_Ddelivery_DonlyVer5.c module.c -o my_program -lm
 #gcc shell_main_GIF_Ddelivery_DonlyVer5_nocharge.c module.c -o my_program -lm
-gcc shell_main_GIF_Ver5_multiD.c module.c -o my_program -lm #ドローン複数（TVと逆周り）
-#gcc shell_main_GIF_Ver5_multiD_gyakumawari.c module.c -o my_program -lm #ドローン複数（TVと同じ周り）
+#gcc shell_main_GIF_Ver5_multiD.c module.c -o my_program -lm #ドローン複数（TVと逆周り）
+gcc shell_main_GIF_Ver5_multiD_gyakumawari.c module.c -o my_program -lm #ドローン複数（TVと同じ周り）
 
 # 特定ディレクトリ内のファイルを初期化
 > drone_datafile/txtfile/Mean_Medinf_delay.txt
@@ -22,6 +22,7 @@ gcc shell_main_GIF_Ver5_multiD.c module.c -o my_program -lm #ドローン複数�
 > drone_datafile/txtfile/Etg_data.txt
 
 > drone_datafile/txtfile/Mean_ETC_dro.txt
+> drone_datafile/txtfile/Mean_ETC_to_Vehicle.txt
 > drone_datafile/txtfile/drone_trip_ave_data.txt
 > drone_datafile/txtfile/Mean_Jyunkai_time_InfCdrone.txt
 
@@ -39,6 +40,8 @@ gcc Eti_average_shell.c
 gcc Etg_average_shell.c
 ./a.out
 gcc Etc_dro_average_shell.c
+./a.out
+gcc Etc_to_Vehicle_average_shell.c
 ./a.out
 gcc E_InfCdrone_TripTime_shell.c
 ./a.out
