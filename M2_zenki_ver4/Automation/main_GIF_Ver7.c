@@ -334,7 +334,7 @@ int main(void)
             }
         }
 
-        infC_drone[i].follow_num = i % M;
+        infC_drone[i].follow_num = 0; // 要求情報回収ドローンは初期状態として、配送車[0]の巡回路に従うため
 
         infC_drone[i].target_num = 1;
 
@@ -357,6 +357,8 @@ int main(void)
         infC_drone[i].TV_wait_flag = FALSE;
 
         infC_drone[i].cannot_fly_judge_flag = FALSE;
+
+        infC_drone[i].crossing_cir_flag = TRUE; // 初期状態のとき、必ず避難所の初期地点に飛行するため TRUE
     }
 
     /*********************************************** pythonの出力ファイルから点の「座標」と「隣接行列」を読み込む **************************************************************************/
@@ -741,6 +743,7 @@ int main(void)
     }
 
     // reverse_cir[][]の配列を表示
+    /*
     for (i = 0; i < M; i++)
     {
         printf("reverse_cir[%d]: ", i);
@@ -749,7 +752,7 @@ int main(void)
             printf("%d ", reverse_cir[i][j]);
         }
         printf("\n");
-    }
+    }*/
 
     /***************************************************************************************************************************************************************************/
 
@@ -1146,12 +1149,30 @@ int main(void)
     {
         ind_dro[i] = 1;
     }
-    // target_droの初期化
+    // target_droの初期化: 巡回路1(TV[0])における避難所から巡回
+    int reverse_num = 0;       // 巡回路の配列の最大要素数から戻す数
+    int pass_count[C_D] = {0}; // ドローンがある巡回路で通過した避難所の数：S_Nと比較用
     for (i = 0; i < C_D; i++)
     {
         current_dro[i] = 0;
-        target_dro[i] = reverse_cir[i % M][1];
+
+        if (ind[0] - (S_N + 1) < 0) // 集積所を超えて戻る場合
+        {
+            reverse_num = S_N + 1 - ind[0]; // 巡回路の配列の最大要素数から戻す数
+            target_dro[i] = cir[0][(size[0] - 1) - reverse_num];
+            ind_dro[i] = size[0] - reverse_num - 1; // ドローンのtarget_droのindexを更新
+        }
+        else
+        {
+            target_dro[i] = cir[0][ind[0] - (S_N + 1)];
+        }
     }
+    // debug
+    printf("target_dro[0]: %d\n", target_dro[0]);
+    printf("reverse_num: %d\n", reverse_num);
+    printf("size[0]: %d\n", size[0]);
+    printf("ind[0]: %d\n", ind[0]);
+    printf("ind_dro[0]: %d\n", ind_dro[0]);
 
     // 情報回収用ドローンの出発時間初期化
     double devision = C_D / M;     // ドローンの数を配送車の数で割る
@@ -1223,25 +1244,22 @@ int main(void)
         // ドローンのサインコサイン
         for (i = 0; i < S_C_D; i++)
         {
-            if (current_dro[i] > INF)
+            if (target_dro[i] == current_dro[i]) // ドローンの目的地と現在地が重複してしまった場合は即座に到着したものとみなす
             {
-                // current_dro[i] = reverse_cir[i % M][ind_dro[i] - 1]; // ドローンの始点が異常値な場合は適切な値にセット
+                n_sin_dro[i] = 0.001;
+                n_cos_dro[i] = 0.001;
             }
-            current_dro[i] = reverse_cir[i % M][ind_dro[i] - 1];
-            target_dro[i] = reverse_cir[i % M][ind_dro[i]]; // ドローンの終点を設定
-            //  debug
-            if (total_t >= 0 && total_t <= 20)
+            else
             {
-                // printf("current_dro[%d]: %d, target_dro[%d]: %d\n", i, current_dro[i], i, target_dro[i]);
+                d_dro[i] = sqrt(pow(new_p[target_dro[i]].x - new_p[current_dro[i]].x, 2) + pow(new_p[target_dro[i]].y - new_p[current_dro[i]].y, 2));
+                n_sin_dro[i] = (new_p[target_dro[i]].x - new_p[current_dro[i]].x) / d_dro[i];
+                n_cos_dro[i] = (new_p[target_dro[i]].y - new_p[current_dro[i]].y) / d_dro[i];
+                n_tan_dro[i] = n_sin_dro[i] / n_cos_dro[i];
             }
-            d_dro[i] = sqrt(pow(new_p[target_dro[i]].x - new_p[current_dro[i]].x, 2) + pow(new_p[target_dro[i]].y - new_p[current_dro[i]].y, 2));
-            n_sin_dro[i] = (new_p[target_dro[i]].x - new_p[current_dro[i]].x) / d_dro[i];
-            n_cos_dro[i] = (new_p[target_dro[i]].y - new_p[current_dro[i]].y) / d_dro[i];
-            n_tan_dro[i] = n_sin_dro[i] / n_cos_dro[i];
         }
 
         // if (total_t >= 0 && total_t <= 20000)
-        if (total_t >= 150000 && total_t <= 170000)
+        if (total_t >= 0 && total_t <= 20000)
         {
             if ((int)(total_t) % 50 == 0)
             { // 50sごとに描画
@@ -1307,7 +1325,29 @@ int main(void)
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red'\n", new_data_file, new_ad_file); // ５台
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green'\n", new_data_file, new_ad_file); // 通常ドローンと情報収集ドローン
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 9 lt rgbcolor'green','-' pt 9 lt rgbcolor'red','-' pt 9 lt rgbcolor'blue','-' pt 9 lt rgbcolor'orange','-' pt 9 lt rgbcolor'black','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green'\n", new_data_file, new_ad_file); // 情報収集ドローンのみ
-                fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 9 ps 1.5 lt rgbcolor'green','-' pt 9 ps 1.5 lt rgbcolor'red','-' pt 9 ps 1.5 lt rgbcolor'blue','-' pt 9 ps 1.5 lt rgbcolor'orange','-' pt 9 ps 1.5 lt rgbcolor'black','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black'\n", new_data_file, new_ad_file); // 情報収集ドローンのみ(10台)
+                // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 9 ps 1.5 lt rgbcolor'green','-' pt 9 ps 1.5 lt rgbcolor'red','-' pt 9 ps 1.5 lt rgbcolor'blue','-' pt 9 ps 1.5 lt rgbcolor'orange','-' pt 9 ps 1.5 lt rgbcolor'black','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black'\n", new_data_file, new_ad_file); // 情報収集ドローンのみ(10台)
+
+                // infC_drone[0]のfollow_numに応じてプロットの色を変更
+                if (infC_drone[0].follow_num == 0)
+                {
+                    fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 9 ps 1.5 lt rgbcolor'green','-' pt 9 ps 1.5 lt rgbcolor'red','-' pt 9 ps 1.5 lt rgbcolor'blue','-' pt 9 ps 1.5 lt rgbcolor'orange','-' pt 9 ps 1.5 lt rgbcolor'black','-' pt 5 lt rgbcolor'green'\n", new_data_file, new_ad_file); // 情報収集ドローンのみ(1台のみ)
+                }
+                else if (infC_drone[0].follow_num == 1)
+                {
+                    fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 9 ps 1.5 lt rgbcolor'green','-' pt 9 ps 1.5 lt rgbcolor'red','-' pt 9 ps 1.5 lt rgbcolor'blue','-' pt 9 ps 1.5 lt rgbcolor'orange','-' pt 9 ps 1.5 lt rgbcolor'black','-' pt 5 lt rgbcolor'red'\n", new_data_file, new_ad_file); // 情報収集ドローンのみ(1台のみ)
+                }
+                else if (infC_drone[0].follow_num == 2)
+                {
+                    fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 9 ps 1.5 lt rgbcolor'green','-' pt 9 ps 1.5 lt rgbcolor'red','-' pt 9 ps 1.5 lt rgbcolor'blue','-' pt 9 ps 1.5 lt rgbcolor'orange','-' pt 9 ps 1.5 lt rgbcolor'black','-' pt 5 lt rgbcolor'blue'\n", new_data_file, new_ad_file); // 情報収集ドローンのみ(1台のみ)
+                }
+                else if (infC_drone[0].follow_num == 3)
+                {
+                    fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 9 ps 1.5 lt rgbcolor'green','-' pt 9 ps 1.5 lt rgbcolor'red','-' pt 9 ps 1.5 lt rgbcolor'blue','-' pt 9 ps 1.5 lt rgbcolor'orange','-' pt 9 ps 1.5 lt rgbcolor'black','-' pt 5 lt rgbcolor'orange'\n", new_data_file, new_ad_file); // 情報収集ドローンのみ(1台のみ)
+                }
+                else if (infC_drone[0].follow_num == 4)
+                {
+                    fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 9 ps 1.5 lt rgbcolor'green','-' pt 9 ps 1.5 lt rgbcolor'red','-' pt 9 ps 1.5 lt rgbcolor'blue','-' pt 9 ps 1.5 lt rgbcolor'orange','-' pt 9 ps 1.5 lt rgbcolor'black','-' pt 5 lt rgbcolor'black'\n", new_data_file, new_ad_file); // 情報収集ドローンのみ(1台のみ)
+                }
 
                 fprintf(gp, "%f %f\n", v[0].x, v[0].y);
                 fprintf(gp, "e\n");
@@ -1339,6 +1379,7 @@ int main(void)
                 */
                 fprintf(gp, "%f %f\n", infC_drone[0].x - 0.1, infC_drone[0].y - 0.1);
                 fprintf(gp, "e\n");
+                /*
                 fprintf(gp, "%f %f\n", infC_drone[1].x - 0.1, infC_drone[1].y - 0.1);
                 fprintf(gp, "e\n");
                 fprintf(gp, "%f %f\n", infC_drone[2].x - 0.1, infC_drone[2].y - 0.1);
@@ -1357,6 +1398,7 @@ int main(void)
                 fprintf(gp, "e\n");
                 fprintf(gp, "%f %f\n", infC_drone[9].x - 0.1, infC_drone[9].y - 0.1);
                 fprintf(gp, "e\n");
+                */
 
                 /*
                 // ドローン1台
@@ -1438,8 +1480,9 @@ int main(void)
             }
         }
 
-        /********************************************** 情報回収ドローンの避難所間飛行処理 **************************************************************************************************/
-        /*****************(追加 5/23)各ドローンにおいて始点から終点へ到達したときの処理****************************/
+/********************************************** 情報回収ドローンの避難所間飛行処理 **************************************************************************************************/
+/*****************(追加 5/23)各ドローンにおいて始点から終点へ到達したときの処理****************************/
+#if 0
         for (i = 0; i < S_C_D; i++)
         {
             if ((ind_dro[i] == size[i % M] - 1 && n_cos_dro[i] < 0 && infC_drone[i].y < new_p[reverse_cir[i % M][0]].y) || (ind_dro[i] == size[i % M] - 1 && n_cos_dro[i] > 0 && infC_drone[i].y > new_p[reverse_cir[i % M][0]].y))
@@ -1526,6 +1569,168 @@ int main(void)
                 }
             }
         }
+#endif
+        /************************************ 情報収集ドローンで各巡回路においてTVの S_N 個前の避難所を順に巡回していく処理 *******************************************************************************************************************************************/
+        for (i = 0; i < S_C_D; i++)
+        {
+            if ((n_cos_dro[i] < 0 && infC_drone[i].y < new_p[target_dro[i]].y) || (n_cos_dro[i] > 0 && infC_drone[i].y > new_p[target_dro[i]].y)) // 目的の避難所に到達した場合
+            {
+
+                /**************************** S_N = 1のとき ***********************************************************************************/
+                if (S_N == 1 && infC_drone[i].crossing_cir_flag == TRUE) // S_N=1のときは、常に巡回路をまたぐ飛行
+                {
+                    infC_drone[i].follow_num += 1; // 一つ隣の巡回路の避難所巡回に変更
+
+                    if (infC_drone[i].follow_num >= M) // 最後の巡回路を超えたら
+                    {
+                        infC_drone[i].follow_num = 0; // 巡回路0からにする
+                    }
+
+                    current_dro[i] = target_dro[i];
+
+                    // 隣の巡回路において、TVの S_N 個前の避難所を目的地にする
+                    if (stay_t[infC_drone[i].follow_num] != 0) // 物資運搬車両が避難所で物資におろし中なら、(S_N + 1)個前から始める
+                    {
+                        if (ind[infC_drone[i].follow_num] - (S_N + 1) <= 0) // 集積所を超えて戻る場合
+                        {
+                            reverse_num = (S_N + 1) - ind[infC_drone[i].follow_num] + 1; // 巡回路の配列の最大要素数から戻す数
+                            target_dro[i] = cir[infC_drone[i].follow_num][(size[infC_drone[i].follow_num] - 1) - reverse_num];
+                            ind_dro[i] = size[infC_drone[i].follow_num] - 1 - reverse_num; // ドローンのtarget_droのindexを更新
+                        }
+                        else
+                        {
+                            target_dro[i] = cir[infC_drone[i].follow_num][ind[infC_drone[i].follow_num] - (S_N + 1)];
+                            ind_dro[i] = ind[infC_drone[i].follow_num] - (S_N + 1);
+                        }
+                    }
+                    else // 物資運搬車両が避難所で物資におろし中でないなら、(S_N)個前から始める
+                    {
+                        if (ind[infC_drone[i].follow_num] - S_N <= 0) // 集積所を超えて戻る場合
+                        {
+                            reverse_num = S_N - ind[infC_drone[i].follow_num] + 1; // 巡回路の配列の最大要素数から戻す数
+                            target_dro[i] = cir[infC_drone[i].follow_num][(size[infC_drone[i].follow_num] - 1) - reverse_num];
+                            ind_dro[i] = size[infC_drone[i].follow_num] - 1 - reverse_num; // ドローンのtarget_droのindexを更新
+                        }
+                        else
+                        {
+                            target_dro[i] = cir[infC_drone[i].follow_num][ind[infC_drone[i].follow_num] - S_N];
+                            ind_dro[i] = ind[infC_drone[i].follow_num] - S_N;
+                        }
+                    }
+
+                    infC_drone[i].x = new_p[current_dro[i]].x; // 座標修正
+                    infC_drone[i].y = new_p[current_dro[i]].y;
+                    part_t_dro[i] = 0;
+                }
+                /************************* S_N = 1 以外のとき ***********************************************************************/
+                else if (infC_drone[i].crossing_cir_flag == TRUE) // ドローンが巡回路間をまたいで飛行していた場合
+                {
+                    pass_count[i] += 1; // 避難所通過回数をカウントアップ
+
+                    infC_drone[i].crossing_cir_flag = FALSE; // フラグをリセット
+                    ind_dro[i] += 1;
+                    current_dro[i] = target_dro[i];
+                    target_dro[i] = cir[infC_drone[i].follow_num][ind_dro[i]]; // 目的避難所変更
+                    infC_drone[i].x = new_p[current_dro[i]].x;                 // 座標修正
+                    infC_drone[i].y = new_p[current_dro[i]].y;
+                    part_t_dro[i] = 0;
+                    //
+                }
+                else // 同巡回路で S_N 箇所の避難所を巡回中のとき
+                {
+                    if (target_dro[i] != 0)
+                    {
+                        pass_count[i] += 1; // 避難所通過回数をカウントアップ
+                    }
+
+                    if (pass_count[i] == S_N) // 同巡回路で S_N 箇所の避難所を通過した場合は、次の隣の巡回路へ
+                    {
+                        pass_count[i] = 0;             // 避難所通過回数をリセット
+                        infC_drone[i].follow_num += 1; // 一つ隣の巡回路の避難所巡回に変更
+
+                        if (infC_drone[i].follow_num >= M) // 最後の巡回路を超えたら
+                        {
+                            infC_drone[i].follow_num = 0; // 巡回路0からにする
+                        }
+
+                        infC_drone[i].crossing_cir_flag = TRUE; // 巡回路間飛行中フラグを立てる
+
+                        current_dro[i] = target_dro[i];
+
+                        // 隣の巡回路において、TVの S_N 個前の避難所を目的地にする
+                        if (stay_t[infC_drone[i].follow_num] != 0) // 物資運搬車両が避難所で物資におろし中なら、(S_N + 1)個前から始める
+                        {
+                            if (ind[infC_drone[i].follow_num] - (S_N + 1) <= 0) // 集積所を超えて戻る場合
+                            {
+                                reverse_num = (S_N + 1) - ind[infC_drone[i].follow_num] + 1; // 巡回路の配列の最大要素数から戻す数
+                                target_dro[i] = cir[infC_drone[i].follow_num][(size[infC_drone[i].follow_num] - 1) - reverse_num];
+                                ind_dro[i] = size[infC_drone[i].follow_num] - 1 - reverse_num; // ドローンのtarget_droのindexを更新
+                            }
+                            else
+                            {
+                                target_dro[i] = cir[infC_drone[i].follow_num][ind[infC_drone[i].follow_num] - (S_N + 1)];
+                                ind_dro[i] = ind[infC_drone[i].follow_num] - (S_N + 1);
+                            }
+                        }
+                        else // 物資運搬車両が避難所で物資におろし中でないなら、(S_N)個前から始める
+                        {
+                            if (ind[infC_drone[i].follow_num] - S_N <= 0) // 集積所を超えて戻る場合
+                            {
+                                reverse_num = S_N - ind[infC_drone[i].follow_num] + 1; // 巡回路の配列の最大要素数から戻す数
+                                target_dro[i] = cir[infC_drone[i].follow_num][(size[infC_drone[i].follow_num] - 1) - reverse_num];
+                                ind_dro[i] = size[infC_drone[i].follow_num] - 1 - reverse_num; // ドローンのtarget_droのindexを更新
+                            }
+                            else
+                            {
+                                target_dro[i] = cir[infC_drone[i].follow_num][ind[infC_drone[i].follow_num] - S_N];
+                                ind_dro[i] = ind[infC_drone[i].follow_num] - S_N;
+                            }
+                        }
+
+                        infC_drone[i].x = new_p[current_dro[i]].x; // 座標修正
+                        infC_drone[i].y = new_p[current_dro[i]].y;
+                        part_t_dro[i] = 0;
+                    }
+                    else // pass_count[i]が S_N より小さい場合:同巡回路で S_N 箇所の避難所を巡回中のとき
+                    {
+
+                        if (ind_dro[i] == size[infC_drone[i].follow_num] - 1) // 目的が巡回路最後（集積所）である場合
+                        {
+                            ind_dro[i] = 1; // 巡回路の最初の避難所
+                        }
+                        else
+                        {
+                            ind_dro[i] += 1;
+                        }
+
+                        current_dro[i] = target_dro[i];
+                        target_dro[i] = cir[infC_drone[i].follow_num][ind_dro[i]]; // 目的避難所変更
+                        infC_drone[i].x = new_p[current_dro[i]].x;                 // 座標修正
+                        infC_drone[i].y = new_p[current_dro[i]].y;
+                        part_t_dro[i] = 0;
+                    }
+                }
+
+                /************ ドローンの充電・バッテリー交換処理 *************/
+                // debug
+                // infC_drone[i].charge_time = 60 * 5; // 充電時間を5分に設定(テスト用)
+
+                // 次の避難所へ行く間に充電量が不足する場合はその避難所で充電する
+                if (infC_drone_flight_time[i] + new_di[current_dro[i]][target_dro[i]] * r_d_velo > capable_flight_time)
+                {
+                    // debug
+                    printf("drone[%d]の飛行時間: %lf [min]\n", i, infC_drone_flight_time[i] / 60);
+
+                    // infC_drone[i].charge_time = infC_drone_flight_time[i] * charge_constant; // 充電時間を設定
+                    infC_drone[i].charge_time = 60 * 10; // バッテリー交換時間
+                    infC_drone_flight_time[i] = 0;       // ドローンの飛行時間を初期化
+                }
+
+                /************************** 情報交換： 避難所　→　情報収集ドローン *****************************/
+                //
+            }
+        }
+        /***********************************************************************************************************************************************************************************************/
 
         /*****************各配送車において始点から終点へ到達したときの処理****************************/
         for (i = 0; i < M; i++)
@@ -1679,7 +1884,7 @@ int main(void)
                         // 医療品の配達
                         v[i].Med_re -= 1;
                         v[i].inf_med[current[i]][v[i].i_med_ptr[current[i]] - 1][3] = TRUE; // 配送車が医療品を届けたことを記録
-                        printf("t=%.2lf : 配送車[%d]から避難所[%d]医療品配達 残り医療物資量:%d\n", total_t, i, current[i], v[i].Med_re);
+                        // printf("t=%.2lf : 配送車[%d]から避難所[%d]医療品配達 残り医療物資量:%d\n", total_t, i, current[i], v[i].Med_re);
                         v[i].queue_Notdelivery_ptr += 1; // 配達が完了したキュー内の避難所のポインタを進める
 
                         counter_Med_re_delivery++; // 医療品の配送回数をカウント
@@ -2208,8 +2413,8 @@ int main(void)
                     if (v[i].i_med_ptr[j] > 0 && v[i].inf_med[j][v[i].i_med_ptr[j] - 1][3] != TRUE && j <= (i + 1) * 10 && j >= i * 10 + 1) // 巡回経路上の物資を荷降ろしする避難所内で医療物資要求があったにも関わらずまだ医療品を届けることができていないとき
                     {
                         v[i].Med_re += 1;
-                        printf("t=%.2lf : 配送車%d:避難所[%d]への物資積載\n", total_t, i, j);
-                        // debug
+                        // printf("t=%.2lf : 配送車%d:避難所[%d]への物資積載\n", total_t, i, j);
+                        //  debug
                         if (j == 13)
                         {
                             printf("flag: %lf\n", v[i].inf_med[j][v[i].i_med_ptr[j] - 1][3]);
