@@ -1711,7 +1711,7 @@ int main(void)
 
                 /************ ドローンの充電・バッテリー交換処理 *************/
                 // debug
-                // infC_drone[i].charge_time = 60 * 5; // 充電時間を5分に設定(テスト用)
+                infC_drone[i].charge_time = 60 * 5; // 充電時間を5分に設定(テスト用)
 
                 // 次の避難所へ行く間に充電量が不足する場合はその避難所で充電する
                 if (infC_drone_flight_time[i] + new_di[current_dro[i]][target_dro[i]] * r_d_velo > capable_flight_time)
@@ -1720,8 +1720,8 @@ int main(void)
                     printf("drone[%d]の飛行時間: %lf [min]\n", i, infC_drone_flight_time[i] / 60);
 
                     // infC_drone[i].charge_time = infC_drone_flight_time[i] * charge_constant; // 充電時間を設定
-                    infC_drone[i].charge_time = 60 * 10; // バッテリー交換時間
-                    infC_drone_flight_time[i] = 0;       // ドローンの飛行時間を初期化
+                    // infC_drone[i].charge_time = 60 * 10; // バッテリー交換時間
+                    infC_drone_flight_time[i] = 0; // ドローンの飛行時間を初期化
                 }
 
                 /************************** 情報交換： 避難所　→　情報収集ドローン *****************************/
