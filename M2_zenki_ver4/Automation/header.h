@@ -16,7 +16,7 @@
 #define SD 5        /*シミュレーションで用いるドローン数*/
 #define C_D 15      /* 要求情報を回収するドローンの初期化台数 */
 #define S_C_D 1     /* 要求情報を回収するドローンのシミュレーションで用いる台数 */
-#define S_N 5       /* 物資運搬車両の S_N 個前の避難所を巡回 */
+#define S_N 3       /* 物資運搬車両の S_N 個前の避難所を巡回 */
 #define B_D 20      /* バッテリー配布ドローン */
 #define I_SIZE 100  /*情報配列の要素数*/
 #define Y_SIZE 10   /*薬の情報配列の二次元要素数*/
@@ -92,21 +92,22 @@ typedef struct
     int target_num;                    // ドローンが巡回路をまたいで向かう巡回路番号
     int wait_flag;                     // ドローンが先回りして避難所で待機することを示すフラグ
     int free_mode;
-    int charge_time;            // ドローンが飛行した分だけ充電する時間
-    double flight_start_time;   // ドローンの飛行開始時間
-    int FtoDiscenter_mode;      // ドローンが配送センターに向かうモード(避難所から集積所)（FALSE:配送車に従う、TRUE:ドローン単独で配送センターへ向かう）
-    int delivery_mode;          // ドローンの配達モード(集積所から避難所)（FALSE:配送車に従う、TRUE:ドローン単独で配達)
-    int target_shelter_num;     // ドローンの目標避難所番号
-    double stay_Medload_time;   // ドローンが医療品を積載するために滞在する時間
-    int cannot_fly_judge_flag;  // ドローンの避難所への飛行不可能性を判断するフラグ（TRUE：飛行不可能 FALSE：飛行可能）
-    int TV_wait_flag;           // ドローンが避難所でTVの到着を待つフラグ
-    int batDel_flag;            // ドローンがバッテリー配布を行うフラグ（TRUE:バッテリー配布を行う、FALSE:バッテリー配布を行わない）:（バッテリー配布ドローン専用）
-    int FtoShelter_mode;        // ドローンが避難所に向かうモード（FALSE:配送車に従う、TRUE:ドローン単独で避難所へ向かう）:（バッテリー配布ドローン専用）
-    double Battery_Unload_time; // ドローンがバッテリーを避難所に降ろす時間:（バッテリー配布ドローン専用）
-    double Battery_load_time;   // ドローンがTVでバッテリーを積載する時間:（バッテリー配布ドローン専用）
-    int batDel_wait_flag;       // ドローンが避難所でバッテリー配布を待つフラグ（TRUE:バッテリー配布を待つ、FALSE:バッテリー配布を待たない）:（情報収集ドローン専用）
-    int crossing_cir_flag;      // ドローンが巡回路をまたいでいるかどうかを示すフラグ（TRUE:巡回路をまたいでいる、FALSE:巡回路をまたいでいない）:（情報収集ドローン専用）
-    int FtoVehicle_mode;        // ドローンが配送車に向かうモード（FALSE:配送車に従う、TRUE:ドローン単独で配送車へ向かう）:（情報収集ドローン専用）
+    int charge_time;              // ドローンが飛行した分だけ充電する時間
+    double flight_start_time;     // ドローンの飛行開始時間
+    int FtoDiscenter_mode;        // ドローンが配送センターに向かうモード(避難所から集積所)（FALSE:配送車に従う、TRUE:ドローン単独で配送センターへ向かう）
+    int delivery_mode;            // ドローンの配達モード(集積所から避難所)（FALSE:配送車に従う、TRUE:ドローン単独で配達)
+    int target_shelter_num;       // ドローンの目標避難所番号
+    double stay_Medload_time;     // ドローンが医療品を積載するために滞在する時間
+    int cannot_fly_judge_flag;    // ドローンの避難所への飛行不可能性を判断するフラグ（TRUE：飛行不可能 FALSE：飛行可能）
+    int TV_wait_flag;             // ドローンが避難所でTVの到着を待つフラグ
+    int batDel_flag;              // ドローンがバッテリー配布を行うフラグ（TRUE:バッテリー配布を行う、FALSE:バッテリー配布を行わない）:（バッテリー配布ドローン専用）
+    int FtoShelter_mode;          // ドローンが避難所に向かうモード（FALSE:配送車に従う、TRUE:ドローン単独で避難所へ向かう）:（バッテリー配布ドローン専用）
+    double Battery_Unload_time;   // ドローンがバッテリーを避難所に降ろす時間:（バッテリー配布ドローン専用）
+    double Battery_load_time;     // ドローンがTVでバッテリーを積載する時間:（バッテリー配布ドローン専用）
+    int batDel_wait_flag;         // ドローンが避難所でバッテリー配布を待つフラグ（TRUE:バッテリー配布を待つ、FALSE:バッテリー配布を待たない）:（情報収集ドローン専用）
+    int crossing_cir_flag;        // ドローンが巡回路をまたいでいるかどうかを示すフラグ（TRUE:巡回路をまたいでいる、FALSE:巡回路をまたいでいない）:（情報収集ドローン専用）
+    int FtoVehicle_mode;          // ドローンが配送車に向かうモード（FALSE:配送車に従う、TRUE:ドローン単独で配送車へ向かう）:（情報収集ドローン専用）
+    int shelter_visit_counter[N]; // シミュレーション内でドローンが訪問した避難所の回数カウンター（情報収集ドローン専用）
 } dro;
 
 /********************************************** 関数定義 ******************************************************************/

@@ -1607,7 +1607,6 @@ int main(void)
                     infC_drone[i].follow_num = 0; // 巡回路0からにする
                 }
                 // 以下プログラム追記
-                infC_drone[i].crossing_cir_flag = TRUE; // 巡回路間飛行中フラグを立てる
 
                 // バッテリー交換が必要なら交換
 
@@ -1694,7 +1693,15 @@ int main(void)
                         // 物資運搬車両まで充電量足りなければバッテリー交換：バッテリー交換終わると改めて合流地点導出
 
                         // ここ以下は適宜消去
-                        pass_count[i] = 0; // 避難所通過回数をリセット
+                        pass_count[i] = 0;             // 避難所通過回数をリセット
+                        infC_drone[i].follow_num += 1; // 一つ隣の巡回路の避難所巡回に変更
+
+                        if (infC_drone[i].follow_num >= M) // 最後の巡回路を超えたら
+                        {
+                            infC_drone[i].follow_num = 0; // 巡回路0からにする
+                        }
+
+                        infC_drone[i].crossing_cir_flag = TRUE; // 巡回路間飛行中フラグを立てる
 
                         current_dro[i] = target_dro[i];
 
