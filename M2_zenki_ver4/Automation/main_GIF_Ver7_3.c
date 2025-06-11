@@ -366,6 +366,10 @@ int main(void)
         {
             infC_drone[i].shelter_visit_counter[j] = 0;
         }
+
+        infC_drone[i].bat_swap_onTV_flag = FALSE;
+
+        infC_drone[i].bat_swap_follow_num = 0;
     }
 
     /*********************************************** pythonの出力ファイルから点の「座標」と「隣接行列」を読み込む **************************************************************************/
@@ -1469,7 +1473,18 @@ int main(void)
                     infC_drone_jyunkai_time[i] = 0;
                 }
 
-                // 物資運搬車両へ飛行する前に充電を行ったことにため、改めて物資運搬車両との合流地点を導出する場合
+                if (infC_drone[i].bat_swap_onTV_flag == TRUE) // TV上でバッテリー交換を行っている場合はTVに追従
+                {
+                    infC_drone[i].x = v[infC_drone[i].bat_swap_follow_num].x;
+                    infC_drone[i].y = v[infC_drone[i].bat_swap_follow_num].y;
+
+                    if (infC_drone[i].charge_time == 0) // バッテリー交換が完了したら
+                    {
+                        infC_drone[i].bat_swap_onTV_flag = FALSE;
+                    }
+                }
+
+                // 物資運搬車両へ飛行する前に充電を行ったため、改めて物資運搬車両との合流地点を導出する場合
                 if (infC_drone[i].charge_time == 0 && infC_drone[i].FtoVehicle_mode == TRUE)
                 {
                     solveConfluenceVer2(v[infC_drone[i].follow_num].x, v[infC_drone[i].follow_num].y, infC_drone[i].x, infC_drone[i].y, 1.0, v_d_ratio, new_p[target[infC_drone[i].follow_num]].x, new_p[target[infC_drone[i].follow_num]].y, &infC_drone[i].xt, &infC_drone[i].yt, v_d_ratio, r_d_velo, r_velo, stay_t, dis_stay_t, new_p, infC_drone, i, v, infC_drone[i].follow_num, current, target, cir, cir_flag, ind, ind_last, ind_relief, size); // follow_numにおける配送車との合流地点
@@ -1588,6 +1603,8 @@ int main(void)
                 current_dro[i] = INF; // ドローンの現在値は物資運搬車両であるため、INFに設定
 
                 // ドローンが次の巡回路へ飛行するための処理追加
+                infC_drone[i].bat_swap_follow_num = infC_drone[i].follow_num; // バッテリー交換を行う物資運搬車両の番号を保存しておく
+
                 pass_count[i] = 0;             // 避難所通過回数をリセット
                 infC_drone[i].follow_num += 1; // 一つ隣の巡回路の避難所巡回に変更
 
@@ -1635,7 +1652,7 @@ int main(void)
                 // debug
                 // infC_drone[i].charge_time = battery_swap_time; // 充電時間を5分に設定(テスト用)
 
-                // 次の避難所へ行く間に充電量が不足する場合はその避難所で充電する
+                // 次の避難所へ行く間に充電量が不足する場合は物資運搬車両で充電する
                 if (infC_drone_flight_time[i] + retDis(infC_drone[i].xt, infC_drone[i].yt, infC_drone[i].x, infC_drone[i].y) * r_d_velo > capable_flight_time)
                 {
                     // debug
@@ -1644,6 +1661,8 @@ int main(void)
                     // infC_drone[i].charge_time = infC_drone_flight_time[i] * charge_constant; // 充電時間を設定
                     infC_drone[i].charge_time = battery_swap_time; // バッテリー交換時間
                     infC_drone_flight_time[i] = 0;                 // ドローンの飛行時間を初期化
+
+                    infC_drone[i].bat_swap_onTV_flag = TRUE; // TV上でバッテリー交換を行う
                 }
 
                 // 物資運搬車両との情報交換
@@ -1762,12 +1781,10 @@ int main(void)
                 {
                     if (new_p[current_dro[i]].i_med_ptr[j] > infC_drone[i].i_med_ptr[j]) // 同じ巡回路内の避難所の要求情報を回収
                     {
-                        printf("aaaaaaaaaaaaaaaa\n");
-
                         for (k = infC_drone[i].i_med_ptr[j]; k < new_p[current_dro[i]].i_med_ptr[j]; k++)
                         {
-                            // if (new_p[current_dro[i]].inf_med[j][k][5] == FALSE) // 既に他の配送車やドローンに要求情報が回収されていなければ
-                            if (TRUE)
+                            // if (TRUE)
+                            if (new_p[current_dro[i]].inf_med[j][k][5] == FALSE) // 既に他の配送車やドローンに要求情報が回収されていなければ
                             {
                                 new_p[current_dro[i]].inf_med[j][k][5] = TRUE; // 回収済みのフラグを立てる
 
@@ -1791,12 +1808,12 @@ int main(void)
                                 // ファイルへの書き込み
                                 // fprintf(fp_Medinf_delay, "t=%lf generate_time:%lf new_p[%d]->drone[%d]\n", total_t, infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0], current_dro[i], i);
                                 // fprintf(fp_Medinf_delay, "%lf\n", total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]); // 生成されてからドローンで回収されるまでの遅延時間
-                                fprintf(fp_ETC_dro, "t=%lf generate_time:%lf new_p[%d]->drone[%d] %lf\n", total_t, infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0], current_dro[i], i, total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]);
-                                // fprintf(fp_ETC_dro, "%lf\n", total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]); // 生成されてからドローンで回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
+                                // fprintf(fp_ETC_dro, "t=%lf generate_time:%lf new_p[%d]->drone[%d] %lf\n", total_t, infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0], current_dro[i], i, total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]);
+                                fprintf(fp_ETC_dro, "%lf\n", total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]); // 生成されてからドローンで回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
                                 infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][4] = total_t;
 
-                                fprintf(fp_Medinf_collect_delay, "t=%lf generate_time:%lf new_p[%d]->drone[%d] %lf\n", total_t, infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0], current_dro[i], i, total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]);
-                                // fprintf(fp_Medinf_collect_delay, "%lf\n", total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]); // 生成されてからドローンで回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
+                                // fprintf(fp_Medinf_collect_delay, "t=%lf generate_time:%lf new_p[%d]->drone[%d] %lf\n", total_t, infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0], current_dro[i], i, total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]);
+                                fprintf(fp_Medinf_collect_delay, "%lf\n", total_t - infC_drone[i].inf_med[j][infC_drone[i].i_med_ptr[j] - 1][0]); // 生成されてからドローンで回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
                             }
                         }
                     }
@@ -1943,10 +1960,10 @@ int main(void)
                                     // ファイルへの書き込み
                                     // fprintf(fp_Medinf_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
                                     fprintf(fp_Medinf_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間
-                                    fprintf(fp_Medinf_collect_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
-                                    // fprintf(fp_Medinf_collect_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
-                                    fprintf(fp_ETC_to_Vehicle, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
-                                    v[i].inf_med[j][v[i].i_med_ptr[j] - 1][2] = total_t;                                      // 要求情報発生から回収までの遅延時間（避難所→TV）
+                                    // fprintf(fp_Medinf_collect_delay, "t=%lf generate_time:%lf new_p[%d]->v[%d]\n", total_t, v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0], current[i], i);
+                                    fprintf(fp_Medinf_collect_delay, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
+                                    fprintf(fp_ETC_to_Vehicle, "%lf\n", total_t - v[i].inf_med[j][v[i].i_med_ptr[j] - 1][0]);       // 生成されてから配送車で回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
+                                    v[i].inf_med[j][v[i].i_med_ptr[j] - 1][2] = total_t;                                            // 要求情報発生から回収までの遅延時間（避難所→TV）
                                 }
                             }
                         }
@@ -3250,7 +3267,7 @@ int main(void)
     if (count7 > 0)
     {
         average7 = sum7 / count7;
-        printf("E(TC) TV：%f [h]\n", average7 / 3600);
+        printf("E(TC) TV + drone：%f [h]\n", average7 / 3600);
         // 各シミュレーションごとのMed_E(TD) のデータを格納する
         FILE *fp_Mean_Medinf_collect_data;
         char *Mean_Medinf_collect_delay_file = "drone_datafile/txtfile/Mean_Medinf_collect_delay.txt";
@@ -3282,7 +3299,7 @@ int main(void)
     if (count7 > 0)
     {
         average7 = sum7 / count7;
-        printf("E(TC) drone：%f [min]\n", average7 / 60);
+        printf("E(TC) drone：%f [hour]\n", average7 / 3600);
         // printf("sum7: %f, count7: %f\n", sum7, count7);
         //  各シミュレーションごとのMed_E(TD) のデータを格納する
         FILE *fp_Mean_ETC_dro_data;
