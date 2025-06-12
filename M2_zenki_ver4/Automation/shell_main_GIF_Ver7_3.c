@@ -8,7 +8,7 @@
 #include "header.h"
 
 /**************************************メイン関数******************************************************/
-int main(void)
+int main(int argc, char *argv[])
 {
     int i, j, k, m, n;
     char *data_file;     // 座標プロット用
@@ -38,8 +38,14 @@ int main(void)
     int VIA[N];     /*経由点*/
     char USED[N];   /*確定か未確定か*/
 
-    srand(821); // シード値
-    // srand(57); // シード値
+    // シェルスクリプトにおける記述
+    if (argc < 2)
+    {
+        fprintf(stderr, "Usage: %s <seed>\n", argv[0]);
+        return 1;
+    }
+    int seed = atoi(argv[1]);
+    srand(seed); // シード値
 
     point p[N];          // 避難所と配送センターの宣言
     vehicle v[M];        // 配送車の宣言
@@ -1275,7 +1281,7 @@ int main(void)
                 n_tan_dro[i] = n_sin_dro[i] / n_cos_dro[i];
             }
         }
-
+#if 0
         // if (total_t >= 0 && total_t <= 20000)
         if (total_t >= 0 && total_t <= 20000)
         {
@@ -1427,9 +1433,10 @@ int main(void)
                 fprintf(gp, "%f %f\n", drone[0].x + 0.1, drone[0].y + 0.1);
                 fprintf(gp, "e\n");
                 */
+
             }
         }
-
+#endif
         /**************配送車の座標更新*****************/
         for (i = 0; i < M; i++)
         {

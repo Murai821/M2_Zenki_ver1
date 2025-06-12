@@ -45,7 +45,7 @@ int main()
     // 出力ファイルを閉じる
     fclose(outputFile);
 
-    printf("情報の回収から配達までの遅延時間の平均値 %.6f をファイルに書き込みました。\n", average);
+    // printf("情報の回収から配達までの遅延時間の平均値 %.6f をファイルに書き込みました。\n", average);
 
     return 0;
 }

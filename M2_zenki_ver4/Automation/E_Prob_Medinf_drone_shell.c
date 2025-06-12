@@ -1,13 +1,12 @@
-
-// 要求情報の回収にかかる遅延時間 E(TC) TV + drone
+// 医療品の配送平均遅延時間算出
 #include <stdio.h>
 #include <stdlib.h>
 
 int main()
 {
     FILE *inputFile, *outputFile;
-    char inputFilePath[] = "drone_datafile/txtfile/Mean_Medinf_collect_delay.txt";                 // 読み込むファイルのパス
-    char outputFilePath[] = "drone_datafile/txtfile/excel_data/Shell_Etc_Dro+Vehicle_average.txt"; // 書き込むファイルのパス
+    char inputFilePath[] = "drone_datafile/txtfile/Prob_Medinf_drone.txt";                   // 読み込むファイルのパス
+    char outputFilePath[] = "drone_datafile/txtfile/excel_data/Shell_Prob_Medinf_drone.txt"; // 書き込むファイルのパス
     double value, sum = 0.0;
     int count = 0;
 
@@ -46,7 +45,7 @@ int main()
     // 出力ファイルを閉じる
     fclose(outputFile);
 
-    printf("E(TC) TV + drone: %.6f をファイルに書き込みました。\n", average);
+    printf("ドローンによる情報収集割合の平均値 %.6f をファイルに書き込みました。\n", average);
 
     return 0;
 }

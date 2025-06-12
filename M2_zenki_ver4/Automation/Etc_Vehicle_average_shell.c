@@ -1,13 +1,12 @@
-
-// 要求情報の回収にかかる遅延時間 E(TC) TV + drone
+// shellスクリプトで求めた「drone_datafile/txtfile/Etd_data.txt」内のEtdの平均値を求め「Shell_Etd_average.txt」に書き込むプログラム
 #include <stdio.h>
 #include <stdlib.h>
 
 int main()
 {
     FILE *inputFile, *outputFile;
-    char inputFilePath[] = "drone_datafile/txtfile/Mean_Medinf_collect_delay.txt";                 // 読み込むファイルのパス
-    char outputFilePath[] = "drone_datafile/txtfile/excel_data/Shell_Etc_Dro+Vehicle_average.txt"; // 書き込むファイルのパス
+    char inputFilePath[] = "drone_datafile/txtfile/Mean_ETC_Vehicle.txt";                      // 読み込むファイルのパス
+    char outputFilePath[] = "drone_datafile/txtfile/excel_data/Shell_Etc_Vehicle_average.txt"; // 書き込むファイルのパス
     double value, sum = 0.0;
     int count = 0;
 
@@ -15,7 +14,7 @@ int main()
     inputFile = fopen(inputFilePath, "r");
     if (inputFile == NULL)
     {
-        printf("ファイルを開けませんでした。\n");
+        printf("Etc_Vehicle_data.txt ファイルを開けませんでした。\n");
         return 1;
     }
 
@@ -36,7 +35,7 @@ int main()
     outputFile = fopen(outputFilePath, "a+");
     if (outputFile == NULL)
     {
-        printf("ファイルを開けませんでした。\n");
+        printf("average.txt ファイルを開けませんでした。\n");
         return 1;
     }
 
@@ -46,7 +45,7 @@ int main()
     // 出力ファイルを閉じる
     fclose(outputFile);
 
-    printf("E(TC) TV + drone: %.6f をファイルに書き込みました。\n", average);
+    printf("E(TC) Vehicle: %.6f をファイルに書き込みました。\n", average);
 
     return 0;
 }
