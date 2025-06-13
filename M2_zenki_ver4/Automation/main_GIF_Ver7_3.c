@@ -1175,7 +1175,13 @@ int main(void)
     {
         current_dro[i] = 0;
 
-        if (ind[0] - (S_N + 1) < 0) // 集積所を超えて戻る場合
+        if (S_N >= size[0] && ind[0] - (S_N + 1) < 0) // 集積所を超えて戻る場合：S_Nが巡回路のサイズ以上のとき
+        {
+            reverse_num = S_N + 1 - ind[0]; // 巡回路の配列の最大要素数から戻す数
+            target_dro[i] = cir[0][(2 * size[0] - 1) - reverse_num];
+            ind_dro[i] = 2 * size[0] - reverse_num - 1; // ドローンのtarget_droのindexを更新
+        }
+        else if (ind[0] - (S_N + 1) < 0) // 集積所を超えて戻る場合：S_Nが巡回路のサイズ以下のとき
         {
             reverse_num = S_N + 1 - ind[0]; // 巡回路の配列の最大要素数から戻す数
             target_dro[i] = cir[0][(size[0] - 1) - reverse_num];
@@ -1623,10 +1629,34 @@ int main(void)
 
                 infC_drone[i].crossing_cir_flag = TRUE; // 巡回路間飛行中フラグを立てる
 
+                // 参考
+                /*
+                if (S_N >= size[0] && ind[0] - (S_N + 1) < 0) // 集積所を超えて戻る場合：S_Nが巡回路のサイズ以上のとき
+                {
+                    reverse_num = S_N + 1 - ind[0]; // 巡回路の配列の最大要素数から戻す数
+                    target_dro[i] = cir[0][(2 * size[0] - 1) - reverse_num];
+                    ind_dro[i] = 2 * size[0] - reverse_num - 1; // ドローンのtarget_droのindexを更新
+                }*/
+
                 // 隣の巡回路において、TVの S_N 個前の避難所を目的地にする
                 if (stay_t[infC_drone[i].follow_num] != 0) // 物資運搬車両が避難所で物資におろし中なら、(S_N + 1)個前から始める
                 {
-                    if (ind[infC_drone[i].follow_num] - (S_N + 1) <= 0) // 集積所を超えて戻る場合
+                    /*
+                    if (S_N + 1 >= (size[infC_drone[i].follow_num] + (ind[i] - 1)) && ind[infC_drone[i].follow_num] - (S_N + 1) <= 0) // 集積所を超えて戻る場合：S_Nが巡回路のサイズ以上のとき
+                    {
+                        reverse_num = (S_N + 1) - ind[infC_drone[i].follow_num] + 1; // 巡回路の配列の最大要素数から戻す数
+                        target_dro[i] = cir[infC_drone[i].follow_num][(2 * size[infC_drone[i].follow_num] - 1) - reverse_num] - ((ind[i] - 1) - 1);
+                        ind_dro[i] = (2 * size[infC_drone[i].follow_num] - 1) - reverse_num - ((ind[i] - 1) - 1); // ドローンのtarget_droのindexを更新
+                    }*/
+                    if (S_N - ind[i] + 1 >= size[infC_drone[i].follow_num] && ind[infC_drone[i].follow_num] - (S_N + 1) <= 0) // 集積所を超えて戻る場合：S_Nが巡回路のサイズ以上のとき
+                    {
+                        // reverse_num = (S_N + 1) - ind[infC_drone[i].follow_num] + 1; // 巡回路の配列の最大要素数から戻す数
+                        // target_dro[i] = cir[infC_drone[i].follow_num][(2 * size[infC_drone[i].follow_num] - 1) - reverse_num] - ((ind[i] - 1) - 1);
+                        // ind_dro[i] = (2 * size[infC_drone[i].follow_num] - 1) - reverse_num - ((ind[i] - 1) - 1); // ドローンのtarget_droのindexを更新
+                        target_dro[i] = cir[infC_drone[i].follow_num][2 * (size[infC_drone[i].follow_num] - 1) + ind[infC_drone[i].follow_num] - (S_N + 1)];
+                        ind_dro[i] = 2 * (size[infC_drone[i].follow_num] - 1) + ind[infC_drone[i].follow_num] - (S_N + 1); // ドローンのtarget_droのindexを更新
+                    }
+                    else if (ind[infC_drone[i].follow_num] - (S_N + 1) <= 0) // 集積所を超えて戻る場合：S_Nが巡回路のサイズ以下のとき
                     {
                         reverse_num = (S_N + 1) - ind[infC_drone[i].follow_num] + 1; // 巡回路の配列の最大要素数から戻す数
                         target_dro[i] = cir[infC_drone[i].follow_num][(size[infC_drone[i].follow_num] - 1) - reverse_num];
@@ -1640,9 +1670,22 @@ int main(void)
                 }
                 else // 物資運搬車両が避難所で物資におろし中でないなら、(S_N)個前から始める
                 {
-                    if (ind[infC_drone[i].follow_num] - S_N <= 0) // 集積所を超えて戻る場合
+                    /*
+                    if (S_N >= (size[infC_drone[i].follow_num] + (ind[i] - 1)) && ind[infC_drone[i].follow_num] - (S_N + 1) <= 0) // 集積所を超えて戻る場合：S_Nが巡回路のサイズ以上のとき
                     {
-                        reverse_num = S_N - ind[infC_drone[i].follow_num] + 1; // 巡回路の配列の最大要素数から戻す数
+                        reverse_num = (S_N ) - ind[infC_drone[i].follow_num] + 1; // 巡回路の配列の最大要素数から戻す数
+                        target_dro[i] = cir[infC_drone[i].follow_num][(2 * size[infC_drone[i].follow_num] - 1) - reverse_num] - ((ind[i] - 1) - 1);
+                        ind_dro[i] = (2 * size[infC_drone[i].follow_num] - 1) - reverse_num - ((ind[i] - 1) - 1); // ドローンのtarget_droのindexを更新
+                    }*/
+                    if (S_N - ind[i] >= size[infC_drone[i].follow_num] && ind[infC_drone[i].follow_num] - (S_N + 1) <= 0) // 集積所を超えて戻る場合：S_Nが巡回路のサイズ以上のとき
+                    {
+                        // reverse_num = (S_N)-ind[infC_drone[i].follow_num] + 1; // 巡回路の配列の最大要素数から戻す数
+                        target_dro[i] = cir[infC_drone[i].follow_num][2 * (size[infC_drone[i].follow_num] - 1) + ind[infC_drone[i].follow_num] - S_N];
+                        ind_dro[i] = 2 * (size[infC_drone[i].follow_num] - 1) + ind[infC_drone[i].follow_num] - S_N; // ドローンのtarget_droのindexを更新
+                    }
+                    else if (ind[infC_drone[i].follow_num] - S_N <= 0) // 集積所を超えて戻る場合
+                    {
+                        reverse_num = S_N - ind[infC_drone[i].follow_num] + 1; // 巡回路の配列の最大要素数から戻す数集積所を超えて戻る場合：S_Nが巡回路のサイズ以下のとき
                         target_dro[i] = cir[infC_drone[i].follow_num][(size[infC_drone[i].follow_num] - 1) - reverse_num];
                         ind_dro[i] = size[infC_drone[i].follow_num] - 1 - reverse_num; // ドローンのtarget_droのindexを更新
                     }
