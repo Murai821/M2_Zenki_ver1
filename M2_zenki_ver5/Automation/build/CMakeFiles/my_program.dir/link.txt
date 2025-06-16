@@ -1,0 +1,1 @@
+/usr/bin/cc CMakeFiles/my_program.dir/main.c.o CMakeFiles/my_program.dir/module.c.o -o my_program  -lm 
