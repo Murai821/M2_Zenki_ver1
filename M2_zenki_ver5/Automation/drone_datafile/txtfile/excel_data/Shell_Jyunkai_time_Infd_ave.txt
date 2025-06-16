@@ -2,3 +2,4 @@
 -nan
 -nan
 -nan
+-nan

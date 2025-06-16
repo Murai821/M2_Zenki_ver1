@@ -16,7 +16,7 @@
 #define SD 5        /*シミュレーションで用いるドローン数*/
 #define C_D 15      /* 要求情報を回収するドローンの初期化台数 */
 #define S_C_D 1     /* 要求情報を回収するドローンのシミュレーションで用いる台数 */
-#define S_N 12      /* 物資運搬車両の S_N 個前の避難所を巡回 */
+#define S_N 4       /* 物資運搬車両の S_N 個前の避難所を巡回 */
 #define B_D 20      /* バッテリー配布ドローン */
 #define I_SIZE 100  /*情報配列の要素数*/
 #define Y_SIZE 10   /*薬の情報配列の二次元要素数*/
@@ -24,13 +24,16 @@
 #define INF 9999    /*無限大*/
 #define TRUE 1
 #define FALSE 0
-#define CONST 1000            /*定数*/
-#define MAX_ELEMENTS 100      // pythonファイルから読み込む巡回セールスマン問題の近似解の巡回路の配列の最大要素数
-#define CIR_SIZE 20           /*cir[M][] ,cir[M][]の要素数*/
-#define MAX_SUBARRAYS 10      // 最大サブ配列数 RFCS法
-#define MAX_SIZE 100          // 各サブ配列の最大サイズ RFCS法
-#define MAX_charge_count 9999 // 各TVが一巡回する間にドローンを充電することができる回数
-#define MAX_TVchargeable 300  // TVで一巡回する間にドローンを充電することができる総計（単位は[min]）
+#define CONST 1000                 /*定数*/
+#define MAX_ELEMENTS 100           // pythonファイルから読み込む巡回セールスマン問題の近似解の巡回路の配列の最大要素数
+#define CIR_SIZE 20                /*cir[M][] ,cir[M][]の要素数*/
+#define MAX_SUBARRAYS 10           // 最大サブ配列数 RFCS法
+#define MAX_SIZE 100               // 各サブ配列の最大サイズ RFCS法
+#define MAX_charge_count 9999      // 各TVが一巡回する間にドローンを充電することができる回数
+#define MAX_TVchargeable 300       // TVで一巡回する間にドローンを充電することができる総計（単位は[min]）
+#define INITIAL_BATTERY_COUNT 10   // 避難所・集積所に存在する交換バッテリー量
+#define DELIVERY_BATTERY_COUNT 10  // 避難所・集積所に一度に届ける交換バッテリー量
+#define ADDITIONAL_BATTERY_COUNT 8 // 物資運搬車両上でドローンのバッテリー交換を行うために余分に積載する交換バッテリー量
 // Box-Muller法を用いた正規乱数生成関数に必要なパラメータ
 #define MEAN 50.0      // 平均
 #define STD_DEV 10.0   // 標準偏差
@@ -52,7 +55,7 @@ typedef struct
     int i_ptr[N];                      // 情報配列のポインタ
     double inf_med[N][Y_SIZE][Z_SIZE]; // 避難所の薬の情報配列三次元(避難所番号,情報配列のインデックス,（生成時間・緊急度（生成してから運搬までの目標時間）・要求情報が発生してから共有されるまでの時間（避難所→TV）・要求物資が運搬されたか(TRUE or FALSE)・要求情報が発生してから共有されるまでの時間（避難所→ドローン）・要求情報がTVorドローンに既に共有されたか(TRUE or FALSE)）
     int i_med_ptr[N];                  // 薬の情報配列のポインタ
-    int battery_count;                 // ドローンによって届けられた避難所・集積所に存在する交換バッテリー量
+    int battery_count;                 // 避難所・集積所に存在する交換バッテリー数
 } point;
 
 // 配送車の構造体
@@ -73,6 +76,7 @@ typedef struct
     int Med_delivery_queue[QUEUE_SIZE]; // 医療品を配達する避難所番号を順に格納するキュー
     int queue_ptr;                      // 医療品を配達する避難所番号を順に格納するキューのポインタ
     int queue_Notdelivery_ptr;          // キューのうち、医療品が未配達の避難所の戦闘のポインタ
+    int battery_count;                  // 物資運搬車両上に積載されている交換バッテリー数
 } vehicle;
 
 // ドローンの構造体
@@ -104,13 +108,13 @@ typedef struct
     int FtoShelter_mode;          // ドローンが避難所に向かうモード（FALSE:配送車に従う、TRUE:ドローン単独で避難所へ向かう）:（バッテリー配布ドローン専用）
     double Battery_Unload_time;   // ドローンがバッテリーを避難所に降ろす時間:（バッテリー配布ドローン専用）
     double Battery_load_time;     // ドローンがTVでバッテリーを積載する時間:（バッテリー配布ドローン専用）
-    int batDel_wait_flag;         // ドローンが避難所でバッテリー配布を待つフラグ（TRUE:バッテリー配布を待つ、FALSE:バッテリー配布を待たない）:（情報収集ドローン専用）
     int crossing_cir_flag;        // ドローンが巡回路をまたいでいるかどうかを示すフラグ（TRUE:巡回路をまたいでいる、FALSE:巡回路をまたいでいない）:（情報収集ドローン専用）
     int FtoVehicle_mode;          // ドローンが配送車に向かうモード（FALSE:配送車に従う、TRUE:ドローン単独で配送車へ向かう）:（情報収集ドローン専用）
     int shelter_visit_counter[N]; // シミュレーション内でドローンが訪問した避難所の回数カウンター（情報収集ドローン専用）
     int bat_swap_onTV_flag;       // ドローンがTV上でバッテリー交換を行うフラグ（TRUE:バッテリー交換を行う、FALSE:バッテリー交換を行わない）:（情報収集ドローン専用）
     int bat_swap_follow_num;      // ドローンがバッテリー交換を行う配送車番号（情報収集ドローン専用）
     int bat_swap_counter;         // ドローンがバッテリー交換を行った回数カウンター（情報収集ドローン専用）
+    int batDel_wait_flag;         // ドローンが避難所でバッテリー配布を待つフラグ（TRUE:バッテリー配布を待つ、FALSE:バッテリー配布を待たない）:（情報収集ドローン専用）
 } dro;
 
 /********************************************** 関数定義 ******************************************************************/
