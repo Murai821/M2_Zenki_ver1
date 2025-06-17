@@ -1923,6 +1923,23 @@ int main(int argc, char *argv[])
         printf("データがありません\n");
     }
 
+    /******  シミュレーション通してのE(TC)のヒストグラムを表示する ******/
+    FILE *fp_Etc_histgram_data;
+    char *Etc_histgram_file = "drone_datafile/txtfile/Etc_histgram_data.txt";
+    fp_Etc_histgram_data = fopen(Etc_histgram_file, "a+");
+    // Medinf_collect_delay.txtの内容をEtc_histgram_data.txtにコピー
+    FILE *fp_src = fopen(Medinf_collect_delay_file, "r");
+    if (fp_src != NULL && fp_Etc_histgram_data != NULL)
+    {
+        char buf[256];
+        while (fgets(buf, sizeof(buf), fp_src) != NULL)
+        {
+            fputs(buf, fp_Etc_histgram_data);
+        }
+        fclose(fp_src);
+    }
+    fclose(fp_Etc_histgram_data);
+
     /******** 医療品情報の回収から配達における平均情報遅延時間 *********/
     double value8 = 0;
     double sum8 = 0;

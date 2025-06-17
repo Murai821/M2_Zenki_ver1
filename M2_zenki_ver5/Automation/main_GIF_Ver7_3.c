@@ -934,26 +934,13 @@ int main(void)
     }
     fclose(fp_v5);
 
-    /**************************** 各避難所の物資要求量をランダムに決定 *****************************************/
-    double lambda_re = 1; // 物資要求量変化のラムダ
+    /**************************** 各避難所の物資要求量を決定 *****************************************/
     // 各避難所の物資量を生成
     for (int i = 1; i < N; i++)
     {
-        // new_p[i].re_req = generate_normal(MEAN, STD_DEV); // 各避難所の必要物資量をランダムに生成(正規分布)
-        new_p[i].re_req = MEAN;                      // 初期値MEAN(=50)に設定
-        new_p[i].re_req += (int)rand_exp(lambda_re); // 指数分布による増加分
-        new_p[i].re_req_sum += new_p[i].re_req;      // 各避難所の総必要物資量
+        new_p[i].re_req = MEAN;                 // 初期値MEAN(=50)に設定
+        new_p[i].re_req_sum += new_p[i].re_req; // 各避難所の総必要物資量
     }
-
-    // 結果を表示
-    int sum_re = 0; // 物資総要求量
-    // printf("避難所ごとの必要物資量:\n");
-    for (int i = 1; i < N; i++)
-    {
-        sum_re += new_p[i].re_req;
-        // printf("避難所 %d: %d\n", i, new_p[i].re_req);
-    }
-    // printf("物資総要求量：%d\n", sum_re);
 
     /********************************************************************　シミュレーション（これより上を「titibumodel_douromou_kettei2.c」からコピペ）　*************************************************************************************/
     /******************GNUPLOT**************************/
@@ -1968,16 +1955,8 @@ int main(void)
                 {
                     stay_t[i] = stay; // 避難所待機時間をセット
 
-                    if (v[i].re > new_p[current[i]].re_req) // 配送車が避難所に物資を要求分届けることができるとき
+                    if (v[i].re >= new_p[current[i]].re_req) // 配送車が避難所に物資を要求分届けることができるとき
                     {
-                        // パターン１:前半の避難所から物資必要量すべて運搬
-                        /*
-                        v[i].re -= new_p[current[i]].re_req;                  // 配送車の物資減少
-                        new_p[ind_relief[i]].re += new_p[current[i]].re_req;  // 避難所の物資増加
-                        new_p[current[i]].re_deli = new_p[current[i]].re_req; // 避難所に届けられた物資量記録
-                        ind_relief[i] += 1;
-                        */
-
                         // パターン２:すべての避難所に平等にMEANだけ物資運搬
                         v[i].re -= MEAN;                  // 配送車の物資減少
                         new_p[ind_relief[i]].re += MEAN;  // 避難所の物資増加
@@ -2579,21 +2558,6 @@ int main(void)
             }
             ave_TV_chargeAmount = TV_chargeAmount / M; // 一巡回におけるTVの平均総ドローン充電時間
             TV_chargeAmount = 0;
-
-            /**************************************** 各避難所の要求物資量と実際に届けられた物資の比較結果表示 **************************************************/
-            // printf("%-8s %-8s %-8s %-8s %-8s %-8s %-8s\n", "避難所", "必要物資量", "配達物資量", "物資不足量", "総物資必要量", "総物資配達量", "総物資不足量");
-            for (int i = 1; i < N; i++)
-            {
-                // printf("%-8d %-8d %-8d    %-8d   %-8d         %-8d %-8d\n", i, new_p[i].re_req, new_p[i].re_deli, new_p[i].re_req - new_p[i].re_deli, new_p[i].re_req_sum, new_p[i].re, new_p[i].re_req_sum - new_p[i].re);
-            }
-
-            // 各避難所の要求物資量を更新
-            for (int i = 1; i < N; i++)
-            {
-                // new_p[i].re_req = generate_normal(MEAN, STD_DEV); // 各避難所の必要物資量をランダムに生成(正規分布)
-                new_p[i].re_req += (int)rand_exp(lambda_re); // 指数分布による増加分
-                new_p[i].re_req_sum += new_p[i].re_req;      // 各避難所の総必要物資量
-            }
 
             // 医療品の積載について
             for (int i = 0; i < M; i++)
@@ -3381,6 +3345,24 @@ int main(void)
     {
         printf("E(TC) TV + drone：データがありません\n");
     }
+
+    /******  シミュレーション通してのE(TC)のヒストグラムを表示する ******/
+    FILE *fp_Etc_histgram_data;
+    char *Etc_histgram_file = "drone_datafile/txtfile/Etc_histgram_data.txt";
+    fp_Etc_histgram_data = fopen(Etc_histgram_file, "a+");
+    // Medinf_collect_delay.txtの内容をEtc_histgram_data.txtにコピー
+    FILE *fp_src = fopen(Medinf_collect_delay_file, "r");
+    if (fp_src != NULL && fp_Etc_histgram_data != NULL)
+    {
+        char buf[256];
+        while (fgets(buf, sizeof(buf), fp_src) != NULL)
+        {
+            fputs(buf, fp_Etc_histgram_data);
+        }
+        fclose(fp_src);
+    }
+    fclose(fp_Etc_histgram_data);
+
     /*** 避難所から物資運搬車両のみ ***/
     count7 = 0; // 初期化
     sum7 = 0;

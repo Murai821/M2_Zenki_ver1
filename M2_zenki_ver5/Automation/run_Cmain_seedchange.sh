@@ -9,7 +9,7 @@ end_seed=141
 #gcc shell_main_GIF_Ddelivery_DonlyVer5_nocharge.c module.c -o my_program -lm
 #gcc shell_main_GIF_Ver5_multiD.c module.c -o my_program -lm #ドローン複数（TVと逆周り）
 #gcc shell_main_GIF_Ver5_multiD_gyakumawari.c module.c -o my_program -lm #ドローン複数（TVと同じ周り）
-gcc shell_main_GIF_Ver7_4.c module.c -o my_program -lm
+gcc shell_main_GIF_Ver7_3.c module.c -o my_program -lm
 
 # 特定ディレクトリ内のファイルを初期化
 > drone_datafile/txtfile/Mean_Medinf_delay.txt
@@ -28,6 +28,7 @@ gcc shell_main_GIF_Ver7_4.c module.c -o my_program -lm
 > drone_datafile/txtfile/Mean_ETC_to_Vehicle.txt
 > drone_datafile/txtfile/drone_trip_ave_data.txt
 > drone_datafile/txtfile/Mean_Jyunkai_time_InfCdrone.txt
+> drone_datafile/txtfile/Etc_histgram_data.txt
 
 for i in $(seq $start_seed $end_seed)
 do
@@ -73,4 +74,8 @@ gcc E_Medinf_collect_average_shell.c
 gcc E_Drone_deliveryProbability_shell.c
 ./a.out
 gcc E_Prob_Medinf_drone_shell.c
+./a.out
+
+# E(TC)のヒストグラムを作成
+gcc ETC_histgram.c
 ./a.out

@@ -14,5 +14,8 @@
         "sh": "bash"
     },
     "code-runner.fileDirectoryAsCwd": true,
-    "code-runner.saveFileBeforeRun": true
+    "code-runner.saveFileBeforeRun": true,
+    "files.associations": {
+        "string.h": "c"
+    }
 }

@@ -888,14 +888,11 @@ int main(int argc, char *argv[])
     }
     fclose(fp_v5);
 
-    /**************************** 各避難所の物資要求量をランダムに決定 *****************************************/
-    double lambda_re = 1; // 物資要求量変化のラムダ
+    /**************************** 各避難所の物資要求量を決定 *****************************************/
     // 各避難所の物資量を生成
     for (int i = 1; i < N; i++)
     {
-        // new_p[i].re_req = generate_normal(MEAN, STD_DEV); // 各避難所の必要物資量をランダムに生成(正規分布)
-        new_p[i].re_req = MEAN; // 初期値MEAN(=50)に設定
-        // new_p[i].re_req += (int)rand_exp(lambda_re); // 指数分布による増加分
+        new_p[i].re_req = MEAN;                 // 初期値MEAN(=50)に設定
         new_p[i].re_req_sum += new_p[i].re_req; // 各避難所の総必要物資量
     }
 
@@ -1918,15 +1915,6 @@ int main(int argc, char *argv[])
 
                     if (v[i].re >= new_p[current[i]].re_req) // 配送車が避難所に物資を要求分届けることができるとき
                     {
-                        // パターン１:前半の避難所から物資必要量すべて運搬
-                        /*
-                        v[i].re -= new_p[current[i]].re_req;                  // 配送車の物資減少
-                        new_p[ind_relief[i]].re += new_p[current[i]].re_req;  // 避難所の物資増加
-                        new_p[current[i]].re_deli = new_p[current[i]].re_req; // 避難所に届けられた物資量記録
-                        ind_relief[i] += 1;
-                        */
-
-                        // パターン２:すべての避難所に平等にMEANだけ物資運搬
                         v[i].re -= MEAN;                  // 配送車の物資減少
                         new_p[ind_relief[i]].re += MEAN;  // 避難所の物資増加
                         new_p[current[i]].re_deli = MEAN; // 避難所に届けられた物資量記録
@@ -2528,18 +2516,9 @@ int main(int argc, char *argv[])
             ave_TV_chargeAmount = TV_chargeAmount / M; // 一巡回におけるTVの平均総ドローン充電時間
             TV_chargeAmount = 0;
 
-            /**************************************** 各避難所の要求物資量と実際に届けられた物資の比較結果表示 **************************************************/
-            // printf("%-8s %-8s %-8s %-8s %-8s %-8s %-8s\n", "避難所", "必要物資量", "配達物資量", "物資不足量", "総物資必要量", "総物資配達量", "総物資不足量");
-            for (int i = 1; i < N; i++)
-            {
-                // printf("%-8d %-8d %-8d    %-8d   %-8d         %-8d %-8d\n", i, new_p[i].re_req, new_p[i].re_deli, new_p[i].re_req - new_p[i].re_deli, new_p[i].re_req_sum, new_p[i].re, new_p[i].re_req_sum - new_p[i].re);
-            }
-
             // 各避難所の要求物資量を更新
             for (int i = 1; i < N; i++)
             {
-                // new_p[i].re_req = generate_normal(MEAN, STD_DEV); // 各避難所の必要物資量をランダムに生成(正規分布)
-                // new_p[i].re_req += (int)rand_exp(lambda_re); // 指数分布による増加分
                 new_p[i].re_req_sum += new_p[i].re_req; // 各避難所の総必要物資量
             }
 
