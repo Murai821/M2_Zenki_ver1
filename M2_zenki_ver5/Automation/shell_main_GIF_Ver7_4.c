@@ -1148,18 +1148,10 @@ int main(int argc, char *argv[])
     }
 
     // 情報回収用ドローンの出発時間初期化
-    double devision = C_D / M;     // ドローンの数を配送車の数で割る
-    double total_di_time[M] = {0}; // 各小回線の総時間
     double f_s_time = 0;
-    for (i = 0; i < M; i++)
-    {
-        total_di_time[i] = total_di[i] * r_d_velo;                   // 各小回線の総時間を計算
-        total_di_time[i] = total_di_time[i] * (charge_constant + 1); // 充電時間も考慮した飛行間隔に（充電なしの場合*(充電係数+1)）
-        // printf("total_di_time[%d]: %f\n", i, total_di_time[i]);
-    }
     for (i = 0; i < C_D; i++)
     {
-        f_s_time = total_di_time[i % M] / (double)devision * (double)(i - i % M) / M;
+        f_s_time = 4000 / S_C_D * i;
         infC_drone[i].flight_start_time = (int)f_s_time - (int)f_s_time % 10; // ドローンの出発時間を設定(少数第一位を0にする)
         // printf("infC_drone[%d].flight_start_time: %f\n", i, infC_drone[i].flight_start_time);
     }
@@ -2836,6 +2828,47 @@ int main(int argc, char *argv[])
             }
         }
             */
+
+        // 物資運搬車両との情報交換: 巡回中にTVとすれ違った場合はそこで情報交換(すれ違うのは S_N が大きいとき)
+        /************************** 情報交換： 情報収集ドローン　→　物資運搬車両 *****************************/
+        for (i = 0; i < S_C_D; i++)
+        {
+            if (fabs(infC_drone[i].x - v[infC_drone[i].follow_num].x) < 0.001 && fabs(infC_drone[i].y - v[infC_drone[i].follow_num].y) < 0.001) // 情報収集ドローンと物資運搬車両が合流したとき
+            {
+                // 薬の情報配列の交換
+                for (j = 0; j < N; j++)
+                {
+                    if (infC_drone[i].i_med_ptr[j] > v[infC_drone[i].follow_num].i_med_ptr[j])
+                    {
+                        for (k = v[infC_drone[i].follow_num].i_med_ptr[j]; k < infC_drone[i].i_med_ptr[j]; k++)
+                        {
+                            for (m = 0; m < Z_SIZE; m++)
+                            {
+                                v[infC_drone[i].follow_num].inf_med[j][k][m] = infC_drone[i].inf_med[j][k][m];
+                            }
+                            v[infC_drone[i].follow_num].i_med_ptr[j] += 1;
+                            // 配列の容量オーバー
+                            if (v[infC_drone[i].follow_num].i_med_ptr[j] == Y_SIZE)
+                            {
+                                printf("配列要素数オーバー\n");
+                                break;
+                            }
+
+                            // ドローンが情報を渡す物資運搬車両は、その物資運搬車両が担当する巡回路内の避難所に関する情報のみにする（その物資運搬車両から配送ドローンが飛行する）
+                            if (j >= infC_drone[i].follow_num * 10 + 1 && j <= (infC_drone[i].follow_num + 1) * 10)
+                            {
+                                printf(" t=%lf : ドローン[%d]が物資運搬車両[%d]に 避難所[%d] の情報を伝達\n", total_t, i, infC_drone[i].follow_num, j);
+
+                                printf(" %lf\n", v[infC_drone[i].follow_num].inf_med[j][v[infC_drone[i].follow_num].i_med_ptr[j] - 1][0]);
+
+                                // fprintf(fp_ETC_to_Vehicle, "t=%lf generate_time:%lf 避難所[%d]の情報 : drone[%d]->vehicle[%d] %lf\n", total_t, v[infC_drone[i].bat_swap_follow_num].inf_med[j][v[infC_drone[i].bat_swap_follow_num].i_med_ptr[j] - 1][0], j, i, infC_drone[i].bat_swap_follow_num, total_t - v[infC_drone[i].bat_swap_follow_num].inf_med[j][v[infC_drone[i].bat_swap_follow_num].i_med_ptr[j] - 1][0]);
+                                fprintf(fp_ETC_to_Vehicle, "%lf\n", total_t - v[infC_drone[i].follow_num].inf_med[j][v[infC_drone[i].follow_num].i_med_ptr[j] - 1][0]); // 生成されてから配送車で回収されるまでの遅延時間(避難所から配送車への情報共有の遅延時間)
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         /*****************避難所への情報の到着******************/
         if (total_t != 0 && (int)(total_t) % ((int)(poisson_inf_total) - (int)(poisson_inf_total) % 10) == 0)

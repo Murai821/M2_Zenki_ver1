@@ -1,4 +1,4 @@
-// 新手法　ドローンが独立して避難所間を飛行しながら要求情報を回収する手法：物資運搬車両の数個前の避難所を重点的に飛行する手法：巡回路で集積所巡回し終えたらTVに届けに行く手法：S_Nが大きいときTVとすれ違うと情報交換
+// 新手法　ドローンが独立して避難所間を飛行しながら要求情報を回収する手法：物資運搬車両の数個前の避難所を重点的に飛行する手法：巡回路で集積所巡回し終えたらTVに届けに行く手法（避難所のバッテリーの数考慮したver）
 // GIFアニメーションで表示するプログラム
 // コンパイル方法「gcc -o my_program main.c module.c -lm」
 #include <stdio.h>
@@ -8,7 +8,7 @@
 #include "header.h"
 
 /**************************************メイン関数******************************************************/
-int main(void)
+int main(int argc, char *argv[])
 {
     int i, j, k, m, n;
     char *data_file;     // 座標プロット用
@@ -38,8 +38,14 @@ int main(void)
     int VIA[N];     /*経由点*/
     char USED[N];   /*確定か未確定か*/
 
-    srand(821); // シード値
-    // srand(57); // シード値
+    // シェルスクリプトにおける記述
+    if (argc < 2)
+    {
+        fprintf(stderr, "Usage: %s <seed>\n", argv[0]);
+        return 1;
+    }
+    int seed = atoi(argv[1]);
+    srand(seed); // シード値
 
     point p[N];          // 避難所と配送センターの宣言
     vehicle v[M];        // 配送車の宣言
@@ -84,24 +90,8 @@ int main(void)
     }
 
     // 避難所の要素初期化 i=0は集積所のため省く
-    /*中心市街地*/
-    for (i = 1; i < C_N; i++)
+    for (i = 1; i < N; i++)
     {
-        // 一度ランダムに生成
-        p[i].x = (double)rand() / RAND_MAX * (2 * R);
-        p[i].y = (double)rand() / RAND_MAX * (2 * R);
-        p[i].x += L / 2 - R; // 中心をL/2に修正
-        p[i].y += L / 2 - R;
-
-        while (retDis(p[0].x, p[0].y, p[i].x, p[i].y) > R) // 中心市街地内に生成されるまで繰り返す
-        {
-            p[i].x = (double)rand() / RAND_MAX * (2 * R);
-            p[i].y = (double)rand() / RAND_MAX * (2 * R);
-
-            p[i].x += L / 2 - R; // 中心をL/2に修正
-            p[i].y += L / 2 - R;
-        }
-
         p[i].re = 0;
 
         p[i].re_req = 0;
@@ -134,52 +124,8 @@ int main(void)
                 }
             }
         }
-    }
-    /*山間部の避難所初期化*/
-    for (i = C_N; i < N; i++)
-    {
-        p[i].x = L / 2; // 初期値
-        p[i].y = L / 2;
 
-        while (retDis(p[0].x, p[0].y, p[i].x, p[i].y) < (R + A_R)) // (R+A_R)の範囲外に生成されるまで繰り返す
-        {
-            // printf("i=%d : %f\n", i, retDis(p[0].x, p[0].y, p[i].x, p[i].y));
-            p[i].x = (double)rand() / RAND_MAX * L;
-            p[i].y = (double)rand() / RAND_MAX * L;
-        }
-
-        p[i].re = 0;
-
-        p[i].re_req = 0;
-
-        p[i].re_req_sum = 0;
-
-        p[i].re_deli = 0;
-
-        for (j = 0; j < N; j++)
-        {
-            p[i].i_ptr[j] = 0;
-            p[i].i_med_ptr[j] = 0.0;
-        }
-
-        for (j = 0; j < N; j++)
-        {
-            for (k = 0; k < I_SIZE; k++)
-            {
-                p[i].inf[j][k] = 0;
-            }
-        }
-
-        for (j = 0; j < N; j++)
-        {
-            for (k = 0; k < Y_SIZE; k++)
-            {
-                for (m = 0; m < Z_SIZE; m++)
-                {
-                    p[i].inf_med[j][k][m] = 0.0;
-                }
-            }
-        }
+        p[i].battery_count = INITIAL_BATTERY_COUNT; // 避難所の初期バッテリー数
     }
 
     // 配送車初期化
@@ -233,6 +179,10 @@ int main(void)
         v[i].queue_ptr = 0;
 
         v[i].queue_Notdelivery_ptr = 0;
+
+        v[i].battery_count = DELIVERY_BATTERY_COUNT * ((N - 1) / M) + ADDITIONAL_BATTERY_COUNT; // 配送車の初期積載バッテリー数:それぞれの避難所へ INITIAL_BATTERY_COUNT + TV上での交換用の余分なバッテリー
+
+        v[i].used_battery_count = 0;
     }
 
     // ドローン初期化
@@ -372,6 +322,10 @@ int main(void)
         infC_drone[i].bat_swap_follow_num = 0;
 
         infC_drone[i].bat_swap_counter = 0;
+
+        infC_drone[i].batDel_wait_flag = FALSE;
+
+        infC_drone[i].batDel_wait_onTV_flag = FALSE;
     }
 
     /*********************************************** pythonの出力ファイルから点の「座標」と「隣接行列」を読み込む **************************************************************************/
@@ -555,7 +509,11 @@ int main(void)
                 }
             }
         }
+
+        new_p[i].battery_count = INITIAL_BATTERY_COUNT; // 避難所の初期バッテリー数
     }
+
+    new_p[0].battery_count = INF; // 集積所のバッテリー数はINFに設定
 
     for (i = 0; i < N; i++)
     {
@@ -938,9 +896,18 @@ int main(void)
     // 各避難所の物資量を生成
     for (int i = 1; i < N; i++)
     {
-        new_p[i].re_req = MEAN;                 // 初期値MEAN(=50)に設定
-        new_p[i].re_req_sum += new_p[i].re_req; // 各避難所の総必要物資量
+        new_p[i].re_req = MEAN; // 初期値MEAN(=50)に設定
     }
+
+    // 結果を表示
+    int sum_re = 0; // 物資総要求量
+    // printf("避難所ごとの必要物資量:\n");
+    for (int i = 1; i < N; i++)
+    {
+        sum_re += new_p[i].re_req;
+        // printf("避難所 %d: %d\n", i, new_p[i].re_req);
+    }
+    // printf("物資総要求量：%d\n", sum_re);
 
     /********************************************************************　シミュレーション（これより上を「titibumodel_douromou_kettei2.c」からコピペ）　*************************************************************************************/
     /******************GNUPLOT**************************/
@@ -965,13 +932,13 @@ int main(void)
     fprintf(gp, "unset key\n");
 
     // fprintf(gp, "set term gif animate delay 5 optimize size 640,480\n");
-    fprintf(gp, "set term gif animate delay 15 optimize size 640,480 font 'DejaVu Sans,12'\n");
+    fprintf(gp, "set term gif animate delay 10 optimize size 640,480 font 'DejaVu Sans,12'\n");
     fprintf(gp, "set output 'drone_datafile/test.gif'\n");
 
     // ラベルの表示
     for (i = 0; i < N; i++)
     {
-        fprintf(gp, "set label %d at first %f,%f '%d'\n", i + 1, new_p[i].x + 0.1, new_p[i].y + 0.1, i);
+        // fprintf(gp, "set label %d at first %f,%f '%d'\n", i + 1, new_p[i].x + 0.1, new_p[i].y + 0.1, i);
     }
 
     /************************************シミュレーション******************************************/
@@ -1112,7 +1079,6 @@ int main(void)
     int drone_next_target[M] = {1, 2, 3, 4, 0};                                      // ドローンが巡回路をまたいで向かう配送車の番号の対応配列：
     double infC_drone_flight_time[C_D] = {0};                                        // 要求情報回収ドローンの飛行時間
     double infC_drone_jyunkai_time[C_D] = {0};                                       // 要求情報回収ドローンの巡回時間
-    double infC_drone_round_time[C_D] = {0};                                         // 要求情報回収ドローンの周回時間(5つの巡回路をまたいで戻ってくるまでの時間)
 
     // ドローンの合流点を決める際のパラメータ
     int answerFlag = 0;    // 関数の戻り値を格納
@@ -1237,12 +1203,6 @@ int main(void)
         // debug
         // printf("total_t: %f\n", total_t);
 
-        // ドローンの巡回路をまたいで飛行する時間
-        for (i = 0; i < S_C_D; i++)
-        {
-            infC_drone_round_time[i] += time_span; // ドローンの周回時間を更新
-        }
-
         // 配送車のサインコサイン
         for (i = 0; i < M; i++)
         {
@@ -1267,9 +1227,9 @@ int main(void)
                 n_tan_dro[i] = n_sin_dro[i] / n_cos_dro[i];
             }
         }
-
+#if 0
         // if (total_t >= 0 && total_t <= 20000)
-        if (total_t >= 0 && total_t <= 20000)
+        if (total_t >= 20000 && total_t <= 40000)
         {
             if ((int)(total_t) % 50 == 0)
             { // 50sごとに描画
@@ -1280,43 +1240,16 @@ int main(void)
                     // fprintf(gp, "set label %d at first %f,%f '%d'\n", j + 51, new_p[j].x + 0.1, new_p[j].y + 0.1, new_p[j].re);
                 }
 
-                // 薬の情報ラベル(避難所)
-                for (i = 0; i < N; i++)
+                // 避難所のバッテリー数を表示
+                for (i = 1; i < N; i++)
                 {
-                    if (new_p[i].i_med_ptr[i] != 0)
-                    {
-                        // Plot a red circle at the coordinates of the shelter with medical information
-                        fprintf(gp, "set object circle at %f,%f size screen 0.01 fillcolor rgb 'red' front linewidth 3\n", new_p[i].x, new_p[i].y);
-                    }
+                    fprintf(gp, "set label %d at first %f,%f '%d'\n", i + 101, new_p[i].x - 0.2, new_p[i].y - 0.2, new_p[i].battery_count);
                 }
 
-                // 薬の情報ラベル(車)
-                int c_label = 0; // ラベル表示かぶらないようにするためのカウンター
+                // 物資運搬車両のバッテリー数を表示
                 for (i = 0; i < M; i++)
                 {
-                    for (j = 0; j < N; j++)
-                    {
-                        if (v[i].i_med_ptr[j] != 0)
-                        {
-                            // fprintf(gp, "set label %d at first %f,%f ':%d'\n", c_label + 251 + 40 * i, v[i].x + 0.55 * c_label, v[i].y + 0.15, j);
-                            c_label += 1;
-                        }
-                    }
-                    c_label = 0; // 初期化
-                }
-
-                // 薬の情報ラベル(ドローン)
-                for (i = 0; i < M; i++)
-                {
-                    for (j = 0; j < N; j++)
-                    {
-                        if (drone[i].i_med_ptr[j] != 0)
-                        {
-                            // fprintf(gp, "set label %d at first %f,%f ':%d'\n", c_label + 451 + 40 * i, drone[i].x + 0.55 * c_label, drone[i].y - 0.15, j);
-                            c_label += 1;
-                        }
-                    }
-                    c_label = 0; // 初期化
+                    fprintf(gp, "set label %d at first %f,%f '%d'\n", i + 201, v[i].x + 0.2, v[i].y + 0.2, v[i].battery_count);
                 }
 
                 // ドローン8台
@@ -1329,9 +1262,12 @@ int main(void)
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 9 lt rgbcolor'green','-' pt 9 lt rgbcolor'red','-' pt 9 lt rgbcolor'blue','-' pt 9 lt rgbcolor'orange','-' pt 9 lt rgbcolor'black','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'orange-red','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green','-' pt 5 lt rgbcolor'light-green'\n", new_data_file, new_ad_file); // 情報収集ドローンのみ
                 // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 9 ps 1.5 lt rgbcolor'green','-' pt 9 ps 1.5 lt rgbcolor'red','-' pt 9 ps 1.5 lt rgbcolor'blue','-' pt 9 ps 1.5 lt rgbcolor'orange','-' pt 9 ps 1.5 lt rgbcolor'black','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'dark-magenta','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red','-' pt 5 lt rgbcolor'blue','-' pt 5 lt rgbcolor'orange','-' pt 5 lt rgbcolor'black'\n", new_data_file, new_ad_file); // 情報収集ドローンのみ(10台)
 
-                // infC_drone[0]のfollow_numに応じてプロットの色を変更(情報収集ドローン1台)
-                ///*
-                if (infC_drone[0].follow_num == 0)
+                // infC_drone[0]のfollow_numに応じてプロットの色を変更
+                if (infC_drone[0].batDel_wait_onTV_flag == TRUE)
+                {
+                    fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 9 ps 1.5 lt rgbcolor'green','-' pt 9 ps 1.5 lt rgbcolor'red','-' pt 9 ps 1.5 lt rgbcolor'blue','-' pt 9 ps 1.5 lt rgbcolor'orange','-' pt 9 ps 1.5 lt rgbcolor'black','-' pt 5 lt rgbcolor'dark-magenta'\n", new_data_file, new_ad_file); // 情報収集ドローンのみ(1台のみ)
+                }
+                else if (infC_drone[0].follow_num == 0)
                 {
                     fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 9 ps 1.5 lt rgbcolor'green','-' pt 9 ps 1.5 lt rgbcolor'red','-' pt 9 ps 1.5 lt rgbcolor'blue','-' pt 9 ps 1.5 lt rgbcolor'orange','-' pt 9 ps 1.5 lt rgbcolor'black','-' pt 5 lt rgbcolor'green'\n", new_data_file, new_ad_file); // 情報収集ドローンのみ(1台のみ)
                 }
@@ -1351,9 +1287,9 @@ int main(void)
                 {
                     fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 9 ps 1.5 lt rgbcolor'green','-' pt 9 ps 1.5 lt rgbcolor'red','-' pt 9 ps 1.5 lt rgbcolor'blue','-' pt 9 ps 1.5 lt rgbcolor'orange','-' pt 9 ps 1.5 lt rgbcolor'black','-' pt 5 lt rgbcolor'black'\n", new_data_file, new_ad_file); // 情報収集ドローンのみ(1台のみ)
                 }
-                //*/
 
-                // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 9 ps 1.5 lt rgbcolor'green','-' pt 9 ps 1.5 lt rgbcolor'red','-' pt 9 ps 1.5 lt rgbcolor'blue','-' pt 9 ps 1.5 lt rgbcolor'orange','-' pt 9 ps 1.5 lt rgbcolor'black','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red'\n", new_data_file, new_ad_file); // 情報収集ドローンのみ(2台)
+                // 情報収集ドローンのみ(2台)
+                // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7, \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'grey','-' pt 9 ps 1.5 lt rgbcolor'green','-' pt 9 ps 1.5 lt rgbcolor'red','-' pt 9 ps 1.5 lt rgbcolor'blue','-' pt 9 ps 1.5 lt rgbcolor'orange','-' pt 9 ps 1.5 lt rgbcolor'black','-' pt 5 lt rgbcolor'green','-' pt 5 lt rgbcolor'red'\n", new_data_file, new_ad_file);
 
                 fprintf(gp, "%f %f\n", v[0].x, v[0].y);
                 fprintf(gp, "e\n");
@@ -1388,7 +1324,6 @@ int main(void)
                 /*
                 fprintf(gp, "%f %f\n", infC_drone[1].x - 0.1, infC_drone[1].y - 0.1);
                 fprintf(gp, "e\n");
-
                 fprintf(gp, "%f %f\n", infC_drone[2].x - 0.1, infC_drone[2].y - 0.1);
                 fprintf(gp, "e\n");
                 fprintf(gp, "%f %f\n", infC_drone[3].x - 0.1, infC_drone[3].y - 0.1);
@@ -1426,7 +1361,7 @@ int main(void)
                 */
             }
         }
-
+#endif
         /**************配送車の座標更新*****************/
         for (i = 0; i < M; i++)
         {
@@ -1456,6 +1391,35 @@ int main(void)
                 {
                     infC_drone[i].flight_start_time = 0; // 飛行開始時間を0にする
                     printf("drone[%d]の飛行開始時間: %lf\n", i, total_t);
+                }
+            }
+            else if (infC_drone[i].batDel_wait_flag == TRUE) // ドローンが避難所でTVによるバッテリー配達を待っている場合
+            {
+                if (new_p[current_dro[i]].battery_count > 0) // 避難所にバッテリーが届けられた場合
+                {
+                    infC_drone[i].batDel_wait_flag = FALSE; // バッテリー配達待ちフラグを解除
+
+                    new_p[current_dro[i]].battery_count -= 1; // 避難所のバッテリー数を減らす
+
+                    infC_drone[i].bat_swap_counter += 1; // バッテリー交換回数をカウント
+                }
+            }
+            else if (infC_drone[i].batDel_wait_onTV_flag == TRUE) // ドローンがTV上で余剰バッテリー到着を待っている場合
+            {
+                infC_drone[i].x = v[infC_drone[i].bat_swap_follow_num].x; // ドローンはTVに追従
+                infC_drone[i].y = v[infC_drone[i].bat_swap_follow_num].y;
+
+                if (v[infC_drone[i].bat_swap_follow_num].used_battery_count == 0) // 避難所にバッテリーが届けられた場合
+                {
+                    infC_drone[i].batDel_wait_onTV_flag = FALSE; // バッテリー配達待ちフラグを解除
+
+                    infC_drone[i].bat_swap_counter += 1; // バッテリー交換回数をカウント
+
+                    infC_drone[i].bat_swap_onTV_flag = TRUE; // TV上でバッテリー交換を行う
+
+                    v[infC_drone[i].bat_swap_follow_num].battery_count -= 1; // 物資運搬車両上でバッテリー交換を行うため、物資運搬車両のバッテリー数を減らす
+
+                    v[infC_drone[i].bat_swap_follow_num].used_battery_count += 1; // 物資運搬車両上でバッテリー交換を行った回数カウント
                 }
             }
             else if (infC_drone[i].charge_time == 0) // 避難所へ飛行する場合：充電する必要ないなら目的の避難所へ飛行
@@ -1620,15 +1584,6 @@ int main(void)
 
                 infC_drone[i].crossing_cir_flag = TRUE; // 巡回路間飛行中フラグを立てる
 
-                // 参考
-                /*
-                if (S_N >= size[0] && ind[0] - (S_N + 1) < 0) // 集積所を超えて戻る場合：S_Nが巡回路のサイズ以上のとき
-                {
-                    reverse_num = S_N + 1 - ind[0]; // 巡回路の配列の最大要素数から戻す数
-                    target_dro[i] = cir[0][(2 * size[0] - 1) - reverse_num];
-                    ind_dro[i] = 2 * size[0] - reverse_num - 1; // ドローンのtarget_droのindexを更新
-                }*/
-
                 // 隣の巡回路において、TVの S_N 個前の避難所を目的地にする
                 if (stay_t[infC_drone[i].follow_num] != 0) // 物資運搬車両が避難所で物資におろし中なら、(S_N + 1)個前から始める
                 {
@@ -1691,22 +1646,27 @@ int main(void)
                 infC_drone[i].yt = new_p[target_dro[i]].y;
 
                 /************ ドローンの充電・バッテリー交換処理 *************/
-                // debug
-                // infC_drone[i].charge_time = battery_swap_time; // 充電時間を5分に設定(テスト用)
-
                 // 次の避難所へ行く間に充電量が不足する場合は物資運搬車両で充電する
                 if (infC_drone_flight_time[i] + retDis(infC_drone[i].xt, infC_drone[i].yt, infC_drone[i].x, infC_drone[i].y) * r_d_velo > capable_flight_time)
                 {
-                    // debug
-                    // printf("drone[%d]の飛行時間: %lf [min]\n", i, infC_drone_flight_time[i] / 60);
-
-                    // infC_drone[i].charge_time = infC_drone_flight_time[i] * charge_constant; // 充電時間を設定
                     infC_drone[i].charge_time = battery_swap_time; // バッテリー交換時間
                     infC_drone_flight_time[i] = 0;                 // ドローンの飛行時間を初期化
 
-                    infC_drone[i].bat_swap_counter += 1; // バッテリー交換回数をカウント
+                    if (v[infC_drone[i].bat_swap_follow_num].used_battery_count < ADDITIONAL_BATTERY_COUNT) // 情報収集ドローンがTV上でバッテリー交換を行った回数が、余剰分用意しておいたバッテリー数以下のとき
+                    {
+                        infC_drone[i].bat_swap_counter += 1; // バッテリー交換回数をカウント
 
-                    infC_drone[i].bat_swap_onTV_flag = TRUE; // TV上でバッテリー交換を行う
+                        infC_drone[i].bat_swap_onTV_flag = TRUE; // TV上でバッテリー交換を行う
+
+                        v[infC_drone[i].bat_swap_follow_num].battery_count -= 1; // 物資運搬車両上でバッテリー交換を行うため、物資運搬車両のバッテリー数を減らす
+
+                        v[infC_drone[i].bat_swap_follow_num].used_battery_count += 1; // 物資運搬車両上でバッテリー交換を行った回数カウント
+                    }
+                    else // 情報収集ドローンがTV上でバッテリー交換を行った回数が、余剰分用意しておいたバッテリー数を超えた場合は余剰バッテリーが集積所で補充されるまでTV上で待機
+                    {
+                        infC_drone[i].batDel_wait_onTV_flag = TRUE;
+                        printf("ドローン[%d]はTV上でバッテリー交換待ち\n", i);
+                    }
                 }
 
                 // 物資運搬車両との情報交換
@@ -1747,13 +1707,6 @@ int main(void)
             /****************** 避難所へドローンが到達した場合 ***********************************************************************************************/
             else if (((n_cos_dro[i] < 0 && infC_drone[i].y < infC_drone[i].yt) || (n_cos_dro[i] > 0 && infC_drone[i].y > infC_drone[i].yt)) && infC_drone[i].FtoVehicle_mode == FALSE) // 目的の避難所に到達した場合
             {
-                // ドローンが5つの巡回路をまたいで周回する時間表示
-                if (infC_drone[i].crossing_cir_flag == TRUE && pass_count[i] == 0 && infC_drone[i].follow_num == 0)
-                {
-                    printf("********* t = %lf : drone[%d]の周回時間: %lf[hour]\n", total_t, i, infC_drone_round_time[i] / 3600);
-                    infC_drone_round_time[i] = 0; // ドローンの巡回時間を初期化
-                }
-
                 infC_drone[i].x = infC_drone[i].xt; // 座標修正
                 infC_drone[i].y = infC_drone[i].yt;
 
@@ -1853,10 +1806,22 @@ int main(void)
                     // printf("drone[%d]の飛行時間: %lf [min]\n", i, infC_drone_flight_time[i] / 60);
 
                     // infC_drone[i].charge_time = infC_drone_flight_time[i] * charge_constant; // 充電時間を設定
+
                     infC_drone[i].charge_time = battery_swap_time; // バッテリー交換時間
                     infC_drone_flight_time[i] = 0;                 // ドローンの飛行時間を初期化
 
-                    infC_drone[i].bat_swap_counter += 1; // バッテリー交換回数をカウント
+                    if (new_p[current_dro[i]].battery_count >= 1) // 避難所に交換バッテリーがある場合は、その場で交換
+                    {
+                        infC_drone[i].bat_swap_counter += 1; // バッテリー交換回数をカウント
+
+                        new_p[current_dro[i]].battery_count -= 1; // 避難所のバッテリー数を減らす
+                    }
+                    else // 避難所に交換バッテリーがない場合は、TVによってバッテリーが運搬されてくるまで避難所で待機
+                    {
+                        infC_drone[i].batDel_wait_flag = TRUE; // バッテリー交換待ちフラグを立てる
+
+                        printf("避難所[%d]におけるバッテリー数が不足しているためバッテリー交換不可\n", current_dro[i]);
+                    }
                 }
 
                 /************************** 情報交換： 避難所　→　情報収集ドローン *****************************/
@@ -1951,6 +1916,11 @@ int main(void)
                 }
 
                 vehicle_merge_flag = FALSE; // 配送車合流フラグを0にしておく
+
+                // 集積所にてバッテリー補充：配送車のバッテリー数を初期化
+                v[i].battery_count = DELIVERY_BATTERY_COUNT * ((N - 1) / M) + ADDITIONAL_BATTERY_COUNT;
+
+                v[i].used_battery_count = 0; // TV上でのバッテリー交換回数を初期化
             }
             else if ((n_cos[i] < 0 && v[i].y < new_p[target[i]].y) || (n_cos[i] > 0 && v[i].y > new_p[target[i]].y))
             { // ③それ以外において、targetに到達したらcurrentとtarget更新
@@ -1966,9 +1936,11 @@ int main(void)
                 {
                     stay_t[i] = stay; // 避難所待機時間をセット
 
+                    v[i].battery_count -= DELIVERY_BATTERY_COUNT;              // 配送車のバッテリー数を減らす
+                    new_p[current[i]].battery_count += DELIVERY_BATTERY_COUNT; // 避難所のバッテリー数を増やす
+
                     if (v[i].re >= new_p[current[i]].re_req) // 配送車が避難所に物資を要求分届けることができるとき
                     {
-                        // パターン２:すべての避難所に平等にMEANだけ物資運搬
                         v[i].re -= MEAN;                  // 配送車の物資減少
                         new_p[ind_relief[i]].re += MEAN;  // 避難所の物資増加
                         new_p[current[i]].re_deli = MEAN; // 避難所に届けられた物資量記録
@@ -2884,7 +2856,6 @@ int main(void)
             }
         }
             */
-
         // 物資運搬車両との情報交換: 巡回中にTVとすれ違った場合はそこで情報交換(すれ違うのは S_N が大きいとき)
         /************************** 情報交換： 情報収集ドローン　→　物資運搬車両 *****************************/
         for (i = 0; i < S_C_D; i++)

@@ -16,12 +16,12 @@
 #define SD 5        /*シミュレーションで用いるドローン数*/
 #define C_D 15      /* 要求情報を回収するドローンの初期化台数 */
 #define S_C_D 1     /* 要求情報を回収するドローンのシミュレーションで用いる台数 */
-#define S_N 18      /* 物資運搬車両の S_N 個前の避難所を巡回 */
-#define B_D 20      /* バッテリー配布ドローン */
-#define I_SIZE 100  /*情報配列の要素数*/
-#define Y_SIZE 10   /*薬の情報配列の二次元要素数*/
-#define Z_SIZE 6    /*薬の情報配列の三次元要素数*/
-#define INF 9999    /*無限大*/
+#define S_N 18
+#define B_D 20     /* バッテリー配布ドローン */
+#define I_SIZE 100 /*情報配列の要素数*/
+#define Y_SIZE 10  /*薬の情報配列の二次元要素数*/
+#define Z_SIZE 6   /*薬の情報配列の三次元要素数*/
+#define INF 9999   /*無限大*/
 #define TRUE 1
 #define FALSE 0
 #define CONST 1000                 /*定数*/
@@ -31,9 +31,9 @@
 #define MAX_SIZE 100               // 各サブ配列の最大サイズ RFCS法
 #define MAX_charge_count 9999      // 各TVが一巡回する間にドローンを充電することができる回数
 #define MAX_TVchargeable 300       // TVで一巡回する間にドローンを充電することができる総計（単位は[min]）
-#define INITIAL_BATTERY_COUNT 10   // 避難所・集積所に存在する交換バッテリー量
-#define DELIVERY_BATTERY_COUNT 10  // 避難所・集積所に一度に届ける交換バッテリー量
-#define ADDITIONAL_BATTERY_COUNT 8 // 物資運搬車両上でドローンのバッテリー交換を行うために余分に積載する交換バッテリー量
+#define INITIAL_BATTERY_COUNT 2    // 避難所・集積所に存在する交換バッテリー量：初期値
+#define DELIVERY_BATTERY_COUNT 2   // 避難所・集積所に一度に届ける交換バッテリー量
+#define ADDITIONAL_BATTERY_COUNT 3 // 物資運搬車両上でドローンのバッテリー交換を行うために余分に積載する交換バッテリー量
 // Box-Muller法を用いた正規乱数生成関数に必要なパラメータ
 #define MEAN 50.0      // 平均
 #define STD_DEV 10.0   // 標準偏差
@@ -75,8 +75,9 @@ typedef struct
     double chargeable_flag;             // TVでドローンを充電可能かを表すフラグ（充電可能：１、不可能：０）
     int Med_delivery_queue[QUEUE_SIZE]; // 医療品を配達する避難所番号を順に格納するキュー
     int queue_ptr;                      // 医療品を配達する避難所番号を順に格納するキューのポインタ
-    int queue_Notdelivery_ptr;          // キューのうち、医療品が未配達の避難所の戦闘のポインタ
+    int queue_Notdelivery_ptr;          // キューのうち、医療品が未配達の避難所の先頭のポインタ
     int battery_count;                  // 物資運搬車両上に積載されている交換バッテリー数
+    int used_battery_count;             // 物資運搬車両上で利用した交換バッテリーの数（物資運搬車両上での情報収集ドローンのバッテリー交換）
 } vehicle;
 
 // ドローンの構造体
@@ -115,6 +116,7 @@ typedef struct
     int bat_swap_follow_num;      // ドローンがバッテリー交換を行う配送車番号（情報収集ドローン専用）
     int bat_swap_counter;         // ドローンがバッテリー交換を行った回数カウンター（情報収集ドローン専用）
     int batDel_wait_flag;         // ドローンが避難所でバッテリー配布を待つフラグ（TRUE:バッテリー配布を待つ、FALSE:バッテリー配布を待たない）:（情報収集ドローン専用）
+    int batDel_wait_onTV_flag;    // ドローンがTVでバッテリー配布を待つフラグ（TRUE:バッテリー配布を待つ、FALSE:バッテリー配布を待たない）:（情報収集ドローン専用）
 } dro;
 
 /********************************************** 関数定義 ******************************************************************/
