@@ -9,8 +9,8 @@ end_seed=141
 #gcc shell_main_GIF_Ddelivery_DonlyVer5_nocharge.c module.c -o my_program -lm
 #gcc shell_main_GIF_Ver5_multiD.c module.c -o my_program -lm #ドローン複数（TVと逆周り）
 #gcc shell_main_GIF_Ver5_multiD_gyakumawari.c module.c -o my_program -lm #ドローン複数（TVと同じ周り）
-#gcc shell_main_GIF_Ver7_3.c module.c -o my_program -lm
-gcc shell_main_GIF_Ver7_4_1.c module.c -o my_program -lm
+gcc shell_main_GIF_Ver7_3.c module.c -o my_program -lm
+#gcc shell_main_GIF_Ver7_4_1.c module.c -o my_program -lm
 
 # 特定ディレクトリ内のファイルを初期化
 > drone_datafile/txtfile/Mean_Medinf_delay.txt

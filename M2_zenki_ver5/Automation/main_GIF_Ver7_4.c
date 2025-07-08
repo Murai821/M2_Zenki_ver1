@@ -932,7 +932,7 @@ int main(void)
     // ラベルの表示
     for (i = 0; i < N; i++)
     {
-        // fprintf(gp, "set label %d at first %f,%f '%d'\n", i + 1, new_p[i].x + 0.1, new_p[i].y + 0.1, i);
+        fprintf(gp, "set label %d at first %f,%f '%d'\n", i + 1, new_p[i].x + 0.1, new_p[i].y + 0.1, i);
     }
 
     /************************************シミュレーション******************************************/
@@ -1223,27 +1223,28 @@ int main(void)
         }
 
         // if (total_t >= 0 && total_t <= 20000)
-        if (total_t >= 20000 && total_t <= 40000)
+        if (total_t >= 0 && total_t <= 12000)
         {
             if ((int)(total_t) % 50 == 0)
             { // 50sごとに描画
 
-                // ラベルの表示
+                // 各避難所の物資量表示
                 for (j = 0; j < N; j++)
                 {
                     // fprintf(gp, "set label %d at first %f,%f '%d'\n", j + 51, new_p[j].x + 0.1, new_p[j].y + 0.1, new_p[j].re);
                 }
 
+                /******************* バッテリー数の表示 *******************/
                 // 避難所のバッテリー数を表示
                 for (i = 1; i < N; i++)
                 {
-                    fprintf(gp, "set label %d at first %f,%f '%d'\n", i + 101, new_p[i].x - 0.2, new_p[i].y - 0.2, new_p[i].battery_count);
+                    // fprintf(gp, "set label %d at first %f,%f '%d'\n", i + 101, new_p[i].x - 0.2, new_p[i].y - 0.2, new_p[i].battery_count);
                 }
 
                 // 物資運搬車両のバッテリー数を表示
                 for (i = 0; i < M; i++)
                 {
-                    fprintf(gp, "set label %d at first %f,%f '%d'\n", i + 201, v[i].x + 0.2, v[i].y + 0.2, v[i].battery_count);
+                    // fprintf(gp, "set label %d at first %f,%f '%d'\n", i + 201, v[i].x + 0.2, v[i].y + 0.2, v[i].battery_count);
                 }
 
                 // ドローン8台

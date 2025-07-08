@@ -1003,7 +1003,7 @@ int main(void)
     double dis_stay = stay + t_wait;                     // 配送センターでの待機時間
     double lambda_g = 0.25;                              // 配送センターへの物資到着率
     double lambda_i = 0.25;                              // 各避難所での情報生成率
-    double lambda_i_med = 0.15;                          // 各避難所での薬の情報性成立
+    double lambda_i_med = 0.20;                          // 各避難所での薬の情報性成立
     double poisson_re_total = rand_exp(lambda_g) * 3600; // 物資の到着間隔
     double poisson_re_count = 0;
     double poisson_inf_total = rand_exp(lambda_i) * 3600;
@@ -1088,7 +1088,7 @@ int main(void)
     double capable_flight_time = 60 * 30;     // ドローンの最大飛行時間(３０分)
     double drone_Med_loding_time = 60 * 10;   // ドローンの医療物資積載時間(10分) 60*10
     double drone_Med_Unloding_time = 60 * 10; // ドローンの避難所での医療物資荷降ろし時間(10分) 60*10
-    double battery_swap_time = 60 * 10;       // ドローンのバッテリー交換時間(5分) 60*5
+    double battery_swap_time = 60 * 5;        // ドローンのバッテリー交換時間(5分) 60*5
     double addtional_time = 0;                // ドローンの配送による配送車の避難所での追加待機時間
     double d_d[D];                            // ドローンと集積所との距離
     double d_s_dis;                           // 集積所と任意の避難所の距離
@@ -1690,6 +1690,9 @@ int main(void)
                 infC_drone[i].xt = new_p[target_dro[i]].x; // ドローンの目的座標更新
                 infC_drone[i].yt = new_p[target_dro[i]].y;
 
+                // debug
+                // printf("目的避難所: %d, 経由数: %d\n", target_dro[i], pass_count[i]);
+
                 /************ ドローンの充電・バッテリー交換処理 *************/
                 // debug
                 // infC_drone[i].charge_time = battery_swap_time; // 充電時間を5分に設定(テスト用)
@@ -1835,6 +1838,9 @@ int main(void)
                         part_t_dro[i] = 0;
                     }
                 }
+
+                // debug
+                // printf("目的避難所: %d, 経由数: %d\n", target_dro[i], pass_count[i]);
 
                 /************ ドローンが避難所へ訪れた回数カウント ************/
                 if (current_dro[i] != INF)

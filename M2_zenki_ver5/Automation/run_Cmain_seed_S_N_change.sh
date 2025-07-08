@@ -33,7 +33,9 @@ for sn in $(seq 2 2 18); do
     sed -i "s/^#define S_N .*/#define S_N $sn/" header.h
 
     # 再コンパイル
-    gcc shell_main_GIF_Ver7_4_1.c module.c -o my_program -lm
+    #gcc shell_main_GIF_Ver7_4_1.c module.c -o my_program -lm
+    gcc shell_main_GIF_Ver7_3.c module.c -o my_program -lm
+
 
     # シードを変えながら実行
     for seed in $(seq $start_seed $end_seed); do

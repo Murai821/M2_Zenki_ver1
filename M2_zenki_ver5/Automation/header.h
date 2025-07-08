@@ -16,7 +16,7 @@
 #define SD 5        /*シミュレーションで用いるドローン数*/
 #define C_D 15      /* 要求情報を回収するドローンの初期化台数 */
 #define S_C_D 1     /* 要求情報を回収するドローンのシミュレーションで用いる台数 */
-#define S_N 18
+#define S_N 16
 #define B_D 20     /* バッテリー配布ドローン */
 #define I_SIZE 100 /*情報配列の要素数*/
 #define Y_SIZE 10  /*薬の情報配列の二次元要素数*/
@@ -191,6 +191,15 @@ double generate_normal(double mean, double std_dev);
 
 // min から maxの範囲の整数値をランダムに返す関数
 int get_random_int(int min, int max);
+
+// point構造体を初期化する関数*/
+void init_point(point *p, double x, double y, int battery_count);
+
+/*vehicle構造体を初期化する関数*/
+void init_vehicle(vehicle *v, double x, double y, int battery_count);
+
+/*dro構造体を初期化する関数*/
+void init_dro(dro *d, int follow_num, int target_num);
 
 /*********************************************** 変数定義 ******************************************************************************/
 

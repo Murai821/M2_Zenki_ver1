@@ -6,6 +6,180 @@
 #include <string.h>
 #define M_PI 3.14159265358979323846 // π の定義
 
+/*point構造体を初期化する関数*/
+void init_point(point *p, double x, double y, int battery_count)
+{
+    // 座標を設定
+    p->x = x;
+    p->y = y;
+
+    // 物資関連の変数を初期化
+    p->re = 0;
+    p->re_req = 0;
+    p->re_req_sum = 0;
+    p->re_deli = 0;
+
+    // 情報配列とポインタを初期化
+    for (int i = 0; i < N; i++)
+    {
+        p->i_ptr[i] = 0;
+        for (int j = 0; j < I_SIZE; j++)
+        {
+            p->inf[i][j] = 0;
+        }
+    }
+
+    // 薬の情報配列とポインタを初期化
+    for (int i = 0; i < N; i++)
+    {
+        p->i_med_ptr[i] = 0;
+        for (int j = 0; j < Y_SIZE; j++)
+        {
+            for (int k = 0; k < Z_SIZE; k++)
+            {
+                p->inf_med[i][j][k] = 0.0;
+            }
+        }
+    }
+
+    // バッテリー数を初期値に設定
+    p->battery_count = battery_count;
+}
+
+/*vehicle構造体を初期化する関数*/
+void init_vehicle(vehicle *v, double x, double y, int battery_count)
+{
+    // 座標を設定
+    v->x = x;
+    v->y = y;
+
+    // 物資・医療品積載量を初期化
+    v->re = 0;
+    v->Med_re = 0;
+
+    // 情報配列とポインタを初期化
+    for (int i = 0; i < N; i++)
+    {
+        v->i_ptr[i] = 0;
+        for (int j = 0; j < I_SIZE; j++)
+        {
+            v->inf[i][j] = 0;
+        }
+    }
+
+    // 薬の情報配列とポインタを初期化
+    for (int i = 0; i < N; i++)
+    {
+        v->i_med_ptr[i] = 0;
+        for (int j = 0; j < Y_SIZE; j++)
+        {
+            for (int k = 0; k < Z_SIZE; k++)
+            {
+                v->inf_med[i][j][k] = 0.0;
+            }
+        }
+    }
+
+    // フラグ類を初期化
+    v->next_wait_flag = FALSE;
+    v->chargeable_flag = TRUE; // 充電可能
+
+    // ドローン充電関連を初期化
+    v->drone_charge_count = 0;
+    v->charge_amount = 0.0;
+
+    // 医療品配達キューを初期化
+    v->queue_ptr = 0;
+    v->queue_Notdelivery_ptr = 0;
+    for (int i = 0; i < QUEUE_SIZE; i++)
+    {
+        v->Med_delivery_queue[i] = 0;
+    }
+
+    // バッテリー関連を初期化
+    v->battery_count = battery_count; // 配送車の初期積載バッテリー数:それぞれの避難所へのINITIAL_BATTERY_COUNT + TV上での交換用の余分なバッテリー ADDITIONAL_BATTERY_COUNT
+    v->used_battery_count = 0;
+}
+
+/*dro構造体を初期化する関数*/
+void init_dro(dro *d, int follow_num, int target_num)
+{
+    // 座標を初期化
+    d->x = L / 2;
+    d->y = L / 2;
+    d->xt = 0.0;
+    d->yt = 0.0;
+
+    // 物資・医療品積載量を初期化
+    d->re = 0;
+    d->Med_re = 0;
+
+    // 情報配列とポインタを初期化
+    for (int i = 0; i < N; i++)
+    {
+        d->i_ptr[i] = 0;
+        for (int j = 0; j < I_SIZE; j++)
+        {
+            d->inf[i][j] = 0;
+        }
+    }
+
+    // 薬の情報配列とポインタを初期化
+    for (int i = 0; i < N; i++)
+    {
+        d->i_med_ptr[i] = 0;
+        for (int j = 0; j < Y_SIZE; j++)
+        {
+            for (int k = 0; k < Z_SIZE; k++)
+            {
+                d->inf_med[i][j][k] = 0.0;
+            }
+        }
+    }
+
+    // 引数で指定されたfollow_numを設定
+    d->follow_num = follow_num;
+
+    // 巡回路のターゲット番号を設定
+    if (target_num == M)
+    {
+        d->target_num = 1;
+    }
+    else
+    {
+        d->target_num = target_num;
+    }
+
+    // その他のパラメータを初期化
+    d->wait_flag = FALSE;
+    d->free_mode = FALSE;
+    d->charge_time = 0;
+    d->flight_start_time = 0.0;
+    d->FtoDiscenter_mode = FALSE; // ドローンが配送センターに向かうモード(避難所から集積所)（FALSE:配送車に従う、TRUE:ドローン単独で配送センターへ向かう）
+    d->delivery_mode = FALSE;     // ドローンの配達モード(集積所から避難所)（FALSE:配送車に従う、TRUE:ドローン単独で配達)
+    d->target_shelter_num = 0;
+    d->stay_Medload_time = 0.0;
+    d->cannot_fly_judge_flag = FALSE;
+    d->TV_wait_flag = FALSE;
+    d->batDel_flag = FALSE;
+    d->FtoShelter_mode = FALSE;
+    d->Battery_Unload_time = 0.0;
+    d->Battery_load_time = 0.0;
+    d->crossing_cir_flag = TRUE; // 初期状態のとき、必ず避難所の初期地点に飛行するため TRUE
+    d->FtoVehicle_mode = FALSE;  // ドローンが配送車に向かうモード（FALSE:配送車に従う、TRUE:ドローン単独で配送車へ向かう）
+    d->bat_swap_onTV_flag = FALSE;
+    d->bat_swap_follow_num = 0;
+    d->bat_swap_counter = 0;
+    d->batDel_wait_flag = FALSE;
+    d->batDel_wait_onTV_flag = FALSE;
+
+    // 避難所訪問カウンターを初期化
+    for (int i = 0; i < N; i++)
+    {
+        d->shelter_visit_counter[i] = 0;
+    }
+}
+
 /*配列において、ある値のインデックスを返す関数*/
 int search_index(int arry[], int num)
 {
