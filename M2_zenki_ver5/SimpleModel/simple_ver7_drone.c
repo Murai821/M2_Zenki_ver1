@@ -60,15 +60,15 @@
 #define DRONE_DIRECTION_NAME ((DRONE_CLOCKWISE) ? "時計回り" : "反時計回り") // 表示用文字列
 
 // === 情報発生システム（ポアソン過程） ===
-#define LAMBDA 1.0    // ポアソン到着率 [件/時間] | 1時間に平均0.5件の情報発生
+#define LAMBDA 0.5    // ポアソン到着率 [件/時間] | 1時間に平均0.5件の情報発生
 #define MAX_INFO 1000 // 最大情報数（メモリ制限対策）
 
 // === ドローン物資運搬システム ===
 #define NR 2                   // ドローンの往復回数（基本値、情報により動的変更）
 #define T_DRONE_STOP (10 * 60) // ドローンの停止時間 (s) | 10分=600秒（集積所・避難所共通）
 #define DRONE_MAX_CARRY 30.0   // ドローンの最大積載量 (kg)
-#define MIN_EXTRA_DEMAND 0.0   // 余剰物資B需要量の最小値 (kg)
-#define MAX_EXTRA_DEMAND 90.0  // 余剰物資B需要量の最大値 (kg)
+#define MIN_EXTRA_DEMAND 70.0  // 余剰物資B需要量の最小値 (kg)
+#define MAX_EXTRA_DEMAND 120.0 // 余剰物資B需要量の最大値 (kg)
 
 // === 物資運搬車両システム ===
 #define TOTAL_SUPPLY_WEIGHT 10000.0                                // 物資運搬車両の総積載量 (kg)
@@ -80,8 +80,8 @@
 #define SUPPLY_B_PER_SHELTER (SUPPLY_PER_SHELTER * SUPPLY_B_RATIO) // 1避難所あたりの物資B量 (kg)
 
 // === 余剰物資B配送手法の選択 ===
-#define DELIVERY_METHOD_IGNORE 0     // 従来手法：車両がドローンの運搬を無視
-#define DELIVERY_METHOD_COORDINATE 1 // 新手法：車両がドローンの運搬状況を考慮
+#define DELIVERY_METHOD_IGNORE 0     // 手法1：車両がドローンの運搬を無視
+#define DELIVERY_METHOD_COORDINATE 1 // 手法2：車両がドローンの運搬状況を考慮
 // #define DELIVERY_METHOD DELIVERY_METHOD_COORDINATE // 使用する配送手法を選択
 #define DELIVERY_METHOD DELIVERY_METHOD_IGNORE // 使用する配送手法を選択
 
@@ -1062,7 +1062,7 @@ int main(void)
         printf("ドローン物資運搬: 往復%d回, 停止時間%.0f分（集積所・避難所共通）\n",
                NR, T_DRONE_STOP / 60.0);
         printf("余剰物資B配送手法: %s\n",
-               (DELIVERY_METHOD == DELIVERY_METHOD_IGNORE) ? "従来手法（ドローン運搬無視）" : "新手法（ドローン運搬考慮）");
+               (DELIVERY_METHOD == DELIVERY_METHOD_IGNORE) ? "手法1（ドローン運搬無視）" : "手法2（ドローン運搬考慮）");
     }
     else
     {
@@ -1254,9 +1254,9 @@ int main(void)
 
                             if (DELIVERY_METHOD == DELIVERY_METHOD_COORDINATE)
                             {
-                                printf("aaaaaaaaaaaaaa\n");
+                                // printf("aaaaaaaaaaaaaa\n");
 
-                                // === 新手法：ドローンの運搬状況を考慮 ===
+                                // === 手法２：ドローンの運搬状況を考慮 ===
                                 // ドローンによる運搬量（運搬中+運搬予定）を計算
                                 double drone_transport_amount = calculate_drone_transport_amount(drones, ND, current_stop_idx, info_list, info_count);
 
@@ -1699,14 +1699,14 @@ int main(void)
     double total_extra_supply = total_extra_supply_by_vehicle + total_extra_supply_by_drone;
     int total_delivery_count = vehicle_delivery_count + drone_delivery_count;
 
-    printf("車両による運搬: %.1fkg（配送回数: %d回）\n", total_extra_supply_by_vehicle, vehicle_delivery_count);
-    printf("ドローンによる運搬: %.1fkg（配送回数: %d回 (往復含む), %d回（往復含まない））\n", total_extra_supply_by_drone, drone_delivery_count, total_collected_count - collected_count);
-    printf("運搬総量: %.1fkg（総配送回数: %d回）\n", total_extra_supply, total_delivery_count);
+    printf("*車両による運搬: %.1fkg（配送回数: %d回）\n", total_extra_supply_by_vehicle, vehicle_delivery_count);
+    printf("*ドローンによる運搬: %.1fkg（配送回数: %d回 (往復含む), %d回（往復含まない））\n", total_extra_supply_by_drone, drone_delivery_count, total_collected_count - collected_count);
+    printf("*運搬総量: %.1fkg（総配送回数: %d回）\n", total_extra_supply, total_delivery_count);
 
     if (total_delivery_count > 0)
     {
         double avg_delivery_per_trip = total_extra_supply / total_delivery_count;
-        printf("1回あたり平均配送量: %.1fkg\n", avg_delivery_per_trip);
+        printf("1回あたり平均配送量(車両＋ドローン): %.1fkg\n", avg_delivery_per_trip);
 
         if (vehicle_delivery_count > 0)
         {
@@ -1720,14 +1720,14 @@ int main(void)
             printf("ドローンの1回あたり平均配送量: %.1fkg\n", avg_drone_delivery);
         }
 
-        // 運搬主体の割合表示
+        // 運搬主体の割合表示（運搬総量のうち何kgを車両・ドローンが運搬したか）
         double vehicle_ratio = (total_extra_supply > 0) ? (total_extra_supply_by_vehicle / total_extra_supply) * 100.0 : 0.0;
         double drone_ratio = (total_extra_supply > 0) ? (total_extra_supply_by_drone / total_extra_supply) * 100.0 : 0.0;
         printf("運搬割合: 車両 %.1f%%, ドローン %.1f%%\n", vehicle_ratio, drone_ratio);
 
         // 一周あたりの車両の余剰物資配送量
         double vehicle_extra_supply_per_lap = total_extra_supply_by_vehicle / lap_count;
-        printf("車両の1周あたり余剰物資B配送量: %.1fkg\n", vehicle_extra_supply_per_lap);
+        printf("*車両の1周あたり余剰物資B配送量: %.1fkg\n", vehicle_extra_supply_per_lap);
     }
     else
     {
