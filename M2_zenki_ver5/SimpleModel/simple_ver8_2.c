@@ -33,7 +33,9 @@
  * 7/15：手法1：ドローンが余剰物資Bを運搬途中のときに避難所に車両が停止してもドローンは動作継続（情報を最初に回収したものが運搬をになう）
  *       手法2：ドローンが余剰物資Bを運搬途中のときに避難所に車両が停止した場合、車両も余剰物資を届ける（ドローンがすでに運搬しているものは差し引いて）
  * 7/18 :・手法3：ドローンが避難所に到達した際にドローンによる運搬が終わっていない場合に、そのドローンも協調して運搬する（複数ドローンによる運搬手法）追加
- *       ・検出半径をマクロ定義　・ドローンが複数のときの、協調運搬判定処理を修正(should_drone_join_transport関数の修正)
+ *       ・検出半径をマクロ定義　・ドローンが複数(3台以上)のときの、協調運搬判定処理を修正(should_drone_join_transport関数の修正)
+ * 7/22：手法3において、手法2を適用：運搬車両が、複数ドローンが運搬中の避難所にやってきた場合に余剰物資を運搬する処理を追加(calculate_drone_transport_amount関数の
+ * 　　　
  *
  *
  */
@@ -56,7 +58,7 @@
 // === シミュレーション設定 ===
 #define NS 10        // 避難所の数（集積所除く）
 #define NT 3         // シミュレーションの周回数
-#define ND 2         // ドローンの台数（0の場合はドローンなし、最大制限なし）
+#define ND 3         // ドローンの台数（0の場合はドローンなし、最大制限なし）
 #define ENABLE_GIF 1 // GIF出力の有効/無効 (1:有効, 0:無効) | 処理軽量化用
 
 // === ドローン巡回方向設定 ===
@@ -84,9 +86,10 @@
 #define SUPPLY_B_PER_SHELTER (SUPPLY_PER_SHELTER * SUPPLY_B_RATIO) // 1避難所あたりの物資B量 (kg)
 
 // === 余剰物資B配送手法の選択 ===
-#define DELIVERY_METHOD_IGNORE 0      // 手法1：車両がドローンの運搬を無視
-#define DELIVERY_METHOD_COORDINATE 1  // 手法2：車両がドローンの運搬状況を考慮
-#define DELIVERY_METHOD_MULTI_DRONE 2 // 手法3：複数ドローンによる協調運搬
+#define DELIVERY_METHOD_IGNORE 0      // 手法1：車両がドローンの運搬を無視：一つの避難所には１台のドローンのみが運搬担当する
+#define DELIVERY_METHOD_COORDINATE 1  // 手法2：車両がドローンの運搬状況を考慮：手法1の延長
+#define DELIVERY_METHOD_MULTI_DRONE 2 // 手法3：複数ドローンによる協調運搬(あるドローンが避難所で余剰物資Bを運搬中のとき、他のドローンが来たらそのドローンも協調して運搬する)
+#define DELIVERY_COORDINATATE_FLAG 0  // 手法4：手法3に手法2を適用するかを制御するフラグ（1:適用, 0:非適用）
 // #define DELIVERY_METHOD DELIVERY_METHOD_IGNORE // 手法1を使用
 // #define DELIVERY_METHOD DELIVERY_METHOD_COORDINATE // 手法2を使用
 #define DELIVERY_METHOD DELIVERY_METHOD_MULTI_DRONE // 手法3を使用
@@ -141,7 +144,7 @@ typedef struct
 /**
  * @brief 物資運搬車両の状態と積載物資を管理する構造体
  */
-typedef struct
+typedef struct // 物資運搬車両管理構造体
 {
     double remaining_supply_a;       // 積載中の物資A残量 (kg)
     double remaining_supply_b;       // 積載中の物資B残量 (kg)
@@ -189,7 +192,7 @@ typedef struct
     double total_flight_time;     // 総飛行時間（秒）
     double supply_transport_time; // 物資運搬飛行時間（秒）
     double last_state_time;       // 前回の状態変更時刻（秒）
-} DroneInfo;
+} DroneInfo;                      // ドローン情報管理構造体終了
 
 // === 関数プロトタイプ宣言 ===
 double generate_extra_supply_demand();
@@ -348,6 +351,27 @@ int check_drone_info_detection(DroneInfo *drone, double stop_coords[][2], Info *
  * @param info_count 情報総数
  * @return 協調運搬すべき避難所ID (0: 不要)
  */
+/**
+ * @brief ドローンの協調運搬判定処理（手法3専用）
+ *
+ * この関数は、通常巡回中のドローンが避難所近傍で協調運搬に
+ * 参加すべきかを判定します。手法3でのみ動作し、他のドローンと
+ * 協力して効率的な物資配送を実現します。
+ *
+ * 【判定条件】
+ * - 手法3（MULTI_DRONE）が有効である
+ * - ドローンが通常巡回状態（PATROL）である
+ * - 避難所近傍（検出範囲内）にいる
+ * - その避難所で協調運搬が必要である
+ *
+ * @param drone 対象ドローン情報
+ * @param drones 全ドローン配列
+ * @param drone_count ドローン総数
+ * @param stop_coords 拠点座標配列
+ * @param info_list 情報リスト
+ * @param info_count 情報総数
+ * @return 協調運搬すべき避難所ID（不要の場合は0）
+ */
 int check_drone_cooperative_transport(DroneInfo *drone, DroneInfo drones[], int drone_count, double stop_coords[][2], Info *info_list, int info_count)
 {
     // 手法3以外では協調運搬判定を行わない
@@ -469,12 +493,14 @@ void update_drone_state(DroneInfo *drone, DroneInfo drones[], int drone_count, d
 
             if (DELIVERY_METHOD == DELIVERY_METHOD_MULTI_DRONE)
             {
+                // 手法3: 他のドローンの積載量も考慮した需要量計算
                 double other_drone_transport = get_other_drones_carrying_sum(drone, drones, ND, drone->target_shelter, info_list, info_count);
 
                 for (int i = 0; i < info_count; i++)
                 {
                     if (info_list[i].shelter_id == drone->target_shelter && !info_list[i].delivery_completed)
                     {
+                        // 残り需要量 = 総需要量 - 既配送量 - 他ドローン積載量
                         remaining_demand = info_list[i].extra_supply_demand - info_list[i].extra_supply_delivered - other_drone_transport;
                         break;
                     }
@@ -482,6 +508,7 @@ void update_drone_state(DroneInfo *drone, DroneInfo drones[], int drone_count, d
             }
             else // 手法1,2
             {
+                // 手法1,2: 他ドローンの積載量は考慮しない
                 for (int i = 0; i < info_count; i++)
                 {
                     if (info_list[i].shelter_id == drone->target_shelter && !info_list[i].delivery_completed)
@@ -492,11 +519,12 @@ void update_drone_state(DroneInfo *drone, DroneInfo drones[], int drone_count, d
                 }
             }
 
+            // 積載量決定: min(残り需要量, ドローン最大積載量)
             drone->carrying_extra_supply = (remaining_demand > DRONE_MAX_CARRY) ? DRONE_MAX_CARRY : remaining_demand;
 
             // 停止時間終了、避難所への飛行開始
-            drone->target_x = stop_coords[drone->target_shelter][0];
-            drone->target_y = stop_coords[drone->target_shelter][1];
+            drone->target_x = stop_coords[drone->target_shelter][0]; // 目標避難所のX座標
+            drone->target_y = stop_coords[drone->target_shelter][1]; // 目標避難所のY座標
             update_drone_flight_time(drone, elapsed_time, DRONE_TO_SHELTER);
             printf("ドローン: 集積所出発（避難所%dへ、余剰物資B %.0fkg積載）\n",
                    drone->target_shelter, drone->carrying_extra_supply);
@@ -567,7 +595,6 @@ void update_drone_state(DroneInfo *drone, DroneInfo drones[], int drone_count, d
                             else // 自分が最後にとどけた場合
                             {
                                 info_list[i].delivery_completed = 1;
-                                printf("debug1----------------\n");
                                 printf("ドローン: 避難所%dの余剰物資B配送完了（全ドローン終了）, 避難所%d の Req:%f \n", drone->target_shelter, drone->target_shelter, info_list[i].extra_supply_demand - info_list[i].extra_supply_delivered);
                             }
 
@@ -1024,7 +1051,7 @@ double calculate_drone_transport_amount(DroneInfo drones[], int drone_count, int
                     }
                 }
             }
-            break; // 該当する情報が見つかったので終了
+            // break; // 該当する情報が見つかったので終了
         }
     }
 
@@ -1049,73 +1076,84 @@ double calculate_drone_transport_amount(DroneInfo drones[], int drone_count, int
  */
 int should_drone_join_transport(DroneInfo *drone, DroneInfo drones[], int drone_count, int shelter_id, Info *info_list, int info_count)
 {
-    // 対象避難所の情報を検索
+    // 対象避難所の情報を検索（情報リスト全体をスキャン）
     for (int i = 0; i < info_count; i++)
     {
+        // 指定避難所IDかつ未配送完了の情報を検索
         if (info_list[i].shelter_id == shelter_id && info_list[i].delivery_completed == 0)
         {
 
-            // 条件1: 情報回収フラグが有効
+            // 協調運搬条件1: 情報が既に回収されているかチェック
+            // 情報未回収の場合は協調運搬不可（情報回収が優先）
             if (!info_list[i].collected)
-                return 0;
+                return 0; // 情報未回収なので協調運搬に参加しない
 
-            // 条件3: 既配送量 + 他ドローンの運搬量 < 需要量
-            double other_drones_transport = 0.0;
-            double total_amount = 0.0; // すでに計算済みの運搬量(ドローンが3台以上のとき)
+            // 協調運搬条件2: 需要量と供給量のバランスチェック
+            // 他ドローンの運搬量を集計して重複配送を防ぐ
+            double other_drones_transport = 0.0; // 他ドローンによる運搬量合計
+            double total_amount = 0.0;           // 計算済み運搬量の累積（デバッグ用）
 
-            // 他のドローンの運搬量を計算（現在のドローンは除外）
+            // 他のドローンの運搬量を状態別に計算（現在のドローンは除外）
             for (int j = 0; j < drone_count; j++)
             {
+                // アクティブ、同一避難所対象、現在のドローン以外の条件チェック
                 if (drones[j].active && drones[j].target_shelter == shelter_id && &drones[j] != drone)
                 {
+                    // ドローンの状態に応じて運搬量を計算
                     switch (drones[j].state)
                     {
-                    case DRONE_TO_DEPOT:
-                    case DRONE_AT_DEPOT:
-                        // 残りの往復で運搬する量を計算
+                    case DRONE_TO_DEPOT: // 集積所への移動中
+                    case DRONE_AT_DEPOT: // 集積所で物資積込中
+                        // 次回往復で運搬予定の量を推定
                         {
+                            // 残り需要量 = 総需要量 - 既配送量 - 計算済み運搬量
                             double remaining_demand = info_list[i].extra_supply_demand - (info_list[i].extra_supply_delivered + total_amount);
 
+                            // 残り需要がある場合のみ次回運搬量を計算
                             if (remaining_demand > 0)
                             {
-                                // 次の往復で運搬する量 = min(DRONE_MAX_CARRY, 残り需要量)
+                                // 次の往復で運搬する量 = min(ドローン積載容量, 残り需要量)
                                 double next_trip_amount = (remaining_demand > DRONE_MAX_CARRY) ? DRONE_MAX_CARRY : remaining_demand;
-                                other_drones_transport += next_trip_amount;
+                                other_drones_transport += next_trip_amount; // 他ドローン運搬量に加算
                             }
                         }
                         break;
-                    case DRONE_TO_SHELTER:
+                    case DRONE_TO_SHELTER: // 避難所への移動中（物資運搬中）
+                        // 現在運搬中の物資量をそのまま加算
                         other_drones_transport += drones[j].carrying_extra_supply;
                         break;
-                    case DRONE_AT_SHELTER:
+                    case DRONE_AT_SHELTER: // 避難所で荷下ろし中
                     {
+                        // 残り往復回数から今後の運搬量を推定
                         int remaining_trips = drones[j].required_trips - drones[j].current_trip;
-                        if (remaining_trips > 0)
+                        if (remaining_trips > 0) // まだ往復が残っている場合
                         {
+                            // 残り需要量を再計算
                             double remaining_demand = info_list[i].extra_supply_demand - (info_list[i].extra_supply_delivered + total_amount);
                             if (remaining_demand > 0)
                             {
-                                // 次の往復で運搬する量 = min(DRONE_MAX_CARRY, 残り需要量)
+                                // 次の往復で運搬する量 = min(ドローン積載容量, 残り需要量)
                                 double next_trip_amount = (remaining_demand > DRONE_MAX_CARRY) ? DRONE_MAX_CARRY : remaining_demand;
-                                other_drones_transport += next_trip_amount;
+                                other_drones_transport += next_trip_amount; // 他ドローン運搬量に加算
                             }
                         }
                     }
-                        total_amount += other_drones_transport;
-                        // break;
+                        total_amount += other_drones_transport; // デバッグ用累積値更新
+                        // break; // 意図的にbreak省略（fall-through）
                     default:
-                        // break;
+                        // その他の状態では運搬量計算をスキップ
+                        // break; // 意図的にbreak省略
                     }
                 }
             }
 
-            // 既配送量 + 他ドローンの運搬量 < 需要量の場合、参加すべき
+            // 最終判定: 既配送量 + 他ドローンの運搬量 < 総需要量の場合、協調運搬に参加
             double total_covered = info_list[i].extra_supply_delivered + other_drones_transport;
-            return (total_covered < info_list[i].extra_supply_demand) ? 1 : 0;
+            return (total_covered < info_list[i].extra_supply_demand) ? 1 : 0; // 三項演算子で判定結果を返す
         }
     }
 
-    return 0; // 該当する情報が見つからない場合は参加不要
+    return 0; // 該当する情報が見つからない場合は協調運搬に参加しない
 }
 
 /**
@@ -1212,6 +1250,27 @@ double calculate_all_drones_transport_amount(DroneInfo *drone, DroneInfo drones[
  * @param info_count 情報数
  * @return 同じ避難所で往復運搬している他のドローンの積載量の合計
  */
+/**
+ * @brief 指定避難所への他ドローンの運搬量合計を計算する
+ *
+ * この関数は、現在のドローン以外のドローンが指定避難所に運搬中の
+ * 余剰物資B量の合計を計算します。協調運搬判定で重複配送を
+ * 避けるために使用されます。
+ *
+ * 【計算対象】
+ * - アクティブなドローン（故障していない）
+ * - 現在のドローン以外
+ * - 同じ避難所を対象としているドローン
+ * - 現在運搬中の余剰物資B量
+ *
+ * @param current_drone 現在のドローン（計算対象から除外）
+ * @param drones ドローン配列
+ * @param drone_count ドローン総数
+ * @param shelter_id 対象避難所ID
+ * @param info_list 情報リスト
+ * @param info_count 情報総数
+ * @return 他ドローンの運搬量合計 [kg]
+ */
 double get_other_drones_carrying_sum(DroneInfo *current_drone, DroneInfo drones[], int drone_count, int shelter_id, Info *info_list, int info_count)
 {
     double total_carrying = 0.0;
@@ -1239,19 +1298,36 @@ double get_other_drones_carrying_sum(DroneInfo *current_drone, DroneInfo drones[
 }
 
 /****************************************** メイン関数 ************************************************************/
+/**
+ * @brief 車両・ドローン協調物資配送シミュレーションのメイン関数
+ *
+ * 【シミュレーション概要】
+ * - 物資運搬車両が円形経路を巡回し、避難所に物資A・Bを配送
+ * - ドローンが情報収集と余剰物資B配送を担当
+ * - 情報発生タイミングはポアソン過程に従う
+ * - 3つの手法（無視・協調・分担）でドローン動作を制御
+ *
+ * 【実行フロー】
+ * 1. 初期化（乱数シード、gnuplot、データ構造）
+ * 2. シミュレーション設定の表示
+ * 3. メインループ（時間ステップによる状態更新）
+ * 4. 結果出力とファイル保存
+ *
+ * @return 0: 正常終了, その他: エラー
+ */
 int main(void)
 {
     // === 初期化処理 ===
 
     // 乱数シードの初期化（実行毎に異なる結果を得るため）
-    // srand(time(NULL));
-    srand(12);
+    // srand(time(NULL)); // 時刻ベースのランダムシード（コメントアウト中）
+    srand(12); // 固定シードで再現性を確保
 
     // === gnuplotパイプの初期化 ===
     FILE *gnuplot_pipe = NULL;
     if (ENABLE_GIF)
     {
-        gnuplot_pipe = init_gnuplot();
+        gnuplot_pipe = init_gnuplot(); // GIFアニメーション用のgnuplotパイプを開く
         if (gnuplot_pipe == NULL)
         {
             fprintf(stderr, "警告: gnuplotの初期化に失敗しました。GIF出力なしで続行します。\n");
@@ -1446,7 +1522,7 @@ int main(void)
         // 初回出発時以外は各拠点で停止時間を設ける
         if (!is_first_departure)
         {
-            // 停止開始時の描画
+            // 停止開始時の描画（現在位置をプロット）
             plot_frame(gnuplot_pipe, stop_coords, current_x, current_y, drones, elapsed_time, info_list, info_count, shelter_supplies, &supply_vehicle);
 
             // === 停止地点情報の表示 ===
@@ -1456,12 +1532,13 @@ int main(void)
                 printf("周回: %d/%d | 集積所に到着。%d秒間停止します。\n", lap_count + 1, NT, T_STOP);
 
                 // === 集積所での物資補充処理 ===
+                // 車両が空の状態の場合、新たに物資を満載する
                 if (!supply_vehicle.is_loaded)
                 {
-                    supply_vehicle.remaining_supply_a = TOTAL_SUPPLY_WEIGHT * SUPPLY_A_RATIO;
-                    supply_vehicle.remaining_supply_b = TOTAL_SUPPLY_WEIGHT * SUPPLY_B_RATIO;
-                    supply_vehicle.remaining_extra_supply_b = EXTRA_SUPPLY_B;
-                    supply_vehicle.is_loaded = 1;
+                    supply_vehicle.remaining_supply_a = TOTAL_SUPPLY_WEIGHT * SUPPLY_A_RATIO; // 物資A
+                    supply_vehicle.remaining_supply_b = TOTAL_SUPPLY_WEIGHT * SUPPLY_B_RATIO; // 物資B
+                    supply_vehicle.remaining_extra_supply_b = EXTRA_SUPPLY_B;                 // 余剰物資B
+                    supply_vehicle.is_loaded = 1;                                             // 積載状態フラグを設定
                     printf("  物資補充: A=%.0fkg, B=%.0fkg, 余剰B=%.0fkg を積載\n",
                            supply_vehicle.remaining_supply_a, supply_vehicle.remaining_supply_b,
                            supply_vehicle.remaining_extra_supply_b);
@@ -1577,7 +1654,7 @@ int main(void)
 
                             double delivery_amount = 0.0;
 
-                            if (DELIVERY_METHOD == DELIVERY_METHOD_COORDINATE)
+                            if (DELIVERY_METHOD == DELIVERY_METHOD_COORDINATE || DELIVERY_COORDINATATE_FLAG == 1)
                             {
                                 // === 手法２：ドローンの運搬状況を考慮 ===
                                 // ドローンによる運搬量（運搬中+運搬予定）を計算
@@ -1816,6 +1893,7 @@ int main(void)
             }
 
             // === 【時間ステップ進行】 ===
+            // === 移動中の時間進行処理 ===
             // 1秒刻みできめ細かな状態更新を実行
             // 細かい時間刻みにより、ドローンの位置更新・情報検出・描画タイミングを正確に制御
             double time_step = 1.0; // 1秒ステップ（バランスの取れた精度と計算速度）
@@ -1844,7 +1922,7 @@ int main(void)
                     // 物資運搬中や集積所移動中は検出を行わない（集中処理のため）
                     if (drones[i].state == DRONE_PATROL)
                     {
-                        // 200m以内の避難所で未回収情報があるかチェック
+                        // 検出半径以内の避難所で未回収情報があるかチェック
                         int detected_shelter = check_drone_info_detection(&drones[i], stop_coords, info_list, info_count, elapsed_time);
 
                         if (detected_shelter > 0) // 情報を検出した場合
@@ -2042,6 +2120,8 @@ int main(void)
     }
 
     // === 【ドローン飛行時間統計（Pf: 物資運搬割合）】 ===
+    // Pf = 物資運搬時間 / 総飛行時間 × 100 (%)
+    // 高いPf値ほど、無駄な飛行時間が少なく効率的な運用を表す
     if (ND > 0)
     {
         printf("\n=== ドローン飛行時間統計 ===\n");
