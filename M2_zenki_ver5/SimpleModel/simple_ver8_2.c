@@ -35,7 +35,7 @@
  * 7/18 :・手法3：ドローンが避難所に到達した際にドローンによる運搬が終わっていない場合に、そのドローンも協調して運搬する（複数ドローンによる運搬手法）追加
  *       ・検出半径をマクロ定義　・ドローンが複数(3台以上)のときの、協調運搬判定処理を修正(should_drone_join_transport関数の修正)
  * 7/22：手法3において、手法2を適用：運搬車両が、複数ドローンが運搬中の避難所にやってきた場合に余剰物資を運搬する処理を追加(calculate_drone_transport_amount関数の
- * 　　　
+ * 7/28：統計処理のファイルへの出力処理追加　　　
  *
  *
  */
@@ -58,7 +58,7 @@
 // === シミュレーション設定 ===
 #define NS 10        // 避難所の数（集積所除く）
 #define NT 3         // シミュレーションの周回数
-#define ND 3         // ドローンの台数（0の場合はドローンなし、最大制限なし）
+#define ND 2         // ドローンの台数（0の場合はドローンなし、最大制限なし）
 #define ENABLE_GIF 1 // GIF出力の有効/無効 (1:有効, 0:無効) | 処理軽量化用
 
 // === ドローン巡回方向設定 ===
@@ -2081,6 +2081,7 @@ int main(void)
         }
     }
 
+    // コンソールにも表示（従来通り）
     if (total_collected_count > 0)
     {
         printf("=== Tc（回収遅延時間）統計 ===\n");
@@ -2124,8 +2125,6 @@ int main(void)
     // 高いPf値ほど、無駄な飛行時間が少なく効率的な運用を表す
     if (ND > 0)
     {
-        printf("\n=== ドローン飛行時間統計 ===\n");
-
         double total_flight_time_all = 0.0;       // 全ドローンの総飛行時間
         double total_supply_transport_time = 0.0; // 全ドローンの物資運搬時間
         int active_drones = 0;                    // 活動したドローン数
@@ -2140,7 +2139,16 @@ int main(void)
                 total_flight_time_all += drones[i].total_flight_time;
                 total_supply_transport_time += drones[i].supply_transport_time;
                 active_drones++;
+            }
+        }
 
+        // コンソールにも表示（詳細版）
+        printf("\n=== ドローン飛行時間統計 ===\n");
+
+        for (int i = 0; i < ND; i++)
+        {
+            if (drones[i].active)
+            {
                 // 個別ドローンの統計
                 double pf_individual = (drones[i].total_flight_time > 0) ? (drones[i].supply_transport_time / drones[i].total_flight_time) * 100.0 : 0.0;
 
@@ -2170,10 +2178,82 @@ int main(void)
     }
 
     // === 【余剰物資B運搬統計】 ===
-    printf("\n=== 余剰物資B運搬統計 ===\n");
     double total_extra_supply = total_extra_supply_by_vehicle + total_extra_supply_by_drone;
     int total_delivery_count = vehicle_delivery_count + drone_delivery_count;
 
+    // === 余剰物資B運搬統計のファイル出力 ===
+    // === 数値データ専用ファイルの出力（エクセル解析用） ===
+    // ファイルフォーマット: Pf,車両Tc,ドローンTc,全体Tc,車両運搬量,ドローン運搬量,ドローン割合
+    FILE *numerical_data_file = fopen("Results/numerical_data.txt", "a");
+    if (numerical_data_file != NULL)
+    {
+        // 統計値の計算
+        double pf_value = 0.0;
+        double vehicle_tc_avg = 0.0;
+        double drone_tc_avg = 0.0;
+        double all_tc_avg = 0.0;
+        double drone_ratio_value = 0.0;
+
+        // Pf値の計算（ドローン飛行時間統計から再計算）
+        if (ND > 0)
+        {
+            double total_flight_time_all = 0.0;
+            double total_supply_transport_time = 0.0;
+            int active_drones = 0;
+
+            for (int i = 0; i < ND; i++)
+            {
+                if (drones[i].active)
+                {
+                    total_flight_time_all += drones[i].total_flight_time;
+                    total_supply_transport_time += drones[i].supply_transport_time;
+                    active_drones++;
+                }
+            }
+
+            if (active_drones > 0 && total_flight_time_all > 0)
+            {
+                double avg_flight_time = total_flight_time_all / active_drones;
+                double avg_supply_transport_time = total_supply_transport_time / active_drones;
+                pf_value = (avg_supply_transport_time / avg_flight_time) * 100.0;
+            }
+        }
+
+        // Tc平均値の計算
+        if (vehicle_collected_calc > 0)
+        {
+            vehicle_tc_avg = vehicle_tc_total / vehicle_collected_calc;
+        }
+        if (drone_collected_calc > 0)
+        {
+            drone_tc_avg = drone_tc_total / drone_collected_calc;
+        }
+        if (total_collected_count > 0)
+        {
+            all_tc_avg = all_tc_total / total_collected_count;
+        }
+
+        // ドローン運搬割合の計算
+        if (total_extra_supply > 0)
+        {
+            drone_ratio_value = (total_extra_supply_by_drone / total_extra_supply) * 100.0;
+        }
+
+        // CSV形式で数値データを出力（カンマ区切り、小数点第1位まで）
+        fprintf(numerical_data_file, "%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\n",
+                pf_value, vehicle_tc_avg, drone_tc_avg, all_tc_avg,
+                total_extra_supply_by_vehicle, total_extra_supply_by_drone, drone_ratio_value);
+
+        fclose(numerical_data_file);
+        printf("数値データをResults/numerical_data.txtに追記しました\n");
+    }
+    else
+    {
+        printf("警告: 数値データファイルの作成に失敗しました\n");
+    }
+
+    // コンソールにも表示（従来通り）
+    printf("\n=== 余剰物資B運搬統計 ===\n");
     printf("*車両による運搬: %.1fkg（配送回数: %d回）\n", total_extra_supply_by_vehicle, vehicle_delivery_count);
     printf("*ドローンによる運搬: %.1fkg（配送回数: %d回 (往復含む), %d回（往復含まない））\n", total_extra_supply_by_drone, drone_delivery_count, total_collected_count - collected_count);
     printf("*運搬総量: %.1fkg（総配送回数: %d回）\n", total_extra_supply, total_delivery_count);
