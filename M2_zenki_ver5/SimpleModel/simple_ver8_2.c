@@ -57,9 +57,9 @@
 
 // === シミュレーション設定 ===
 #define NS 10        // 避難所の数（集積所除く）
-#define NT 2         // シミュレーションの周回数
-#define ND 4         // ドローンの台数（0の場合はドローンなし、最大制限なし）
-#define ENABLE_GIF 1 // GIF出力の有効/無効 (1:有効, 0:無効) | 処理軽量化用
+#define NT 100       // シミュレーションの周回数
+#define ND 8         // ドローンの台数（0の場合はドローンなし、最大制限なし）
+#define ENABLE_GIF 0 // GIF出力の有効/無効 (1:有効, 0:無効) | 処理軽量化用
 
 // === ドローン巡回方向設定 ===
 #define DRONE_CLOCKWISE 0                                                    // ドローン巡回方向: 0=反時計回り, 1=時計回り
@@ -1131,6 +1131,8 @@ int should_drone_join_transport(DroneInfo *drone, DroneInfo drones[], int drone_
                         break;
                     case DRONE_AT_SHELTER: // 避難所で荷下ろし中
                     {
+                        other_drones_transport += drones[j].carrying_extra_supply; // 現在運搬中の物資量を加算
+
                         // 残り往復回数から今後の運搬量を推定
                         int remaining_trips = drones[j].required_trips - drones[j].current_trip;
                         if (remaining_trips > 0) // まだ往復が残っている場合
@@ -1216,6 +1218,8 @@ double calculate_all_drones_transport_amount(DroneInfo *drone, DroneInfo drones[
                         // 避難所にいる場合（降ろし中）
                         // 今回の往復は完了扱いなので、次回以降の往復分を計算
                         {
+                            total_transport_amount += drones[j].carrying_extra_supply; // 現在積載している物資量を加算
+
                             int remaining_trips = drones[j].required_trips - drones[j].current_trip;
                             if (remaining_trips > 0)
                             {
@@ -2270,9 +2274,19 @@ int main(void)
         }
 
         // CSV形式で数値データを出力（タブ区切り、小数点第1位まで）
-        fprintf(numerical_data_file, "%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\n",
-                1 - pf_value, vehicle_tc_avg / 3600, drone_tc_avg / 3600, all_tc_avg / 3600,
-                total_extra_supply_by_vehicle / NT, total_extra_supply_by_drone / NT, 1 - drone_ratio_value, tr_avg / 3600);
+        double zero_value = 0.0; // ドローンに関する割合が0のときの値
+        if (ND == 0)             // ND=0のときドローンに関する割合は0とする
+        {
+            fprintf(numerical_data_file, "%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\n",
+                    zero_value, vehicle_tc_avg / 3600, drone_tc_avg / 3600, all_tc_avg / 3600,
+                    total_extra_supply_by_vehicle / NT, total_extra_supply_by_drone / NT, zero_value, tr_avg / 3600);
+        }
+        else
+        {
+            fprintf(numerical_data_file, "%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\n",
+                    1 - pf_value, vehicle_tc_avg / 3600, drone_tc_avg / 3600, all_tc_avg / 3600,
+                    total_extra_supply_by_vehicle / NT, total_extra_supply_by_drone / NT, 1 - drone_ratio_value, tr_avg / 3600);
+        }
 
         fclose(numerical_data_file);
         printf("数値データをResults/numerical_data.txtに追記しました\n");
