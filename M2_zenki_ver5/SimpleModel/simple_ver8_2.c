@@ -57,8 +57,8 @@
 
 // === シミュレーション設定 ===
 #define NS 10        // 避難所の数（集積所除く）
-#define NT 3         // シミュレーションの周回数
-#define ND 2         // ドローンの台数（0の場合はドローンなし、最大制限なし）
+#define NT 2         // シミュレーションの周回数
+#define ND 4         // ドローンの台数（0の場合はドローンなし、最大制限なし）
 #define ENABLE_GIF 1 // GIF出力の有効/無効 (1:有効, 0:無効) | 処理軽量化用
 
 // === ドローン巡回方向設定 ===
@@ -66,14 +66,14 @@
 #define DRONE_DIRECTION_NAME ((DRONE_CLOCKWISE) ? "時計回り" : "反時計回り") // 表示用文字列
 
 // === 情報発生システム（ポアソン過程） ===
-#define LAMBDA 0.5    // ポアソン到着率 [件/時間] | 1時間に平均0.5件の情報発生
+#define LAMBDA 1.5    // ポアソン到着率 [件/時間] | 1時間に平均0.5件の情報発生
 #define MAX_INFO 1000 // 最大情報数（メモリ制限対策）
 
 // === ドローン物資運搬システム ===
 #define NR 2                   // ドローンの往復回数（基本値、情報により動的変更）
 #define T_DRONE_STOP (10 * 60) // ドローンの停止時間 (s) | 10分=600秒（集積所・避難所共通）
 #define DRONE_MAX_CARRY 30.0   // ドローンの最大積載量 (kg)
-#define MIN_EXTRA_DEMAND 70.0  // 余剰物資B需要量の最小値 (kg)
+#define MIN_EXTRA_DEMAND 30.0  // 余剰物資B需要量の最小値 (kg)
 #define MAX_EXTRA_DEMAND 120.0 // 余剰物資B需要量の最大値 (kg)
 
 // === 物資運搬車両システム ===
@@ -87,11 +87,11 @@
 
 // === 余剰物資B配送手法の選択 ===
 #define DELIVERY_METHOD_IGNORE 0      // 手法1：車両がドローンの運搬を無視：一つの避難所には１台のドローンのみが運搬担当する
-#define DELIVERY_METHOD_COORDINATE 1  // 手法2：車両がドローンの運搬状況を考慮：手法1の延長
+#define DELIVERY_METHOD_COORDINATE 1  // 手法2：車両がドローンの運搬状況を考慮：手法1の延長（避難所に到着し、ドローンが運搬中であるなら残りの余剰物資を避難所に届ける）
 #define DELIVERY_METHOD_MULTI_DRONE 2 // 手法3：複数ドローンによる協調運搬(あるドローンが避難所で余剰物資Bを運搬中のとき、他のドローンが来たらそのドローンも協調して運搬する)
 #define DELIVERY_COORDINATATE_FLAG 0  // 手法4：手法3に手法2を適用するかを制御するフラグ（1:適用, 0:非適用）
 // #define DELIVERY_METHOD DELIVERY_METHOD_IGNORE // 手法1を使用
-// #define DELIVERY_METHOD DELIVERY_METHOD_COORDINATE // 手法2を使用
+//  #define DELIVERY_METHOD DELIVERY_METHOD_COORDINATE // 手法2を使用
 #define DELIVERY_METHOD DELIVERY_METHOD_MULTI_DRONE // 手法3を使用
 
 // === 派生的な定数（自動計算） ===
@@ -114,14 +114,15 @@
  */
 typedef struct
 {
-    int shelter_id;                // 情報が発生した避難所ID (1〜NS) | 0は集積所なので除外
-    double generation_time;        // 情報発生時刻（秒）| シミュレーション開始からの経過時間
-    double collection_time;        // 情報回収時刻（秒）| -1の場合は未回収状態
-    int collected;                 // 回収済みフラグ（0:未回収, 1:回収済み）
-    int collected_by;              // 回収主体（0:未回収, 1:車両, 2:ドローン）
-    double extra_supply_demand;    // 余剰物資B需要量 (kg) | 0〜90kgの範囲
-    double extra_supply_delivered; // 配送済み余剰物資B量 (kg)
-    int delivery_completed;        // 余剰物資B配送完了フラグ（0:未完了, 1:完了）
+    int shelter_id;                  // 情報が発生した避難所ID (1〜NS) | 0は集積所なので除外
+    double generation_time;          // 情報発生時刻（秒）| シミュレーション開始からの経過時間
+    double collection_time;          // 情報回収時刻（秒）| -1の場合は未回収状態
+    int collected;                   // 回収済みフラグ（0:未回収, 1:回収済み）
+    int collected_by;                // 回収主体（0:未回収, 1:車両, 2:ドローン）
+    double extra_supply_demand;      // 余剰物資B需要量 (kg) | 0〜90kgの範囲
+    double extra_supply_delivered;   // 配送済み余剰物資B量 (kg)
+    int delivery_completed;          // 余剰物資B配送完了フラグ（0:未完了, 1:完了）
+    double delivery_completion_time; // 余剰物資B配送完了時刻（秒）| -1の場合は未完了
 } Info;
 
 // === 避難所物資管理用構造体 ===
@@ -585,7 +586,10 @@ void update_drone_state(DroneInfo *drone, DroneInfo drones[], int drone_count, d
 
                     if (DELIVERY_METHOD == DELIVERY_METHOD_MULTI_DRONE)
                     {
-                        double total_other_drone_transport = calculate_all_drones_transport_amount(drone, drones, drone_count, drone->target_shelter, info_list, info_count);
+                        double total_other_drone_transport = calculate_all_drones_transport_amount(drone, drones, ND, drone->target_shelter, info_list, info_count);
+                        // double total_other_drone_transport = calculate_all_drones_transport_amount(drone, drones, drone_count, drone->target_shelter, info_list, info_count);
+                        // double total_other_drone_transport = get_other_drones_carrying_sum(drone, drones, ND, drone->target_shelter, info_list, info_count);//飛行中のドローンが積載予定の物資量は含まないため不適
+
                         if (info_list[i].extra_supply_delivered + total_other_drone_transport >= info_list[i].extra_supply_demand)
                         {
                             if (total_other_drone_transport > 0) //
@@ -595,6 +599,7 @@ void update_drone_state(DroneInfo *drone, DroneInfo drones[], int drone_count, d
                             else // 自分が最後にとどけた場合
                             {
                                 info_list[i].delivery_completed = 1;
+                                info_list[i].delivery_completion_time = elapsed_time;
                                 printf("ドローン: 避難所%dの余剰物資B配送完了（全ドローン終了）, 避難所%d の Req:%f \n", drone->target_shelter, drone->target_shelter, info_list[i].extra_supply_demand - info_list[i].extra_supply_delivered);
                             }
 
@@ -608,6 +613,7 @@ void update_drone_state(DroneInfo *drone, DroneInfo drones[], int drone_count, d
                         if (info_list[i].extra_supply_delivered >= info_list[i].extra_supply_demand)
                         {
                             info_list[i].delivery_completed = 1;
+                            info_list[i].delivery_completion_time = elapsed_time;
                             printf("ドローン: 避難所%dの余剰物資B配送完了, 避難所%d の Req:%f \n", drone->target_shelter, drone->target_shelter, info_list[i].extra_supply_demand - info_list[i].extra_supply_delivered);
                             drone->current_trip = drone->required_trips + 999; // 往復完了フラグを設定（手法2によって,車両が避難所の余剰物資を運搬したことによるドローンの往復回数短縮を考慮して（車両によってドローンの往復必要回数がへる場合があるため））
                         }
@@ -633,6 +639,7 @@ void update_drone_state(DroneInfo *drone, DroneInfo drones[], int drone_count, d
                             }
 
                             info_list[i].delivery_completed = 1;
+                            info_list[i].delivery_completion_time = elapsed_time;
                             drone->current_trip = drone->required_trips + 999; // 往復完了フラグを設定
                         }
                     }
@@ -1159,7 +1166,7 @@ int should_drone_join_transport(DroneInfo *drone, DroneInfo drones[], int drone_
 /**
  * @brief 全ドローンによる指定避難所への余剰物資B運搬量を計算する関数（手法3用）
  *
- * この関数は、指定された避難所に対して全ドローンが運搬中または運搬予定の
+ * この関数は、指定された避難所に対して現在指定のドローンを除く、全ドローンが運搬中または運搬予定の
  * 余剰物資B量の合計を計算します。手法3でのあとからやってきたドローンによる協調運搬判定に使用します。
  *
  * @param drones ドローン配列
@@ -1255,7 +1262,7 @@ double calculate_all_drones_transport_amount(DroneInfo *drone, DroneInfo drones[
  *
  * この関数は、現在のドローン以外のドローンが指定避難所に運搬中の
  * 余剰物資B量の合計を計算します。協調運搬判定で重複配送を
- * 避けるために使用されます。
+ * 避けるために使用されます。(飛行中のドローンが運搬予定の物資量は考慮しない)
  *
  * 【計算対象】
  * - アクティブなドローン（故障していない）
@@ -1481,7 +1488,7 @@ int main(void)
     }
     printf("円の半径: %.1f m, 車両速度: %.2f m/s, 拠点数: %d\n", R, V, TOTAL_STOPS);
 
-    /****** 【メインシミュレーションループ開始】 ******/
+    /********************** 【メインシミュレーションループ開始】 *********************************************************************************************/
     // 指定された周回数（NT）まで車両の巡回を継続
     // 各周回で全拠点（集積所+10避難所）を訪問し、物資配送・情報回収を実行
     while (lap_count < NT)
@@ -1500,6 +1507,7 @@ int main(void)
             info_list[info_count].extra_supply_demand = generate_extra_supply_demand(); // 0〜90kgの需要量をランダム生成
             info_list[info_count].extra_supply_delivered = 0.0;                         // 配送済み量: 初期0kg
             info_list[info_count].delivery_completed = 0;                               // 配送完了フラグ: 未完了
+            info_list[info_count].delivery_completion_time = -1;                        // 配送完了時刻: 未完了
 
             // 情報発生をログ出力（デバッグ・進捗確認用）
             printf("****情報発生: 時刻 %.1f秒 (%.1f分) : 避難所 %d (余剰物資B需要: %.0fkg)\n",
@@ -1518,7 +1526,7 @@ int main(void)
         double current_x = stop_coords[current_stop_idx][0];
         double current_y = stop_coords[current_stop_idx][1];
 
-        // === 停止中の処理 ===
+        // === 車両停止中の処理 ===
         // 初回出発時以外は各拠点で停止時間を設ける
         if (!is_first_departure)
         {
@@ -1625,6 +1633,7 @@ int main(void)
                                 if (info_list[i].extra_supply_delivered >= info_list[i].extra_supply_demand)
                                 {
                                     info_list[i].delivery_completed = 1;
+                                    info_list[i].delivery_completion_time = elapsed_time;
                                     printf("  余剰物資B配送: %.0fkg配送（需要完了）\n", delivery_amount);
                                 }
                                 else
@@ -1683,6 +1692,7 @@ int main(void)
                                     if (info_list[i].extra_supply_delivered >= info_list[i].extra_supply_demand)
                                     {
                                         info_list[i].delivery_completed = 1;
+                                        info_list[i].delivery_completion_time = elapsed_time;
                                         printf("  余剰物資B配送: %.0fkg配送（需要完了）\n", delivery_amount);
                                     }
                                     else
@@ -1703,7 +1713,7 @@ int main(void)
                 }
             }
 
-            // === 停止時間中の処理ループ ===
+            // === 車両停止時間中の処理ループ ===
             // 停止期間中も時間を進めてドローンの位置更新と描画を実行
             // 集積所、避難所問わず、車両が停止時間中はドローンの状態更新を行う
             double stop_start_time = elapsed_time;
@@ -1871,7 +1881,7 @@ int main(void)
             angle_diff += 2.0 * PI; // 360度加算で反時計回り短縮
         }
 
-        // === 移動中の時間ループ ===
+        // === 車両移動中の時間ループ ===
         while (elapsed_time < move_end_time)
         {
             // === 車両位置の計算 ===
@@ -2183,7 +2193,7 @@ int main(void)
 
     // === 余剰物資B運搬統計のファイル出力 ===
     // === 数値データ専用ファイルの出力（エクセル解析用） ===
-    // ファイルフォーマット: Pf,車両Tc,ドローンTc,全体Tc,車両運搬量,ドローン運搬量,ドローン割合
+    // ファイルフォーマット: Pf(車両の巡回飛行時間割合),車両Tc[hour],ドローンTc,全体Tc,車両運搬量(1周あたり),ドローン運搬量(1周あたり),車両割合,Tr平均[hour]
     FILE *numerical_data_file = fopen("Results/numerical_data.txt", "a");
     if (numerical_data_file != NULL)
     {
@@ -2215,7 +2225,7 @@ int main(void)
             {
                 double avg_flight_time = total_flight_time_all / active_drones;
                 double avg_supply_transport_time = total_supply_transport_time / active_drones;
-                pf_value = (avg_supply_transport_time / avg_flight_time) * 100.0;
+                pf_value = (avg_supply_transport_time / avg_flight_time);
             }
         }
 
@@ -2236,13 +2246,33 @@ int main(void)
         // ドローン運搬割合の計算
         if (total_extra_supply > 0)
         {
-            drone_ratio_value = (total_extra_supply_by_drone / total_extra_supply) * 100.0;
+            drone_ratio_value = (total_extra_supply_by_drone / total_extra_supply);
         }
 
-        // CSV形式で数値データを出力（カンマ区切り、小数点第1位まで）
-        fprintf(numerical_data_file, "%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\n",
-                pf_value, vehicle_tc_avg, drone_tc_avg, all_tc_avg,
-                total_extra_supply_by_vehicle, total_extra_supply_by_drone, drone_ratio_value);
+        // Tr平均値の計算
+        double tr_avg = 0.0;
+        double total_tr_time = 0.0;
+        int completed_deliveries = 0;
+
+        for (int i = 0; i < info_count; i++)
+        {
+            if (info_list[i].delivery_completed && info_list[i].delivery_completion_time > 0)
+            {
+                double tr = info_list[i].delivery_completion_time - info_list[i].generation_time;
+                total_tr_time += tr;
+                completed_deliveries++;
+            }
+        }
+
+        if (completed_deliveries > 0)
+        {
+            tr_avg = total_tr_time / completed_deliveries;
+        }
+
+        // CSV形式で数値データを出力（タブ区切り、小数点第1位まで）
+        fprintf(numerical_data_file, "%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\t%.3f\n",
+                1 - pf_value, vehicle_tc_avg / 3600, drone_tc_avg / 3600, all_tc_avg / 3600,
+                total_extra_supply_by_vehicle / NT, total_extra_supply_by_drone / NT, 1 - drone_ratio_value, tr_avg / 3600);
 
         fclose(numerical_data_file);
         printf("数値データをResults/numerical_data.txtに追記しました\n");
@@ -2287,6 +2317,57 @@ int main(void)
     else
     {
         printf("余剰物資Bの配送は発生しませんでした\n");
+    }
+
+    // === Tr（配送時間）統計 ===
+    printf("\n=== Tr（配送時間）統計 ===\n");
+    double total_tr_time = 0.0;
+    int completed_deliveries = 0;
+
+    // Tr値をファイルに出力（時間単位、1行ずつ）
+    FILE *tr_file = fopen("Results/tr_values.txt", "w");
+    if (tr_file != NULL)
+    {
+        for (int i = 0; i < info_count; i++)
+        {
+            if (info_list[i].delivery_completed && info_list[i].delivery_completion_time > 0)
+            {
+                double tr = info_list[i].delivery_completion_time - info_list[i].generation_time;
+                double tr_hours = tr / 3600.0;        // 秒から時間に変換
+                fprintf(tr_file, "%.6f\n", tr_hours); // 1行ずつTr値（時間単位）を出力
+                total_tr_time += tr;
+                completed_deliveries++;
+            }
+        }
+        fclose(tr_file);
+        printf("Tr値（時間単位）をResults/tr_values.txtに出力しました\n");
+    }
+    else
+    {
+        printf("警告: Tr値ファイルの作成に失敗しました\n");
+
+        // ファイル出力に失敗した場合でも統計計算は実行
+        for (int i = 0; i < info_count; i++)
+        {
+            if (info_list[i].delivery_completed && info_list[i].delivery_completion_time > 0)
+            {
+                double tr = info_list[i].delivery_completion_time - info_list[i].generation_time;
+                total_tr_time += tr;
+                completed_deliveries++;
+            }
+        }
+    }
+
+    if (completed_deliveries > 0)
+    {
+        double avg_tr = total_tr_time / completed_deliveries;
+        printf("配送完了件数: %d件\n", completed_deliveries);
+        printf("Tr平均: %.2f秒 (%.2f分)\n", avg_tr, avg_tr / 60.0);
+        printf("Tr総計: %.2f秒 (%.2f時間)\n", total_tr_time, total_tr_time / 3600.0);
+    }
+    else
+    {
+        printf("配送完了した情報がありません\n");
     }
 
     // === 【GIFファイル処理・クリーンアップ】 ===
