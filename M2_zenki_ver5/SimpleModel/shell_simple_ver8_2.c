@@ -35,8 +35,9 @@
  * 7/18 :・手法3：ドローンが避難所に到達した際にドローンによる運搬が終わっていない場合に、そのドローンも協調して運搬する（複数ドローンによる運搬手法）追加
  *       ・検出半径をマクロ定義　・ドローンが複数(3台以上)のときの、協調運搬判定処理を修正(should_drone_join_transport関数の修正)
  * 7/22：手法3において、手法2を適用：運搬車両が、複数ドローンが運搬中の避難所にやってきた場合に余剰物資を運搬する処理を追加(calculate_drone_transport_amount関数の
- * 7/28：統計処理のファイルへの出力処理追加　　　
- *
+ * 7/28：統計処理のファイルへの出力処理追加
+ * 8/20：ドローンの重複輸送の修正、Tr(情報発生から物資が完全に運びこまれるまでの遅延時間)の導出、ドローン台数変化させて実行するシェルスクリプト実装
+ * 8/22：手法1におけるバグ（ドローンがfor文の順序により自分の担当でない情報に基づく運搬を行っていた）を修正　　　
  *
  */
 #include <stdio.h>
@@ -66,8 +67,8 @@ int ND = 8;          // ドローンの台数（0の場合はドローンなし�
 #define DRONE_DIRECTION_NAME ((DRONE_CLOCKWISE) ? "時計回り" : "反時計回り") // 表示用文字列
 
 // === 情報発生システム（ポアソン過程） ===
-#define LAMBDA 2.0     // ポアソン到着率 [件/時間] | 1時間に平均0.5件の情報発生
-#define MAX_INFO 20000 // 最大情報数（メモリ制限対策）
+#define LAMBDA 1.5     // ポアソン到着率 [件/時間] | 1時間に平均0.5件の情報発生
+#define MAX_INFO 20000 // 最大情報数（メモリ制限対策）（情報発生率が高い場合にこれが小さいと結果がうまくでないことがあるので注意）
 
 // === ドローン物資運搬システム ===
 #define NR 2                   // ドローンの往復回数（基本値、情報により動的変更）
@@ -91,7 +92,7 @@ int ND = 8;          // ドローンの台数（0の場合はドローンなし�
 #define DELIVERY_METHOD_MULTI_DRONE 2 // 手法3：複数ドローンによる協調運搬(あるドローンが避難所で余剰物資Bを運搬中のとき、他のドローンが来たらそのドローンも協調して運搬する)
 #define DELIVERY_COORDINATATE_FLAG 0  // 手法4：手法3に手法2を適用するかを制御するフラグ（1:適用, 0:非適用）
 // #define DELIVERY_METHOD DELIVERY_METHOD_IGNORE // 手法1を使用
-//  #define DELIVERY_METHOD DELIVERY_METHOD_COORDINATE // 手法2を使用
+//     #define DELIVERY_METHOD DELIVERY_METHOD_COORDINATE // 手法2を使用
 #define DELIVERY_METHOD DELIVERY_METHOD_MULTI_DRONE // 手法3を使用
 
 // === 派生的な定数（自動計算） ===
@@ -188,6 +189,7 @@ typedef struct
     double state_start_time;      // 現在状態の開始時刻
     double target_x, target_y;    // 目標座標（直線飛行時）
     double carrying_extra_supply; // 現在積載中の余剰物資B量 (kg)
+    int delivery_info_index;      // ドローンが物資運搬を行う情報のインデックス
 
     // 飛行時間統計用フィールド
     double total_flight_time;     // 総飛行時間（秒）
@@ -329,7 +331,8 @@ int check_drone_info_detection(DroneInfo *drone, double stop_coords[][2], Info *
                     info_list[i].shelter_id == shelter_id &&
                     info_list[i].generation_time <= elapsed_time)
                 {
-                    return shelter_id; // 情報発生避難所を検出
+                    drone->delivery_info_index = i; // 物資運搬情報のインデックスを設定
+                    return shelter_id;              // 情報発生避難所を検出
                 }
             }
         }
@@ -565,7 +568,7 @@ void update_drone_state(DroneInfo *drone, DroneInfo drones[], int drone_count, d
             // 余剰物資Bを配送
             for (int i = 0; i < info_count; i++)
             {
-                if (info_list[i].shelter_id == drone->target_shelter && !info_list[i].delivery_completed) // delivery_completedフラグが立っていない場合
+                if (info_list[i].shelter_id == drone->target_shelter && !info_list[i].delivery_completed && ((DELIVERY_METHOD != DELIVERY_METHOD_MULTI_DRONE && drone->delivery_info_index == i) || (DELIVERY_METHOD == DELIVERY_METHOD_MULTI_DRONE))) // delivery_completedフラグが立っていない場合
                 {
                     // 避難所の余剰物資B在庫を増加
                     // shelter_suppliesの配列インデックスは0ベースなので -1
@@ -618,6 +621,7 @@ void update_drone_state(DroneInfo *drone, DroneInfo drones[], int drone_count, d
                             drone->current_trip = drone->required_trips + 999; // 往復完了フラグを設定（手法2によって,車両が避難所の余剰物資を運搬したことによるドローンの往復回数短縮を考慮して（車両によってドローンの往復必要回数がへる場合があるため））
                         }
                     }
+                    // break;
                 }
                 /*
                 else if (info_list[i].shelter_id == drone->target_shelter && info_list[i].delivery_completed) // delivery_completedフラグが立っている場合
@@ -1158,7 +1162,16 @@ int should_drone_join_transport(DroneInfo *drone, DroneInfo drones[], int drone_
 
             // 最終判定: 既配送量 + 他ドローンの運搬量 < 総需要量の場合、協調運搬に参加
             double total_covered = info_list[i].extra_supply_delivered + other_drones_transport;
-            return (total_covered < info_list[i].extra_supply_demand) ? 1 : 0; // 三項演算子で判定結果を返す
+            // return (total_covered < info_list[i].extra_supply_demand) ? 1 : 0; // 三項演算子で判定結果を返す
+            if (total_covered < info_list[i].extra_supply_demand)
+            {
+                drone->delivery_info_index = i; // 物資運搬情報のインデックスを設定
+                return 1;                       // 協調運搬に参加すべき
+            }
+            else
+            {
+                return 0; // 協調運搬に参加しない
+            }
         }
     }
 
@@ -1439,6 +1452,7 @@ int main(int argc, char *argv[])
         drones[i].state_start_time = 0.0;              // 状態開始時刻
         drones[i].target_x = drones[i].target_y = 0.0; // 目標座標
         drones[i].carrying_extra_supply = 0.0;         // 積載中の余剰物資B量
+        drones[i].delivery_info_index = -1;            // 物資運搬情報のインデックス（未設定）
 
         // 飛行時間統計用フィールドの初期化
         drones[i].total_flight_time = 0.0;     // 総飛行時間
@@ -2211,7 +2225,8 @@ int main(int argc, char *argv[])
 
     // === 余剰物資B運搬統計のファイル出力 ===
     // === 数値データ専用ファイルの出力（エクセル解析用） ===
-    // ファイルフォーマット: Pf(車両の巡回飛行時間割合),車両Tc[hour],ドローンTc,全体Tc,車両運搬量(1周あたり),ドローン運搬量(1周あたり),車両割合,Tr平均[hour]
+    // ファイルフォーマット: "( 1 - Pf(運搬飛行時間割合)) = ドローンの巡回飛行時間割合, 車両Tc[hour],ドローンTc, 全体Tc (Tc:情報発生から回収されるまでの遅延時間),
+    // -> 車両運搬量(1周あたり), ドローン運搬量(1周あたり), 車両運搬割合, Tr（情報発生から完全に運搬し終わるまでの遅延時間）平均[hour]"
     FILE *numerical_data_file = fopen("Results/numerical_data.txt", "a");
     if (numerical_data_file != NULL)
     {
