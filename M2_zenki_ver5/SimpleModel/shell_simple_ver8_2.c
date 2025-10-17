@@ -67,7 +67,7 @@ int ND = 8;          // ドローンの台数（0の場合はドローンなし�
 #define DRONE_DIRECTION_NAME ((DRONE_CLOCKWISE) ? "時計回り" : "反時計回り") // 表示用文字列
 
 // === 情報発生システム（ポアソン過程） ===
-#define LAMBDA 1.5     // ポアソン到着率 [件/時間] | 1時間に平均0.5件の情報発生
+#define LAMBDA 2.0     // ポアソン到着率 [件/時間] | 1時間に平均0.5件の情報発生
 #define MAX_INFO 20000 // 最大情報数（メモリ制限対策）（情報発生率が高い場合にこれが小さいと結果がうまくでないことがあるので注意）
 
 // === ドローン物資運搬システム ===
@@ -75,7 +75,7 @@ int ND = 8;          // ドローンの台数（0の場合はドローンなし�
 #define T_DRONE_STOP (10 * 60) // ドローンの停止時間 (s) | 10分=600秒（集積所・避難所共通）
 #define DRONE_MAX_CARRY 30.0   // ドローンの最大積載量 (kg)
 #define MIN_EXTRA_DEMAND 30.0  // 余剰物資B需要量の最小値 (kg)
-#define MAX_EXTRA_DEMAND 120.0 // 余剰物資B需要量の最大値 (kg)
+#define MAX_EXTRA_DEMAND 60.0  // 余剰物資B需要量の最大値 (kg)
 
 // === 物資運搬車両システム ===
 #define TOTAL_SUPPLY_WEIGHT 10000.0                                // 物資運搬車両の総積載量 (kg)

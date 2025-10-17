@@ -58,7 +58,7 @@
 
 // === シミュレーション設定 ===
 #define NS 10        // 避難所の数（集積所除く）
-#define NT 7         // シミュレーションの周回数
+#define NT 2         // シミュレーションの周回数
 #define ND 3         // ドローンの台数（0の場合はドローンなし、最大制限なし）
 #define ENABLE_GIF 1 // GIF出力の有効/無効 (1:有効, 0:無効) | 処理軽量化用
 
@@ -212,6 +212,7 @@ double calculate_all_drones_transport_amount(DroneInfo *drone, DroneInfo drones[
 double get_other_drones_carrying_sum(DroneInfo *current_drone, DroneInfo drones[], int drone_count, int shelter_id, Info *info_list, int info_count);
 int should_drone_join_transport(DroneInfo *drone, DroneInfo drones[], int drone_count, int shelter_id, Info *info_list, int info_count);
 int check_drone_cooperative_transport(DroneInfo *drone, DroneInfo drones[], int drone_count, double stop_coords[][2], Info *info_list, int info_count);
+void save_simulation_model_png(double stop_coords[][2]);
 
 /**
  * @brief gnuplotを初期化し、GIFアニメーション出力のための設定を行う
@@ -481,7 +482,7 @@ void update_drone_state(DroneInfo *drone, DroneInfo drones[], int drone_count, d
                 drone->y = drone->target_y;
                 update_drone_flight_time(drone, elapsed_time, DRONE_AT_DEPOT);
                 drone->state_start_time = elapsed_time;
-                printf("ドローン: 集積所到着（物資積載開始）\n");
+                // printf("ドローン: 集積所到着（物資積載開始）\n");
             }
             else
             {
@@ -734,6 +735,7 @@ void plot_frame(FILE *pipe, double stop_coords[][2], double vehicle_x, double ve
     int seconds = (int)(elapsed_time - hours * 3600 - minutes * 60);
 
     // タイトルバーに経過時間と物資情報を表示
+    /*
     if (hours > 0)
     {
         fprintf(pipe, "set title 'Vehicle Simulation - Time: %02d:%02d hour | A: %.0fkg B: %.0fkg ExtraB: %.0fkg'\n",
@@ -748,15 +750,30 @@ void plot_frame(FILE *pipe, double stop_coords[][2], double vehicle_x, double ve
     {
         fprintf(pipe, "set title 'Vehicle Simulation - Time: 0 min | A: %.0fkg B: %.0fkg ExtraB: %.0fkg'\n",
                 supply_vehicle->remaining_supply_a, supply_vehicle->remaining_supply_b, supply_vehicle->remaining_extra_supply_b);
+    }*/
+
+    // タイトルバーに経過時間のみ表示するバージョン
+    if (hours > 0)
+    {
+        fprintf(pipe, "set title 'Simulation - Time: %02d:%02d hour'\n", hours, minutes);
+    }
+    else if (minutes > 0)
+    {
+        fprintf(pipe, "set title 'Simulation - Time: %02d min'\n", minutes);
+    }
+    else
+    {
+        fprintf(pipe, "set title 'Simulation - Time: 0 min'\n");
     }
 
     // === 描画コマンドの構築 ===
     // 基本レイヤー（円、集積所、避難所、車両）は常に描画
-    fprintf(pipe, "plot '-' with lines lc 'gray' lw 2 notitle, ");      // 1. 円周経路
-    fprintf(pipe, "'-' with points pt 7 ps 1.5 lc 'blue' notitle, ");   // 2. 集積所
-    fprintf(pipe, "'-' with points pt 7 ps 1.5 lc 'blue' notitle, ");   // 3. 通常避難所
-    fprintf(pipe, "'-' with points pt 7 ps 1.8 lc 'orange' notitle, "); // 4. 情報発生中避難所
-    fprintf(pipe, "'-' with points pt 7 ps 2 lc 'red' notitle");        // 5. 車両
+    fprintf(pipe, "plot '-' with lines lc 'gray' lw 2 notitle, "); // 1. 円周経路
+    // fprintf(pipe, "'-' with points pt 7 ps 1.5 lc 'blue' notitle, ");   // 2. 集積所
+    fprintf(pipe, "'-' with points pointtype 5 pointsize 3 linecolor rgb '#FF00FF' notitle, "); // 2. 集積所強調
+    fprintf(pipe, "'-' with points pt 7 ps 1.5 lc 'gray' notitle, ");                           // 3. 通常避難所
+    fprintf(pipe, "'-' with points pt 7 ps 2.2 lc 'orange' notitle, ");                         // 4. 情報発生中避難所
+    fprintf(pipe, "'-' with points pt 7 ps 2.2 lc 'red' notitle");                              // 5. 車両
 
     // ドローンレイヤーは台数が1台以上の場合のみ追加
     if (ND > 0)
@@ -892,7 +909,9 @@ void plot_frame(FILE *pipe, double stop_coords[][2], double vehicle_x, double ve
         double display_x_demand = stop_coords[i][0] + supply_offset;
         double display_y_demand = stop_coords[i][1] - 300.0; // 最下段
 
+        // 各避難所でそれぞれの物資の配送量と要求物資の数値を表示
         // 物資Aの数値表示（青色）- 常に表示
+        /*
         fprintf(pipe, "set label 'A:%.0f' at %.1f,%.1f tc rgb '#0000FF' font ',11'\n",
                 shelter_supplies[i - 1].supply_a, display_x_a, display_y_a);
 
@@ -903,6 +922,7 @@ void plot_frame(FILE *pipe, double stop_coords[][2], double vehicle_x, double ve
         // 余剰物資Bの数値表示（紫色）- 常に表示
         fprintf(pipe, "set label 'ExB:%.0f' at %.1f,%.1f tc rgb '#800080' font ',11'\n",
                 shelter_supplies[i - 1].extra_supply_b, display_x_extra, display_y_extra);
+        */
 
         // 要求余剰物資Bの数値表示（オレンジ色）- 要求がある場合のみ表示
         if (current_demand > 0.0)
@@ -1518,6 +1538,9 @@ int main(void)
         printf("\nシミュレーションを開始します（GIF出力なし）...\n");
     }
     printf("円の半径: %.1f m, 車両速度: %.2f m/s, 拠点数: %d\n", R, V, TOTAL_STOPS);
+
+    // === シミュレーションモデル構造図をPNG出力 ===
+    save_simulation_model_png(stop_coords);
 
     /********************** 【メインシミュレーションループ開始】 *********************************************************************************************/
     // 指定された周回数（NT）まで車両の巡回を継続
@@ -2440,4 +2463,80 @@ int main(void)
     }
 
     return 0;
+}
+
+/**
+ * @brief シミュレーションモデルの静的構造をPNGファイルとして保存
+ *
+ * 【表示内容】
+ * - 集積所（中心の赤い四角）
+ * - 避難所（円周上の青い円）
+ * - 道路（円形の経路と集積所への接続線）
+ * - 座標軸とラベル
+ *
+ * @param stop_coords 停止地点座標配列
+ */
+void save_simulation_model_png(double stop_coords[][2])
+{
+    FILE *pipe = popen("gnuplot -persist", "w");
+    if (pipe == NULL)
+    {
+        printf("エラー: gnuplotの起動に失敗しました\n");
+        return;
+    }
+
+    double plot_range = R * 1.2;
+
+    // PNG出力設定
+    // fprintf(pipe, "set terminal png size 800,600 font 'Arial,12'\n");
+    fprintf(pipe, "set terminal png size 800,600 font 'DejaVu Sans,12'\n");
+    fprintf(pipe, "set output 'simulation_model.png'\n");
+
+    // プロット範囲をGIFと同じに設定（600x600の範囲）
+    fprintf(pipe, "set xrange [%.1f:%.1f]\n", -plot_range, plot_range);
+    fprintf(pipe, "set yrange [%.1f:%.1f]\n", -plot_range, plot_range);
+
+    // 軸とグリッドの設定
+    fprintf(pipe, "set xlabel 'X (m)'\n");
+    fprintf(pipe, "set ylabel 'Y (m)'\n");
+    fprintf(pipe, "set title 'Simulation Model'\n");
+    // fprintf(pipe, "set grid\n");
+    fprintf(pipe, "set size ratio 1\n");
+
+    // 凡例を無効にする
+    fprintf(pipe, "unset key\n");
+
+    // 道路（円形経路）の描画
+    fprintf(pipe, "set parametric\n");
+    fprintf(pipe, "set trange [0:2*pi]\n");
+    fprintf(pipe, "set samples 100\n");
+
+    // 複数のプロットを一度に描画
+    fprintf(pipe, "plot ");
+
+    // 1. 円形道路
+    fprintf(pipe, "%.1f*cos(t), %.1f*sin(t) with lines linewidth 3 linecolor rgb '#808080' notitle, ",
+            R, R);
+
+    // 2. 集積所
+    fprintf(pipe, "'-' with points pointtype 5 pointsize 3 linecolor rgb '#FF00FF' notitle, ");
+
+    // 3. 避難所
+    fprintf(pipe, "'-' with points pointtype 7 pointsize 2 linecolor rgb '#0000FF' notitle\n");
+
+    // 集積所データ
+    fprintf(pipe, "%.1f %.1f\n", stop_coords[0][0], stop_coords[0][1]);
+    fprintf(pipe, "e\n");
+
+    // 避難所データ
+    for (int i = 1; i <= NS; i++)
+    {
+        fprintf(pipe, "%.1f %.1f\n", stop_coords[i][0], stop_coords[i][1]);
+    }
+    fprintf(pipe, "e\n");
+
+    fflush(pipe);
+    pclose(pipe);
+
+    printf("シミュレーションモデル構造図を 'simulation_model.png' として保存しました\n");
 }
