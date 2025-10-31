@@ -113,11 +113,11 @@ current_directory = os.getcwd()
 print("現在のカレントディレクトリ:", current_directory)
 
 # 新しいファイルのパスを指定（windowsのlinux仮想環境で実行する場合には「pyhtonfile/...」の前に「Automation/」を追加!!!）
-points_file_path = os.path.join(current_directory, "Automation/pythonfile/points.txt")
-adjacency_matrix_file_path = os.path.join(current_directory, "Automation/pythonfile/adjacency_matrix.txt")
-plot_image_path = os.path.join(current_directory, "Automation/pythonfile/network_plot.png")
-jyunkairo_image_path = os.path.join(current_directory, "Automation/pythonfile/jyunkairo_plot.png")
-tsp_result_file_path = os.path.join(current_directory, "Automation/pythonfile/tsp_result.txt")
+points_file_path = os.path.join(current_directory, "pythonfile/points.txt")
+adjacency_matrix_file_path = os.path.join(current_directory, "pythonfile/adjacency_matrix.txt")
+plot_image_path = os.path.join(current_directory, "pythonfile/network_plot.png")
+jyunkairo_image_path = os.path.join(current_directory, "pythonfile/jyunkairo_plot.png")
+tsp_result_file_path = os.path.join(current_directory, "pythonfile/tsp_result.txt")
 
 # plot_image_path = os.path.join(network_directory, "network_plot.png")
 

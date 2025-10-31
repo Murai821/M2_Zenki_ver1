@@ -7,7 +7,7 @@
     //分割コンパイルがコードランナーでできるように変更
     "code-runner.executorMap": {
         //"c": "cd $dir && gcc $fileName module.c -o my_program -lm && ./my_program",
-        "c": "cd $dir && gcc $fileName -o my_program -lm && ./my_program", //simple.cの実行
+        "c": "cd $dir && gcc $fileName module.c -o my_program -lm && ./my_program", //simple.cの実行
         "python": "cd $dir && python3 $fileName",
         "sh": "bash"
     },

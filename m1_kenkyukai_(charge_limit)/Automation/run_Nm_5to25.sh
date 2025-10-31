@@ -17,6 +17,8 @@ do
 
   # 特定ディレクトリ内の「Etd_data.txt」ファイルを初期化
   > drone_datafile/txtfile/Etd_data.txt
+  > drone_datafile/txtfile/Etg_data.txt
+  > drone_datafile/txtfile/Eti_data.txt
   > drone_datafile/txtfile/flight_ave.txt
   > drone_datafile/txtfile/TV_chargeCount.txt
   > drone_datafile/txtfile/TV_chargeAmount.txt
@@ -44,6 +46,10 @@ do
 
   # Cプログラムをコンパイル
   gcc Etd_average_shell.c
+  ./a.out
+  gcc Etg_average_shell.c
+  ./a.out
+  gcc Eti_average_shell.c
   ./a.out
 
   gcc E_flight_time_average_shell.c
