@@ -47,6 +47,12 @@
  * 10/22：手法5のバグ修正。運搬車両が避難所に到着したときに、ドローンがしきい値までの物資を配送を実施している場合に、正しく物資の運搬完了する判断できていなかった不具合を修正。
  *        ドローンが物資を運搬している時間のうち、少量の物資（FEW_SUPPLY_THRESHOLD）を運搬している割合を算出する統計処理追加
  *        ドローンが少ない物資を運搬している状態の判定を修正、ドローンが少量の物資を運搬をあきらめる条件を変更(drone_scheduled_amount < DRONE_MAX_CARRYなどの追加)
+ * 10/23: ①集積所でのドローンの物資積載量の決定に、「drone->supply_scheduled_amount」を使用するように変更
+ *        ②情報の検索の際に（for (int i = 0; i < info_count; i++)）、ドローンが自分の担当のインデックスの情報についてのみ処理するように変更（未配達情報が複数あるとき、先に発生した情報を参照してしまう）
+ *        -> done[].delivery_info_indexを使用して、ドローンが担当する情報のみ処理するように変更
+ *       ③手法2において、あとからやってきた車が情報を検索する caluculate_drone_transport_amount 関数に、情報のインデックスの引数を追加し、正しい情報に基づいて運搬量を計算するように変更
+ *       ④手法5に手法2を適用できるように変更
+ * a
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -68,7 +74,7 @@
 #define NS 10        // 避難所の数（集積所除く）
 #define NDI 1        // 集積所の数
 #define NT 2         // シミュレーションの周回数
-#define ND 7         // ドローンの台数（0の場合はドローンなし、最大制限なし）
+#define ND 3         // ドローンの台数（0の場合はドローンなし、最大制限なし）
 #define NV 2         // 車両の台数（複数台対応）
 #define ENABLE_GIF 1 // GIF出力の有効/無効 (1:有効, 0:無効) | 処理軽量化用
 
@@ -103,7 +109,7 @@
 #define DELIVERY_METHOD_COORDINATE 1  // 手法2：車両がドローンの運搬状況を考慮：手法1の延長（避難所に到着し、ドローンが運搬中であるなら残りの余剰物資を避難所に届ける）
 #define DELIVERY_METHOD_MULTI_DRONE 2 // 手法3：複数ドローンによる協調運搬(あるドローンが避難所で余剰物資Bを運搬中のとき、他のドローンが来たらそのドローンも協調して運搬する)
 #define DELIVERY_COORDINATATE_FLAG 0  // 手法4：手法3に手法2を適用するかを制御するフラグ（1:適用, 0:非適用）
-#define DELIVERY_THRESHOLD_FLAG 1     // 手法5：しきい値配送フラグ（1:適用, 0:非適用）
+#define DELIVERY_THRESHOLD_FLAG 0     // 手法5：しきい値配送フラグ（1:適用, 0:非適用）
 // #define DELIVERY_METHOD DELIVERY_METHOD_IGNORE // 手法1を使用
 //   #define DELIVERY_METHOD DELIVERY_METHOD_COORDINATE // 手法2を使用
 #define DELIVERY_METHOD DELIVERY_METHOD_MULTI_DRONE // 手法3を使用
@@ -228,7 +234,7 @@ double generate_extra_supply_demand();
 int calculate_required_trips(double demand);
 void update_drone_state(DroneInfo *drone, DroneInfo drones[], int drone_count, double stop_coords[][2], double elapsed_time, double time_step, Info *info_list, int info_count, ShelterSupply *shelter_supplies, double *total_extra_supply_by_drone, int *drone_delivery_count);
 void update_drone_flight_time(DroneInfo *drone, double current_time, DroneState new_state);
-double calculate_drone_transport_amount(DroneInfo drones[], int drone_count, int shelter_id, Info *info_list, int info_count);
+double calculate_drone_transport_amount(DroneInfo drones[], int drone_count, int shelter_id, Info *info_list, int info_count, int info_index);
 double calculate_all_drones_transport_amount(DroneInfo *drone, DroneInfo drones[], int drone_count, int shelter_id, Info *info_list, int info_count);
 double get_other_drones_carrying_sum(DroneInfo *current_drone, DroneInfo drones[], int drone_count, int shelter_id, Info *info_list, int info_count);
 int should_drone_join_transport(DroneInfo *drone, DroneInfo drones[], int drone_count, int shelter_id, Info *info_list, int info_count);
@@ -600,7 +606,7 @@ void update_drone_state(DroneInfo *drone, DroneInfo drones[], int drone_count, d
             // 余剰物資Bを配送
             for (int i = 0; i < info_count; i++)
             {
-                if (info_list[i].shelter_id == drone->target_shelter && !info_list[i].delivery_completed && ((DELIVERY_METHOD != DELIVERY_METHOD_MULTI_DRONE && drone->delivery_info_index == i) || (DELIVERY_METHOD == DELIVERY_METHOD_MULTI_DRONE)) && info_list[i].threshold_delivery_wait_flag == 0) // delivery_completedフラグが立っていない場合(手法1,2のみ情報のインデックス参照)
+                if (info_list[i].shelter_id == drone->target_shelter && !info_list[i].delivery_completed && ((DELIVERY_METHOD != DELIVERY_METHOD_MULTI_DRONE && drone->delivery_info_index == i) || (DELIVERY_METHOD == DELIVERY_METHOD_MULTI_DRONE)) && info_list[i].threshold_delivery_wait_flag == 0 && drone->delivery_info_index == i) // delivery_completedフラグが立っていない場合(手法1,2のみ情報のインデックス参照)
                 {
                     drone->supply_scheduled_amount = 0; // 配送予定物資量リセット
 
@@ -825,7 +831,7 @@ void update_drone_flight_time(DroneInfo *drone, double current_time, DroneState 
 /**
  * @brief ドローンによる指定避難所への余剰物資B運搬量を計算する関数
  *
- * この関数は、指定された避難所に対してドローンが運搬中または運搬予定の
+ * この関数は、指定された避難所に対して、指定のインデックスの情報に対してドローンが運搬中または運搬予定の
  * 余剰物資B量を計算します。
  * 車両が配送量を決定する際に使用します。(手法２に使用)
  *
@@ -836,19 +842,20 @@ void update_drone_flight_time(DroneInfo *drone, double current_time, DroneState 
  * @param info_count 情報数
  * @return ドローンによる運搬量（運搬中+運搬予定）
  */
-double calculate_drone_transport_amount(DroneInfo drones[], int drone_count, int shelter_id, Info *info_list, int info_count)
+double calculate_drone_transport_amount(DroneInfo drones[], int drone_count, int shelter_id, Info *info_list, int info_count, int info_index)
 {
     double drone_transport_amount = 0.0;
 
     // 指定避難所の情報を検索
     for (int i = 0; i < info_count; i++)
     {
-        if (info_list[i].shelter_id == shelter_id && !info_list[i].delivery_completed)
+        if (info_list[i].shelter_id == shelter_id && !info_list[i].delivery_completed && info_index == i)
         {
             // この避難所に対して運搬中のドローンを検索
             for (int j = 0; j < drone_count; j++)
             {
-                if (drones[j].active && drones[j].target_shelter == shelter_id)
+                // 未配達の情報が対象、アクティブ、同一避難所対象のドローンをチェック
+                if (drones[j].active && drones[j].target_shelter == shelter_id && drones[j].delivery_info_index == i)
                 {
                     // ドローンの状態に応じて運搬量を計算
                     switch (drones[j].state)
@@ -941,7 +948,7 @@ int should_drone_join_transport(DroneInfo *drone, DroneInfo drones[], int drone_
             for (int j = 0; j < drone_count; j++)
             {
                 // アクティブ、同一避難所対象、現在のドローン以外の条件チェック
-                if (drones[j].active && drones[j].target_shelter == shelter_id && &drones[j] != drone)
+                if (drones[j].active && drones[j].target_shelter == shelter_id && &drones[j] != drone && drones[j].delivery_info_index == i)
                 {
                     // ドローンの状態に応じて運搬量を計算
                     switch (drones[j].state)
@@ -1024,7 +1031,7 @@ int should_drone_join_transport(DroneInfo *drone, DroneInfo drones[], int drone_
                     // debug
                     if (shelter_id == 5)
                     {
-                        printf("aaaaaaaaaaaaaaaaaaaa t = %.1f:避難所[%d] ドローン[] の運搬予定量: %.2f kg\n", shelter_id, drone->supply_scheduled_amount);
+                        // printf("aaaaaaaaaaaaaaaaaaaa t = %.1f:避難所[%d] ドローン[] の運搬予定量: %.2f kg\n", shelter_id, drone->supply_scheduled_amount);
                     }
 
                     drone->delivery_info_index = i; // 物資運搬情報のインデックスを設定
@@ -1067,7 +1074,7 @@ double calculate_all_drones_transport_amount(DroneInfo *drone, DroneInfo drones[
             // この避難所に対して運搬中のドローンを検索
             for (int j = 0; j < drone_count; j++)
             {
-                if (drones[j].active && drones[j].target_shelter == shelter_id && &drones[j] != drone)
+                if (drones[j].active && drones[j].target_shelter == shelter_id && &drones[j] != drone && drones[j].delivery_info_index == i)
                 {
                     // ドローンの状態に応じて運搬量を計算
                     switch (drones[j].state)
@@ -1158,7 +1165,14 @@ double get_other_drones_carrying_sum(DroneInfo *current_drone, DroneInfo drones[
             for (int j = 0; j < drone_count; j++)
             {
                 // アクティブで、現在のドローンではなく、同じ避難所を対象としている場合
+                /*
                 if (drones[j].active && &drones[j] != current_drone &&
+                    drones[j].target_shelter == shelter_id)
+                {
+                    total_carrying += drones[j].carrying_extra_supply;
+                }*/
+                if (drones[j].delivery_info_index == i &&
+                    drones[j].active && &drones[j] != current_drone &&
                     drones[j].target_shelter == shelter_id)
                 {
                     total_carrying += drones[j].carrying_extra_supply;
@@ -1840,6 +1854,57 @@ int main(void)
                     }
                 }
 
+                // ====== 手法5　閾値までの物資はドローンが運搬し、残りの物資は物資運搬車両が担当する ====
+                for (int i = 0; i < info_count; i++)
+                {
+                    // 現在の避難所において
+                    if (info_list[i].shelter_id == current_stop_idx[0])
+                    {
+                        // === 【車両による余剰物資B配送処理】 ===
+                        // 車両に余剰物資Bの残量があり、ドローンによる配送が未完了の場合のみ実行
+                        if (supply_vehicle[0].remaining_extra_supply_b > 0 && !info_list[i].delivery_completed && !info_list[i].threshold_completed_flag && info_list[i].extra_supply_demand > info_list[i].extra_supply_delivered)
+                        {
+
+                            double delivery_amount = 0.0;
+
+                            if (DELIVERY_THRESHOLD_FLAG || info_list[i].threshold_delivery_wait_flag == 1) // 手法５適用するとき
+                            {
+                                delivery_amount = info_list[i].threshold_remaining_amount; // 閾値以上の物資量を物資運搬車両の担当する量として定義
+                                // === 配送の実行 ===
+                                if (delivery_amount > 0)
+                                {
+                                    shelter_supplies[current_stop_idx[0] - 1].extra_supply_b += delivery_amount; // 避難所在庫増加
+                                    supply_vehicle[0].remaining_extra_supply_b -= delivery_amount;
+                                    info_list[i].extra_supply_delivered += delivery_amount;
+
+                                    // === 車両による余剰物資B運搬統計の更新 ===
+                                    total_extra_supply_by_vehicle += delivery_amount;
+                                    vehicle_delivery_count++;
+
+                                    // この避難所で現在物資を運搬しているドローンの物資量を算出
+                                    double drone_transport_amount = calculate_drone_transport_amount(drones, ND, current_stop_idx[0], info_list, info_count, i);
+
+                                    if (drone_transport_amount == 0) // 物資運搬車両が到着したときに、ドローンが運搬中の物資量が0kgの場合、すなわち運搬車両が最後に閾値以上の残りの物資をとどけるとき
+                                    {
+                                        info_list[i].delivery_completed = 1;
+                                        info_list[i].delivery_completion_time = elapsed_time;
+                                        info_list[i].threshold_completed_flag = 1;      // 閾値以上の残りの物資配送完了フラグを設定
+                                        info_list[i].threshold_delivery_wait_flag = -1; // 閾値配送待機フラグを解除
+                                        printf(" 運搬車両：余剰物資Bの閾値以上の物資配送: %.0fkg配送（需要完了）\n", delivery_amount);
+                                    }
+                                    else // 物資運搬車両が閾値以上の残りの物資を、ドローンが運搬中の物資より先に届ける場合
+                                    {
+                                        info_list[i].threshold_completed_flag = 1;      // 閾値以上の残りの物資配送完了フラグを設定
+                                        info_list[i].threshold_delivery_wait_flag = -1; // 閾値配送待機フラグを解除
+                                    }
+
+                                    // break;
+                                }
+                            }
+                        }
+                    }
+                }
+
                 //  ====== 手法２：避難所の情報は回収済みだが、ドローンによる余剰物資B配送が未完了のときに車両が到着した場合(手法2:すべてドローンに任せるのではなく車両がのこりの物資を運搬する)
                 for (int i = 0; i < info_count; i++)
                 {
@@ -1848,7 +1913,7 @@ int main(void)
                     {
                         // === 【車両による余剰物資B配送処理】 ===
                         // 車両に余剰物資Bの残量があり、ドローンによる配送が未完了の場合のみ実行
-                        if (supply_vehicle[0].remaining_extra_supply_b > 0 && !info_list[i].delivery_completed && info_list[i].extra_supply_demand > info_list[i].extra_supply_delivered)
+                        if (supply_vehicle[0].remaining_extra_supply_b > 0 && !info_list[i].delivery_completed && info_list[i].extra_supply_demand > info_list[i].extra_supply_delivered && info_list[i].threshold_delivery_wait_flag == 0)
                         {
 
                             double delivery_amount = 0.0;
@@ -1857,7 +1922,7 @@ int main(void)
                             {
                                 // === 手法２：ドローンの運搬状況を考慮 ===
                                 // ドローンによる運搬量（運搬中+運搬予定）を計算
-                                double drone_transport_amount = calculate_drone_transport_amount(drones, ND, current_stop_idx[0], info_list, info_count);
+                                double drone_transport_amount = calculate_drone_transport_amount(drones, ND, current_stop_idx[0], info_list, info_count, i);
 
                                 // 車両が配送すべき量 = 需要量 - 既配送量 - ドローン運搬量
                                 double remaining_demand = info_list[i].extra_supply_demand - info_list[i].extra_supply_delivered - drone_transport_amount;
@@ -1891,62 +1956,11 @@ int main(void)
                                                delivery_amount, info_list[i].extra_supply_demand - info_list[i].extra_supply_delivered);
                                     }
 
-                                    break;
+                                    // break;
                                 }
                                 else
                                 {
                                     printf("  余剰物資B配送: ドローンが運搬中のため車両配送スキップ\n");
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // ====== 手法5　閾値までの物資はドローンが運搬し、残りの物資は物資運搬車両が担当する ====
-                for (int i = 0; i < info_count; i++)
-                {
-                    // 現在の避難所において
-                    if (info_list[i].shelter_id == current_stop_idx[0])
-                    {
-                        // === 【車両による余剰物資B配送処理】 ===
-                        // 車両に余剰物資Bの残量があり、ドローンによる配送が未完了の場合のみ実行
-                        if (supply_vehicle[0].remaining_extra_supply_b > 0 && !info_list[i].delivery_completed && !info_list[i].threshold_completed_flag && info_list[i].extra_supply_demand > info_list[i].extra_supply_delivered)
-                        {
-
-                            double delivery_amount = 0.0;
-
-                            if (DELIVERY_THRESHOLD_FLAG || info_list[i].threshold_delivery_wait_flag == 1) // 手法５適用するとき
-                            {
-                                delivery_amount = info_list[i].threshold_remaining_amount; // 閾値以上の物資量を物資運搬車両の担当する量として定義
-                                // === 配送の実行 ===
-                                if (delivery_amount > 0)
-                                {
-                                    shelter_supplies[current_stop_idx[0] - 1].extra_supply_b += delivery_amount; // 避難所在庫増加
-                                    supply_vehicle[0].remaining_extra_supply_b -= delivery_amount;
-                                    info_list[i].extra_supply_delivered += delivery_amount;
-
-                                    // === 車両による余剰物資B運搬統計の更新 ===
-                                    total_extra_supply_by_vehicle += delivery_amount;
-                                    vehicle_delivery_count++;
-
-                                    // この避難所で現在物資を運搬しているドローンの物資量を算出
-                                    double drone_transport_amount = calculate_drone_transport_amount(drones, ND, current_stop_idx[0], info_list, info_count);
-
-                                    if (drone_transport_amount == 0) // 物資運搬車両が到着したときに、ドローンが運搬中の物資量が0kgの場合、すなわち運搬車両が最後に閾値以上の残りの物資をとどけるとき
-                                    {
-                                        info_list[i].delivery_completed = 1;
-                                        info_list[i].delivery_completion_time = elapsed_time;
-                                        info_list[i].threshold_completed_flag = 1;      // 閾値以上の残りの物資配送完了フラグを設定
-                                        info_list[i].threshold_delivery_wait_flag = -1; // 閾値配送待機フラグを解除
-                                        printf(" 運搬車両：余剰物資Bの閾値以上の物資配送: %.0fkg配送（需要完了）\n", delivery_amount);
-                                    }
-                                    else // 物資運搬車両が閾値以上の残りの物資を、ドローンが運搬中の物資より先に届ける場合
-                                    {
-                                        info_list[i].threshold_completed_flag = 1;      // 閾値以上の残りの物資配送完了フラグを設定
-                                        info_list[i].threshold_delivery_wait_flag = -1; // 閾値配送待機フラグを解除
-                                    }
-
-                                    // break;
                                 }
                             }
                         }

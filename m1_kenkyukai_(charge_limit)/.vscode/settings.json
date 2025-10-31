@@ -1,0 +1,14 @@
+{
+    /*
+    "files.associations": {
+        "header.h": "c"
+    }
+    */
+    //分割コンパイルがコードランナーでできるように変更
+    "code-runner.executorMap": {
+        //"c": "cd $dir && gcc main.c module.c -o my_program -lm && ./my_program"
+        "c": "cd $dir && gcc main_noGIF.c module.c -o my_program -lm && ./my_program"
+    },
+    "code-runner.fileDirectoryAsCwd": true,
+    "code-runner.saveFileBeforeRun": true
+}
