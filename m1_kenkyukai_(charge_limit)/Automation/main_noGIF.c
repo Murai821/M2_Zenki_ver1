@@ -39,153 +39,26 @@ int main(void)
     vehicle v[M]; // 配送車の宣言
     dro drone[D]; // ドローンの宣言
 
-    // 配送センターの座標初期化
-    p[0].x = L / 2;
-    p[0].y = L / 2;
+    /************* 構造体の初期化 ************/
 
-    p[0].re = 0;
-
-    for (i = 0; i < N; i++)
+    // 配送センター初期化
+    init_point(&p[0], L / 2, L / 2, INITIAL_BATTERY_COUNT);
+    // 避難所の初期化 i=0は集積所のため省く
+    for (i = 1; i < N; i++)
     {
-        p[0].i_ptr[i] = 0;
-    }
-
-    for (i = 0; i < N; i++)
-    {
-        for (j = 0; j < I_SIZE; j++)
-        {
-            p[0].inf[i][j] = 0;
-        }
-    }
-
-    // 避難所の要素初期化 i=0は集積所のため省く
-    /*中心市街地*/
-    for (i = 1; i < C_N; i++)
-    {
-        // 一度ランダムに生成
-        p[i].x = (double)rand() / RAND_MAX * (2 * R);
-        p[i].y = (double)rand() / RAND_MAX * (2 * R);
-        p[i].x += L / 2 - R; // 中心をL/2に修正
-        p[i].y += L / 2 - R;
-
-        while (retDis(p[0].x, p[0].y, p[i].x, p[i].y) > R) // 中心市街地内に生成されるまで繰り返す
-        {
-            p[i].x = (double)rand() / RAND_MAX * (2 * R);
-            p[i].y = (double)rand() / RAND_MAX * (2 * R);
-
-            p[i].x += L / 2 - R; // 中心をL/2に修正
-            p[i].y += L / 2 - R;
-        }
-
-        p[i].re = 0;
-
-        for (j = 0; j < N; j++)
-        {
-            p[i].i_ptr[j] = 0;
-        }
-
-        for (j = 0; j < N; j++)
-        {
-            for (k = 0; k < I_SIZE; k++)
-            {
-                p[i].inf[j][k] = 0;
-            }
-        }
-    }
-    /*山間部の避難所初期化*/
-    for (i = C_N; i < N; i++)
-    {
-        p[i].x = L / 2; // 初期値
-        p[i].y = L / 2;
-
-        while (retDis(p[0].x, p[0].y, p[i].x, p[i].y) < (R + A_R)) // (R+A_R)の範囲外に生成されるまで繰り返す
-        {
-            // printf("i=%d : %f\n", i, retDis(p[0].x, p[0].y, p[i].x, p[i].y));
-            p[i].x = (double)rand() / RAND_MAX * L;
-            p[i].y = (double)rand() / RAND_MAX * L;
-        }
-
-        p[i].re = 0;
-
-        for (j = 0; j < N; j++)
-        {
-            p[i].i_ptr[j] = 0;
-        }
-
-        for (j = 0; j < N; j++)
-        {
-            for (k = 0; k < I_SIZE; k++)
-            {
-                p[i].inf[j][k] = 0;
-            }
-        }
+        init_point(&p[i], 0, 0, INITIAL_BATTERY_COUNT);
     }
 
     // 配送車初期化
     for (i = 0; i < M; i++)
     {
-        v[i].x = L / 2;
-        v[i].y = L / 2;
-
-        v[i].re = 0;
-
-        v[i].next_wait_flag = FALSE;
-
-        for (j = 0; j < N; j++)
-        {
-            v[i].i_ptr[j] = 0;
-        }
-
-        for (j = 0; j < N; j++)
-        {
-            for (k = 0; k < I_SIZE; k++)
-            {
-                v[i].inf[j][k] = 0;
-            }
-        }
-
-        v[i].drone_charge_count = 0;
-
-        v[i].charge_amount = 0;
-
-        v[i].chargeable_flag = TRUE;
+        init_vehicle(&v[i], L / 2, L / 2, DELIVERY_BATTERY_COUNT * ((N - 1) / M) + ADDITIONAL_BATTERY_COUNT);
     }
 
     // ドローン初期化
     for (i = 0; i < D; i++)
     {
-        drone[i].x = L / 2;
-        drone[i].y = L / 2;
-
-        drone[i].xt = 0;
-        drone[i].yt = 0;
-
-        drone[i].re = 0;
-
-        drone[i].wait_flag = FALSE;
-
-        for (j = 0; j < N; j++)
-        {
-            drone[i].i_ptr[j] = 0;
-        }
-
-        for (j = 0; j < N; j++)
-        {
-            for (k = 0; k < I_SIZE; k++)
-            {
-                drone[i].inf[j][k] = 0;
-            }
-        }
-
-        drone[i].follow_num = 0;
-
-        drone[i].target_num = 1;
-
-        drone[i].free_mode = FALSE;
-
-        drone[i].charge_time = 0;
-
-        drone[i].flight_start_time = 0;
+        init_dro(&drone[i], i % M, (i % M) + 1); // 配送車[i%M]の巡回路に従い、目標巡回路は i%M + 1とする
     }
 
     /*********************************************** pythonの出力ファイルから点の「座標」と「隣接行列」を読み込む **************************************************************************/

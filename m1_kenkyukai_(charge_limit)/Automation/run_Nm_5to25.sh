@@ -8,7 +8,7 @@ end_seed=90
 # Nmの範囲を設定
 start_Nm=5 #開始山間部避難所数
 end_Nm=30 #終了山間部避難所数
-step_Nm=5
+step_Nm=25
 
 # シード値を変更しながら実行
 for Nm in $(seq $start_Nm $step_Nm $end_Nm)

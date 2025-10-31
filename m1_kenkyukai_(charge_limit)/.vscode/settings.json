@@ -6,9 +6,15 @@
     */
     //分割コンパイルがコードランナーでできるように変更
     "code-runner.executorMap": {
-        //"c": "cd $dir && gcc main.c module.c -o my_program -lm && ./my_program"
-        "c": "cd $dir && gcc main_noGIF.c module.c -o my_program -lm && ./my_program"
+        //"c": "cd $dir && gcc $fileName module.c -o my_program -lm && ./my_program",
+        "c": "cd $dir && gcc $fileName -o my_program -lm && ./my_program", //simple.cの実行
+        "python": "cd $dir && python3 $fileName",
+        "sh": "bash"
     },
     "code-runner.fileDirectoryAsCwd": true,
-    "code-runner.saveFileBeforeRun": true
+    "code-runner.saveFileBeforeRun": true,
+    "files.associations": {
+        "string.h": "c",
+        "stdlib.h": "c"
+    }
 }

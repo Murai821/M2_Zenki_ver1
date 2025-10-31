@@ -24,8 +24,9 @@ L = 10 #SAの大きさ
 d_limit = 4 #山間部避難所は rasius + d_limt より離れた場所に生成
 point_num = 51 #全部で生成する点の数
 center_point = (5, 5)  # 中央の点
-circle_radius = float(sys.argv[2])  # 円の半径：シェルスクリプトから受け取る
-num_points_outer = 5  # 円外の点の数
+#circle_radius = 4.5  # 円の半径
+circle_radius = float(sys.argv[3])  # 円の半径
+num_points_outer = int(sys.argv[2])  # 円外の点の数：シェルスクリプトから受け取る
 num_points_inner = point_num - num_points_outer  # 円内の点の数
 
 # ランダムシードを設定（この値を変更することによって生成する道路網をランダム生成）
