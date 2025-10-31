@@ -14,7 +14,7 @@ int main()
     inputFile = fopen(inputFilePath, "r");
     if (inputFile == NULL)
     {
-        printf("Etd_data.txt ファイルを開けませんでした。\n");
+        printf("Etg_data.txt ファイルを開けませんでした。\n");
         return 1;
     }
 
