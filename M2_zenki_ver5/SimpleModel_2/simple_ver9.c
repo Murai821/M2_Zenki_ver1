@@ -101,7 +101,7 @@
 #define TOTAL_SUPPLY_WEIGHT 10000.0                                // 物資運搬車両の総積載量 (kg)
 #define SUPPLY_A_RATIO 0.9                                         // 物資Aの割合（0.0〜1.0）
 #define SUPPLY_B_RATIO 0.1                                         // 物資Bの割合（0.0〜1.0）
-#define EXTRA_SUPPLY_B 1000.0                                      // 余剰分の物資B量 (kg)
+#define EXTRA_SUPPLY_B 99999.0                                     // 余剰分の物資B量 (kg)
 #define SUPPLY_PER_SHELTER (TOTAL_SUPPLY_WEIGHT / NS)              // 1避難所あたりの物資量 (kg)
 #define SUPPLY_A_PER_SHELTER (SUPPLY_PER_SHELTER * SUPPLY_A_RATIO) // 1避難所あたりの物資A量 (kg)
 #define SUPPLY_B_PER_SHELTER (SUPPLY_PER_SHELTER * SUPPLY_B_RATIO) // 1避難所あたりの物資B量 (kg)

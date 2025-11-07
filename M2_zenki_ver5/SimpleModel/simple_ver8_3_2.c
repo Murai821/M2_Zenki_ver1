@@ -52,6 +52,7 @@
  *        -> done[].delivery_info_indexを使用して、ドローンが担当する情報のみ処理するように変更
  *       ③手法2において、あとからやってきた車が情報を検索する caluculate_drone_transport_amount 関数に、情報のインデックスの引数を追加し、正しい情報に基づいて運搬量を計算するように変更
  *       ④手法5に手法2を適用できるように変更
+ * 11/6日:物資運搬車両上の余剰物資の積載量を無限に設定
  * a
  */
 #include <stdio.h>
@@ -73,8 +74,8 @@
 // === シミュレーション設定 ===
 #define NS 10        // 避難所の数（集積所除く）
 #define NDI 1        // 集積所の数
-#define NT 2         // シミュレーションの周回数
-#define ND 3         // ドローンの台数（0の場合はドローンなし、最大制限なし）
+#define NT 5         // シミュレーションの周回数
+#define ND 1         // ドローンの台数（0の場合はドローンなし、最大制限なし）
 #define NV 2         // 車両の台数（複数台対応）
 #define ENABLE_GIF 1 // GIF出力の有効/無効 (1:有効, 0:無効) | 処理軽量化用
 
@@ -91,15 +92,15 @@
 #define T_DRONE_STOP (10 * 60)    // ドローンの停止時間 (s) | 10分=600秒（集積所・避難所共通）
 #define DRONE_MAX_CARRY 30.0      // ドローンの最大積載量 (kg)
 #define FEW_SUPPLY_THRESHOLD 10.0 // 少量物資運搬の閾値 (kg)
-#define MIN_EXTRA_DEMAND 30.0     // 余剰物資B需要量の最小値 (kg)
-#define MAX_EXTRA_DEMAND 90.0     // 余剰物資B需要量の最大値 (kg)
+#define MIN_EXTRA_DEMAND 90.0     // 余剰物資B需要量の最小値 (kg)
+#define MAX_EXTRA_DEMAND 180.0    // 余剰物資B需要量の最大値 (kg)
 #define THRESHOLD 0.70            // しきい値配送の閾値 (%)、需要量に対するドローン配送の保証割合
 
 // === 物資運搬車両システム ===
 #define TOTAL_SUPPLY_WEIGHT 10000.0                                // 物資運搬車両の総積載量 (kg)
 #define SUPPLY_A_RATIO 0.9                                         // 物資Aの割合（0.0〜1.0）
 #define SUPPLY_B_RATIO 0.1                                         // 物資Bの割合（0.0〜1.0）
-#define EXTRA_SUPPLY_B 1000.0                                      // 余剰分の物資B量 (kg)
+#define EXTRA_SUPPLY_B 99999.0                                     // 余剰分の物資B量 (kg) : 物資運搬車両は余剰物資Bを無制限に積載している想定
 #define SUPPLY_PER_SHELTER (TOTAL_SUPPLY_WEIGHT / NS)              // 1避難所あたりの物資量 (kg)
 #define SUPPLY_A_PER_SHELTER (SUPPLY_PER_SHELTER * SUPPLY_A_RATIO) // 1避難所あたりの物資A量 (kg)
 #define SUPPLY_B_PER_SHELTER (SUPPLY_PER_SHELTER * SUPPLY_B_RATIO) // 1避難所あたりの物資B量 (kg)

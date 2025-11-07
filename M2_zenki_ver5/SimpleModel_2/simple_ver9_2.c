@@ -76,8 +76,8 @@
 #define DETECTION_RADIUS 10.0      // ドローンの検出半径 (m) | 避難所近傍での情報検出・協調運搬判定用
 
 // === シミュレーション設定 ===
-#define NS 9         // 避難所の数（集積所除く）
-#define NDI 3        // 集積所の数(NV：物資運搬車両の台数と同じにする)
+#define NS 10        // 避難所の数（集積所除く）
+#define NDI 4        // 集積所の数(NV：物資運搬車両の台数と同じにする)
 #define NT 2         // シミュレーションの周回数
 #define ND 3         // ドローンの台数（0の場合はドローンなし、最大制限なし）
 #define NV 2         // 車両の台数（複数台対応）
@@ -104,7 +104,7 @@
 #define TOTAL_SUPPLY_WEIGHT NS * 1000.0                            // 物資運搬車両の総積載量 (kg)
 #define SUPPLY_A_RATIO 0.9                                         // 物資Aの割合（0.0〜1.0）
 #define SUPPLY_B_RATIO 0.1                                         // 物資Bの割合（0.0〜1.0）
-#define EXTRA_SUPPLY_B 1000.0                                      // 余剰分の物資B量 (kg)
+#define EXTRA_SUPPLY_B 99999.0                                     // 余剰分の物資B量 (kg): 物資運搬車両は余剰物資Bを無制限に積載している想定
 #define SUPPLY_PER_SHELTER (TOTAL_SUPPLY_WEIGHT / NS)              // 1避難所あたりの物資量 (kg)
 #define SUPPLY_A_PER_SHELTER (SUPPLY_PER_SHELTER * SUPPLY_A_RATIO) // 1避難所あたりの物資A量 (kg)
 #define SUPPLY_B_PER_SHELTER (SUPPLY_PER_SHELTER * SUPPLY_B_RATIO) // 1避難所あたりの物資B量 (kg)
@@ -1704,10 +1704,12 @@ int main(void)
     int dis_idx[NDI] = {0}; // 集積所のcurrent_stop_idx
     if (NDI > 1)
     {
-        int radix = TOTAL_STOPS / NDI;
+        double radix = (double)TOTAL_STOPS / (double)NDI; // 集積所配置の基数
+        // printf("集積所インデックス配置(radix=%.2f): ", radix);
         for (int i = 0; i < NDI; i++)
         {
-            dis_idx[i] = i * radix; // 集積所を均等配置
+            // dis_idx[i] = i * radix; // 集積所を均等配置
+            dis_idx[i] = (int)((double)i * radix); // 集積所を均等配置(NSとNDIの関係で割り切れない場合は整数化)
         }
     }
 
