@@ -57,6 +57,9 @@
  *       dis_idx[NDI]に集積所のindexを格納し、都度参照し、避難所と集積所の混合インデックスの判別に利用(例: NS=9, NDI=3の場合、dis_idx[0]=0, dis_idx[1]=4, dis_idx[2]=8)
  *       今後：①ドローンが最寄りの集積所に行くように、②車を複数台にした場合のsupply_vehicle[0]のfor文に修正
  * 10/30: ドローンが最寄りの集積所に向かう処理を追加実装(DRONE_FLY_TO_NEAREST_DEPOTフラグで制御)
+ * 11/11: 物資運搬車両の集積所での物資積載時間を集積所数NDIに応じた時間(30/NDI)になるように変更->運搬車両の一巡回時間は固定するため。避難所での荷降ろし時間はそのまま30分。
+ *
+ * プログラム：集積所を複数配置したときのドローンと物資運搬車両のシミュレーション（物資運搬車両は一台、ドローン複数）、ドローンは最寄りの集積所に向かう
  *
  */
 #include <stdio.h>
@@ -72,7 +75,8 @@
 #define R 3000.0                   // 円の半径 (m) | 実スケール3km
 #define V (10000.0 / 3600.0)       // 車両の速度 (m/s) | 10km/h → 2.78m/s
 #define V_DRONE (20000.0 / 3600.0) // ドローンの速度 (m/s) | 20km/h → 5.56m/s（車両の2倍）
-#define T_STOP (30 * 60)           // 各拠点での停止時間 (s) | 30分=1800秒
+#define T_STOP (30 * 60)           // 各避難所での停止時間 (s) | 30分=1800秒
+#define T_STOP_DIS (30 * 60) / NDI // 各集積所での停止時間 (s) | 30分=1800秒/NDI
 #define DETECTION_RADIUS 10.0      // ドローンの検出半径 (m) | 避難所近傍での情報検出・協調運搬判定用
 
 // === シミュレーション設定 ===
@@ -2159,7 +2163,17 @@ int main(void)
             // 停止期間中も時間を進めてドローンの位置更新と描画を実行
             // 集積所、避難所問わず、車両が停止時間中はドローンの状態更新を行う
             double stop_start_time = elapsed_time;
-            double stop_end_time = elapsed_time + T_STOP;
+            double stop_end_time = 0.0;
+
+            // 集積所に停止する場合
+            if (is_depot) // current_stop_idx[0] == 0
+            {
+                stop_end_time = elapsed_time + T_STOP_DIS;
+            }
+            else // 避難所に停止する場合
+            {
+                stop_end_time = elapsed_time + T_STOP; //
+            }
 
             // 停止時間が終了するまでのループ
             while (elapsed_time < stop_end_time)
@@ -2844,6 +2858,19 @@ int main(void)
 
         fclose(numerical_data_file);
         printf("数値データをResults/numerical_data.txtに追記しました\n");
+
+        // === E(Tr).txt ファイルの出力（Tr平均値のみ） ===
+        FILE *tr_avg_file = fopen("Results/ETr.txt", "a");
+        if (tr_avg_file != NULL)
+        {
+            fprintf(tr_avg_file, "%.3f\n", tr_avg / 3600); // Tr平均値[hour]のみを出力
+            fclose(tr_avg_file);
+            printf("Tr平均値をResults/ETr.txtに追記しました\n");
+        }
+        else
+        {
+            printf("警告: ETr.txtファイルの作成に失敗しました\n");
+        }
     }
     else
     {
