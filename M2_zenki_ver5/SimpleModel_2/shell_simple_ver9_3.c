@@ -52,9 +52,18 @@
  *        -> done[].delivery_info_indexを使用して、ドローンが担当する情報のみ処理するように変更
  *       ③手法2において、あとからやってきた車が情報を検索する caluculate_drone_transport_amount 関数に、情報のインデックスの引数を追加し、正しい情報に基づいて運搬量を計算するように変更
  *       ④手法5に手法2を適用できるように変更
- * 11/6日:物資運搬車両上の余剰物資の積載量を無限に設定
+ * 10/28:集積所を複数にした場合に対応するように変更(集積所0から NS+NDI-1 まで集積所と避難所のindex混合に。
+ *       -> shelter_supplies[NS]をshelter_supplies[NS+NDI]に変更（避難所集積所混合、参照時に-1する処理を除去し、current_stop_idxと完全対応）)
+ *       dis_idx[NDI]に集積所のindexを格納し、都度参照し、避難所と集積所の混合インデックスの判別に利用(例: NS=9, NDI=3の場合、dis_idx[0]=0, dis_idx[1]=4, dis_idx[2]=8)
+ *       今後：①ドローンが最寄りの集積所に行くように、②車を複数台にした場合のsupply_vehicle[0]のfor文に修正
+ * 10/30: ドローンが最寄りの集積所に向かう処理を追加実装(DRONE_FLY_TO_NEAREST_DEPOTフラグで制御)
+ * 11/11: 物資運搬車両の集積所での物資積載時間を集積所数NDIに応じた時間(30/NDI)になるように変更->運搬車両の一巡回時間は固定するため。避難所での荷降ろし時間はそのまま30分。
+ * 11/15: 発生する情報における要求量が、緊急度の高い物資（ドローンとTV）と緊急度の低い物資L（TVのみ）の2種類になるように変更。
+ * 　　　　ドローンは情報を取得し，集積所に行くとその情報を共有し、集積所に到着したTVはそれをもとに物資積載
+ * 　　　　E(TL)が物資の運搬遅延時間、
  *
- * プログラム：手法５（閾値配送の検証プログラム）
+ * プログラム：集積所を複数配置したときのドローンと物資運搬車両のシミュレーション（物資運搬車両は一台、ドローン複数）、ドローンは最寄りの集積所に向かう
+ *
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -69,14 +78,15 @@
 #define R 3000.0                   // 円の半径 (m) | 実スケール3km
 #define V (10000.0 / 3600.0)       // 車両の速度 (m/s) | 10km/h → 2.78m/s
 #define V_DRONE (20000.0 / 3600.0) // ドローンの速度 (m/s) | 20km/h → 5.56m/s（車両の2倍）
-#define T_STOP (30 * 60)           // 各拠点での停止時間 (s) | 30分=1800秒
+#define T_STOP (30 * 60)           // 各避難所での停止時間 (s) | 30分=1800秒
+#define T_STOP_DIS (30 * 60) / NDI // 各集積所での停止時間 (s) | 30分=1800秒/NDI
 #define DETECTION_RADIUS 10.0      // ドローンの検出半径 (m) | 避難所近傍での情報検出・協調運搬判定用
 
 // === シミュレーション設定 ===
 #define NS 10        // 避難所の数（集積所除く）
-#define NDI 1        // 集積所の数
-#define NT 20        // シミュレーションの周回数
-int ND = 1;          // ドローンの台数（0の場合はドローンなし、最大制限なし）
+#define NDI 1        // 集積所の数(NV：物資運搬車両の台数と同じにする)
+#define NT 30        // シミュレーションの周回数
+int ND = 0;          // ドローンの台数（0の場合はドローンなし、最大制限なし）
 #define NV 2         // 車両の台数（複数台対応）
 #define ENABLE_GIF 0 // GIF出力の有効/無効 (1:有効, 0:無効) | 処理軽量化用
 
@@ -85,7 +95,7 @@ int ND = 1;          // ドローンの台数（0の場合はドローンなし�
 #define DRONE_DIRECTION_NAME ((DRONE_CLOCKWISE) ? "時計回り" : "反時計回り") // 表示用文字列
 
 // === 情報発生システム（ポアソン過程） ===
-#define LAMBDA 2.0     // ポアソン到着率 [件/時間] | 1時間に平均0.5件の情報発生
+#define LAMBDA 1.5     // ポアソン到着率 [件/時間] | 1時間に平均0.5件の情報発生
 #define MAX_INFO 10000 // 最大情報数（メモリ制限対策）
 
 // === ドローン物資運搬システム ===
@@ -98,10 +108,10 @@ int ND = 1;          // ドローンの台数（0の場合はドローンなし�
 #define THRESHOLD 0.70            // しきい値配送の閾値 (%)、需要量に対するドローン配送の保証割合
 
 // === 物資運搬車両システム ===
-#define TOTAL_SUPPLY_WEIGHT 10000.0                                // 物資運搬車両の総積載量 (kg)
+#define TOTAL_SUPPLY_WEIGHT NS * 1000.0                            // 物資運搬車両の総積載量 (kg)
 #define SUPPLY_A_RATIO 0.9                                         // 物資Aの割合（0.0〜1.0）
 #define SUPPLY_B_RATIO 0.1                                         // 物資Bの割合（0.0〜1.0）
-#define EXTRA_SUPPLY_B 99999.0                                     // 余剰分の物資B量 (kg) : 物資運搬車両は余剰物資Bを無制限に積載している想定
+#define EXTRA_SUPPLY_B 99999.0                                     // 余剰分の物資B量 (kg): 物資運搬車両は余剰物資Bを無制限に積載している想定
 #define SUPPLY_PER_SHELTER (TOTAL_SUPPLY_WEIGHT / NS)              // 1避難所あたりの物資量 (kg)
 #define SUPPLY_A_PER_SHELTER (SUPPLY_PER_SHELTER * SUPPLY_A_RATIO) // 1避難所あたりの物資A量 (kg)
 #define SUPPLY_B_PER_SHELTER (SUPPLY_PER_SHELTER * SUPPLY_B_RATIO) // 1避難所あたりの物資B量 (kg)
@@ -110,8 +120,9 @@ int ND = 1;          // ドローンの台数（0の場合はドローンなし�
 #define DELIVERY_METHOD_IGNORE 0      // 手法1：車両がドローンの運搬を無視：一つの避難所には１台のドローンのみが運搬担当する
 #define DELIVERY_METHOD_COORDINATE 1  // 手法2：車両がドローンの運搬状況を考慮：手法1の延長（避難所に到着し、ドローンが運搬中であるなら残りの余剰物資を避難所に届ける）
 #define DELIVERY_METHOD_MULTI_DRONE 2 // 手法3：複数ドローンによる協調運搬(あるドローンが避難所で余剰物資Bを運搬中のとき、他のドローンが来たらそのドローンも協調して運搬する)
-#define DELIVERY_COORDINATATE_FLAG 1  // 手法4：手法3に手法2を適用するかを制御するフラグ（1:適用, 0:非適用）
+#define DELIVERY_COORDINATATE_FLAG 0  // 手法4：手法3に手法2を適用するかを制御するフラグ（1:適用, 0:非適用）
 #define DELIVERY_THRESHOLD_FLAG 0     // 手法5：しきい値配送フラグ（1:適用, 0:非適用）
+#define DRONE_FLY_TO_NEAREST_DEPOT 1  // ドローンが最寄りの集積所に向かうかのフラグ（1:向かう, 0:向かわない）
 // #define DELIVERY_METHOD DELIVERY_METHOD_IGNORE // 手法1を使用
 //   #define DELIVERY_METHOD DELIVERY_METHOD_COORDINATE // 手法2を使用
 #define DELIVERY_METHOD DELIVERY_METHOD_MULTI_DRONE // 手法3を使用
@@ -141,15 +152,20 @@ int ND = 1;          // ドローンの台数（0の場合はドローンなし�
  */
 typedef struct
 {
-    int shelter_id;                  // 情報が発生した避難所ID (1〜NS) | 0は集積所なので除外
-    double generation_time;          // 情報発生時刻（秒）| シミュレーション開始からの経過時間
-    double collection_time;          // 情報回収時刻（秒）| -1の場合は未回収状態
-    int collected;                   // 回収済みフラグ（0:未回収, 1:回収済み）
-    int collected_by;                // 回収主体（0:未回収, 1:車両, 2:ドローン）
-    double extra_supply_demand;      // 余剰物資B需要量 (kg) | 0〜90kgの範囲
-    double extra_supply_delivered;   // 配送済み余剰物資B量 (kg)
-    int delivery_completed;          // 余剰物資B配送完了フラグ（0:未完了, 1:完了）
-    double delivery_completion_time; // 余剰物資B配送完了時刻（秒）| -1の場合は未完了
+    int shelter_id;                    // 情報が発生した避難所ID (1〜NS+NDI-1) | dis_idx(0など)は集積所なので除外
+    double generation_time;            // 情報発生時刻（秒）| シミュレーション開始からの経過時間
+    double collection_time;            // 情報回収時刻（秒）| -1の場合は未回収状態
+    int collected;                     // 回収済みフラグ（0:未回収, 1:回収済み）
+    int collected_by;                  // 回収主体（0:未回収, 1:車両, 2:ドローン）
+    double extra_supply_demand;        // 余剰物資B需要量 (kg) | 0〜90kgの範囲
+    double L_extra_supply_demand;      // 余剰物資L需要量 (kg) | 0〜90kgの範囲(Low priority：緊急度低い物資)
+    double extra_supply_delivered;     // 配送済み余剰物資B量 (kg)
+    double L_extra_supply_delivered;   // 配送済み余剰物資L量 (kg)
+    int delivery_completed;            // 余剰物資B配送完了フラグ（0:未完了, 1:完了）
+    int L_delivery_completed;          // 余剰物資L配送完了フラグ（0:未完了, 1:完了）
+    double delivery_completion_time;   // 余剰物資B配送完了時刻（秒）| -1の場合は未完了
+    double L_delivery_completion_time; // 余剰物資Lの配送完了時刻（秒）| -1の場合は未完了
+    int distribution_center_flag[NDI]; // 情報が特定の集積所に共有されたかを示すフラグ
     // 手法5用（しきい値まではドローン、残り物資運搬車両）
     double threshold_delivery_time;    // 余剰物資Bが閾値以上配送された時刻（秒）| -1の場合は未完了
     double threshold_remaining_amount; // 閾値以上残っている余剰物資B量 (kg)
@@ -171,6 +187,7 @@ typedef struct
     double supply_a;       // 物資Aの在庫量 (kg)
     double supply_b;       // 物資Bの在庫量 (kg)
     double extra_supply_b; // 余剰物資Bの在庫量 (kg)
+    double extra_supply_L; // 余剰物資Lの在庫量 (kg)
 } ShelterSupply;
 
 // === 物資運搬車両管理用構造体 ===
@@ -179,10 +196,12 @@ typedef struct
  */
 typedef struct // 物資運搬車両管理構造体
 {
-    double remaining_supply_a;       // 積載中の物資A残量 (kg)
-    double remaining_supply_b;       // 積載中の物資B残量 (kg)
-    double remaining_extra_supply_b; // 積載中の余剰分物資B残量 (kg)
-    int is_loaded;                   // 積載状態（0:空, 1:積載中）
+    double remaining_supply_a;               // 積載中の物資A残量 (kg)
+    double remaining_supply_b;               // 積載中の物資B残量 (kg)
+    double remaining_extra_supply_b;         // 積載中の余剰分物資B残量 (kg)(物資Ｌもまとめて)
+    int is_loaded;                           // 積載状態（0:空, 1:積載中）
+    int collect_info_id[MAX_INFO];           // 情報を回収した避難所のidに1をつける
+    int demand_supply_loaded_flag[MAX_INFO]; // 要求された物資を把握し、集積所で積載したかを示すフラグ(0:未積載, 1:積載済み)
 } SupplyVehicle;
 
 // === ドローン状態管理用構造体 ===
@@ -215,6 +234,7 @@ typedef struct
     // 物資運搬関連
     DroneState state;               // 現在の動作状態
     int target_shelter;             // 目標避難所ID（物資運搬時）
+    int target_depot;               // 目標集積所ID（物資運搬時）
     int current_trip;               // 現在の往復回数（1〜NR）
     int required_trips;             // 必要な往復回数（余剰物資B需要に基づく）
     double state_start_time;        // 現在状態の開始時刻
@@ -222,6 +242,8 @@ typedef struct
     double carrying_extra_supply;   // 現在積載中の余剰物資B量 (kg)
     int delivery_info_index;        // ドローンが物資運搬を行う情報のインデックス
     double supply_scheduled_amount; // ドローンが避難所に届ける予定の物資量 (kg)
+
+    int collect_info_id[MAX_INFO]; // 情報を回収した避難所のidに1をつける
 
     // 飛行時間統計用フィールド
     double total_flight_time;         // 総飛行時間（秒）- 状態間遷移による累積
@@ -234,14 +256,16 @@ typedef struct
 // === 関数プロトタイプ宣言 ===
 double generate_extra_supply_demand();
 int calculate_required_trips(double demand);
-void update_drone_state(DroneInfo *drone, DroneInfo drones[], int drone_count, double stop_coords[][2], double elapsed_time, double time_step, Info *info_list, int info_count, ShelterSupply *shelter_supplies, double *total_extra_supply_by_drone, int *drone_delivery_count);
+void update_drone_state(DroneInfo *drone, DroneInfo drones[], int drone_count, double stop_coords[][2], double elapsed_time, double time_step, Info *info_list, int info_count, ShelterSupply *shelter_supplies, double *total_extra_supply_by_drone, int *drone_delivery_count, int drone_index, int dis_idx[NDI]);
 void update_drone_flight_time(DroneInfo *drone, double current_time, DroneState new_state);
 double calculate_drone_transport_amount(DroneInfo drones[], int drone_count, int shelter_id, Info *info_list, int info_count, int info_index);
 double calculate_all_drones_transport_amount(DroneInfo *drone, DroneInfo drones[], int drone_count, int shelter_id, Info *info_list, int info_count);
 double get_other_drones_carrying_sum(DroneInfo *current_drone, DroneInfo drones[], int drone_count, int shelter_id, Info *info_list, int info_count);
 int should_drone_join_transport(DroneInfo *drone, DroneInfo drones[], int drone_count, int shelter_id, Info *info_list, int info_count);
-int check_drone_cooperative_transport(DroneInfo *drone, DroneInfo drones[], int drone_count, double stop_coords[][2], Info *info_list, int info_count);
-void save_simulation_model_png(double stop_coords[][2]);
+int check_drone_info_detection(DroneInfo *drone, double stop_coords[][2], Info *info_list, int info_count, double elapsed_time, int dis_idx[NDI]);
+int check_drone_cooperative_transport(DroneInfo *drone, DroneInfo drones[], int drone_count, double stop_coords[][2], Info *info_list, int info_count, int dis_idx[NDI]);
+int find_nearest_depot(DroneInfo drones[], int i, double stop_coords[][2], int dis_idx[NDI], int ndi_count);
+void save_simulation_model_png(double stop_coords[][2], int dis_idx[NDI]);
 
 /**
  * @brief gnuplotを初期化し、GIFアニメーション出力のための設定を行う
@@ -264,11 +288,17 @@ FILE *init_gnuplot()
         return NULL;
     }
 
+    // === WSL環境での文字化け対策設定 ===
+    fprintf(pipe, "set encoding utf8\n");
+    fprintf(pipe, "set locale 'C'\n");
+
     // === GIFアニメーション設定 ===
     // delay: フレーム間隔（1/100秒単位）→ 20 = 0.2秒間隔
     // size: 画像サイズ（600x600px）→ 正方形で円が歪まない
     // crop: 余白を自動トリミング
-    fprintf(pipe, "set terminal gif animate delay 20 size 600,600 crop\n");
+    // enhanced: 拡張テキスト処理を有効化（文字化け対策）
+    // font: WSL環境で利用可能なフォント指定（日本語対応）
+    fprintf(pipe, "set terminal gif animate delay 20 size 600,600 crop enhanced font 'DejaVu Sans,12'\n");
     fprintf(pipe, "set output 'simulation.gif'\n");
 
     // === 描画エリア設定 ===
@@ -317,15 +347,50 @@ double generate_exponential_interval(double lambda)
  * @brief ランダムな避難所IDを生成（情報発生場所の決定用）
  *
  * 【注意事項】
- * - 集積所（ID=0）では情報は発生しない
- * - 避難所のみ（ID=1〜NS）で情報が発生
+ * - 集積所（dis_idxに格納されている値）では情報は発生しない
+ * - 避難所のみ（1〜NS+NDI-1のうちdis_idx以外）で情報が発生
  * - 一様分布でランダム選択（各避難所の発生確率は等しい）
  *
- * @return 避難所ID (1〜NS)
+ * @param dis_idx 集積所のインデックス配列（除外対象）
+ * @return 避難所ID (1〜NS+NDI-1のうちdis_idx以外)
  */
-int generate_random_shelter()
+int generate_random_shelter(int dis_idx[NDI])
 {
-    return (rand() % NS) + 1; // 1からNSまでの一様分布
+    // int candidates[NS + NDI - 1]; // 候補となる避難所IDの配列
+    int candidates[NS]; // 候補となる避難所IDの配列
+    int candidate_count = 0;
+
+    // 1からNS+NDI-1の範囲で、dis_idxに含まれない値を候補に追加
+    for (int i = 1; i <= NS + NDI - 1; i++)
+    {
+        int is_depot = 0;
+        // dis_idxに含まれているかチェック
+        for (int j = 0; j < NDI; j++)
+        {
+            if (i == dis_idx[j])
+            {
+                is_depot = 1;
+                break;
+            }
+        }
+        // 集積所でない場合は候補に追加
+        if (!is_depot)
+        {
+            candidates[candidate_count] = i;
+            candidate_count++;
+        }
+    }
+
+    // 候補からランダムに選択
+    if (candidate_count > 0)
+    {
+        int random_index = rand() % candidate_count;
+        printf("candidate_count=%d, random_index=%d random_number=%d\n", candidate_count, random_index, candidates[random_index]);
+        return candidates[random_index];
+    }
+
+    // 候補がない場合のフォールバック（通常発生しない）
+    return 1;
 }
 
 /**
@@ -341,17 +406,33 @@ int generate_random_shelter()
  * @param info_list 情報リスト
  * @param info_count 情報総数
  * @param elapsed_time 現在時刻
+ * @param dis_idx 集積所のインデックス配列
  * @return 検出した避難所ID（検出なしの場合は0）
  */
-int check_drone_info_detection(DroneInfo *drone, double stop_coords[][2], Info *info_list, int info_count, double elapsed_time)
+int check_drone_info_detection(DroneInfo *drone, double stop_coords[][2], Info *info_list, int info_count, double elapsed_time, int dis_idx[NDI])
 {
     // 通常巡回モード以外では検出しない
     if (drone->state != DRONE_PATROL)
         return 0;
 
     // 各避難所との距離をチェック
-    for (int shelter_id = 1; shelter_id <= NS; shelter_id++)
+    for (int shelter_id = 1; shelter_id <= NS + NDI - 1; shelter_id++)
     {
+        // 集積所かどうかをチェック
+        int is_depot = 0;
+        for (int d = 0; d < NDI; d++)
+        {
+            if (shelter_id == dis_idx[d])
+            {
+                is_depot = 1;
+                break; // 集積所と判明したらループを抜ける
+            }
+        }
+        if (is_depot)
+        {
+            continue; // 集積所の場合、次のshelter_idに進む
+        }
+
         double dx = drone->x - stop_coords[shelter_id][0];
         double dy = drone->y - stop_coords[shelter_id][1];
         double distance = sqrt(dx * dx + dy * dy);
@@ -409,9 +490,10 @@ int check_drone_info_detection(DroneInfo *drone, double stop_coords[][2], Info *
  * @param stop_coords 拠点座標配列
  * @param info_list 情報リスト
  * @param info_count 情報総数
+ * @param dis_idx 集積所のインデックス配列
  * @return 協調運搬すべき避難所ID（不要の場合は0）
  */
-int check_drone_cooperative_transport(DroneInfo *drone, DroneInfo drones[], int drone_count, double stop_coords[][2], Info *info_list, int info_count)
+int check_drone_cooperative_transport(DroneInfo *drone, DroneInfo drones[], int drone_count, double stop_coords[][2], Info *info_list, int info_count, int dis_idx[NDI])
 {
     // 手法3以外では協調運搬判定を行わない
     if (DELIVERY_METHOD != DELIVERY_METHOD_MULTI_DRONE)
@@ -422,8 +504,23 @@ int check_drone_cooperative_transport(DroneInfo *drone, DroneInfo drones[], int 
         return 0;
 
     // 各避難所との距離をチェック
-    for (int shelter_id = 1; shelter_id <= NS; shelter_id++)
+    for (int shelter_id = 1; shelter_id <= NS + NDI - 1; shelter_id++)
     {
+        // 集積所かどうかをチェック
+        int is_depot = 0;
+        for (int d = 0; d < NDI; d++)
+        {
+            if (shelter_id == dis_idx[d])
+            {
+                is_depot = 1;
+                break; // 集積所と判明したらループを抜ける
+            }
+        }
+        if (is_depot)
+        {
+            continue; // 集積所の場合、次のshelter_idに進む
+        }
+
         double dx = drone->x - stop_coords[shelter_id][0];
         double dy = drone->y - stop_coords[shelter_id][1];
         double distance = sqrt(dx * dx + dy * dy);
@@ -444,6 +541,49 @@ int check_drone_cooperative_transport(DroneInfo *drone, DroneInfo drones[], int 
 }
 
 /**
+ * @brief ドローンから最も近い集積所のインデックスを取得
+ *
+ * ドローンの現在位置から各集積所までの距離を計算し、
+ * 最も近い集積所のインデックス（0〜NDI-1）を返す
+ *
+ * @param drones ドローン配列
+ * @param i ドローンのインデックス
+ * @param stop_coords 拠点座標配列
+ * @param dis_idx 集積所のインデックス配列
+ * @param ndi_count 集積所数（NDI）
+ * @return 最も近い集積所のインデックス（0〜NDI-1）、ND=1の場合は0
+ */
+int find_nearest_depot(DroneInfo drones[], int i, double stop_coords[][2], int dis_idx[NDI], int ndi_count)
+{
+    // NDI=1の場合,またはDRONE_FLY_TO_NEAREST_DEPOTが0のときは常に0を返す
+    if (ndi_count <= 1 || DRONE_FLY_TO_NEAREST_DEPOT == 0)
+    {
+        return 0;
+    }
+
+    int nearest_depot_id = dis_idx[0]; // 最初の集積所IDで初期化
+    double min_distance = -1.0;
+
+    // 各集積所との距離を計算
+    for (int depot = 0; depot < ndi_count; depot++)
+    {
+        int depot_id = dis_idx[depot];
+        double dx = drones[i].x - stop_coords[depot_id][0];
+        double dy = drones[i].y - stop_coords[depot_id][1];
+        double distance = sqrt(dx * dx + dy * dy);
+
+        // 最初の集積所、またはより近い集積所が見つかった場合
+        if (min_distance < 0.0 || distance < min_distance)
+        {
+            min_distance = distance;
+            nearest_depot_id = depot_id; // インデックスではなく実際の集積所IDを保存
+        }
+    }
+
+    return nearest_depot_id; // 実際の集積所IDを返す
+}
+
+/**
  * @brief ドローンの状態更新処理
  *
  * @param drone ドローン情報
@@ -453,7 +593,7 @@ int check_drone_cooperative_transport(DroneInfo *drone, DroneInfo drones[], int 
  * @param info_list 情報リスト（回収フラグ更新用）
  * @param info_count 情報総数
  */
-void update_drone_state(DroneInfo *drone, DroneInfo drones[], int drone_count, double stop_coords[][2], double elapsed_time, double time_step, Info *info_list, int info_count, ShelterSupply *shelter_supplies, double *total_extra_supply_by_drone, int *drone_delivery_count)
+void update_drone_state(DroneInfo *drone, DroneInfo drones[], int drone_count, double stop_coords[][2], double elapsed_time, double time_step, Info *info_list, int info_count, ShelterSupply *shelter_supplies, double *total_extra_supply_by_drone, int *drone_delivery_count, int drone_index, int dis_idx[NDI])
 {
     if (!drone->active)
         return;
@@ -531,6 +671,16 @@ void update_drone_state(DroneInfo *drone, DroneInfo drones[], int drone_count, d
         // 集積所での停止（余剰物資B積載）
         if (elapsed_time >= drone->state_start_time + T_DRONE_STOP)
         {
+            // 集積所についたら集積所に避難所の情報を共有
+            //  情報回収フラグを更新
+            for (int i = 0; i < info_count; i++)
+            {
+                if (drone->collect_info_id[i] == 1 && info_list[i].shelter_id == drone->target_shelter && drone->delivery_info_index == i) // ドローンが飛行してきた避難所で回収した情報について
+                {
+                    info_list[i].distribution_center_flag[drone->target_depot] = 1; // 集積所に情報共有済みフラグを立てる
+                }
+            }
+
             // 今回の積載量を計算（残り需要量とドローン最大積載量の小さい方）
             double remaining_demand = 0;
 
@@ -613,9 +763,9 @@ void update_drone_state(DroneInfo *drone, DroneInfo drones[], int drone_count, d
                     drone->supply_scheduled_amount = 0; // 配送予定物資量リセット
 
                     // 避難所の余剰物資B在庫を増加
-                    // shelter_suppliesの配列インデックスは0ベースなので -1
-                    int shelter_idx = drone->target_shelter - 1;
-                    if (shelter_idx >= 0 && shelter_idx < NS)
+                    // shelter_suppliesの配列インデックスは,current_stop_idxと同様なインデックス
+                    int shelter_idx = drone->target_shelter;
+                    if (shelter_idx >= 1 && shelter_idx <= NS + NDI - 1)
                     {
                         shelter_supplies[shelter_idx].extra_supply_b += drone->carrying_extra_supply;
                     }
@@ -706,9 +856,14 @@ void update_drone_state(DroneInfo *drone, DroneInfo drones[], int drone_count, d
 
             if (drone->current_trip <= drone->required_trips)
             {
-                // 次の往復へ、集積所に戻る
-                drone->target_x = stop_coords[0][0]; // 集積所座標
-                drone->target_y = stop_coords[0][1];
+                // 次の往復へ、最も近い集積所に戻る
+                // drone->target_x = stop_coords[0][0]; // 集積所座標
+                // drone->target_y = stop_coords[0][1]; // 集積所座標
+                int target_depot_id = find_nearest_depot(drones, drone_index, stop_coords, dis_idx, NDI);
+                drone->target_depot = target_depot_id;             // 最寄り集積所IDを設定
+                drone->target_x = stop_coords[target_depot_id][0]; // 最寄り集積所座標を目的として設定
+                drone->target_y = stop_coords[target_depot_id][1];
+
                 update_drone_flight_time(drone, elapsed_time, DRONE_TO_DEPOT);
                 printf("ドローン: 避難所%d出発（往復%d/%d回目）\n",
                        drone->target_shelter, drone->current_trip, drone->required_trips);
@@ -997,7 +1152,7 @@ int should_drone_join_transport(DroneInfo *drone, DroneInfo drones[], int drone_
                         // break; // 意図的にbreak省略（fall-through）
                     default:
                         // その他の状態では運搬量計算をスキップ
-                        break; // 意図的にbreak省略
+                        break; // 空の処理でもbreakを追加
                     }
                 }
             }
@@ -1214,7 +1369,7 @@ double get_other_drones_carrying_sum(DroneInfo *current_drone, DroneInfo drones[
  * @param shelter_supplies 各避難所の物資在庫配列
  * @param supply_vehicle 物資運搬車両の状態
  */
-void plot_frame(FILE *pipe, double stop_coords[][2], double vehicle_x[], double vehicle_y[], DroneInfo drones[], double elapsed_time, Info *info_list, int info_count, ShelterSupply shelter_supplies[], SupplyVehicle supply_vehicle[])
+void plot_frame(FILE *pipe, double stop_coords[][2], double vehicle_x[], double vehicle_y[], DroneInfo drones[], double elapsed_time, Info *info_list, int info_count, ShelterSupply shelter_supplies[], SupplyVehicle supply_vehicle[], int dis_idx[NDI])
 {
     // GIF出力が無効、または指定時間範囲外の場合は処理をスキップ
     if (GIF_TIME_RANGE_FLAG == 1) // gifに出力する時間範囲が指定されている場合
@@ -1297,14 +1452,19 @@ void plot_frame(FILE *pipe, double stop_coords[][2], double vehicle_x[], double 
     fprintf(pipe, "%.1f %.1f\n", R * cos(0), R * sin(0));
     fprintf(pipe, "e\n"); // データ終了マーカー
 
-    // 2. 集積所（拠点0）の座標データ送信
-    fprintf(pipe, "%.1f %.1f\n", stop_coords[0][0], stop_coords[0][1]);
+    // 2. 集積所の座標データ送信
+    // fprintf(pipe, "%.1f %.1f\n", stop_coords[0][0], stop_coords[0][1]);
+    //
+    for (int i = 0; i < NDI; i++)
+    {
+        fprintf(pipe, "%.1f %.1f\n", stop_coords[dis_idx[i]][0], stop_coords[dis_idx[i]][1]); // 集積所のインデックスを参照して強調
+    }
     fprintf(pipe, "e\n");
 
     // === 情報発生状況の解析 ===
     // 各避難所の情報発生状況を調査（描画色分け用）
-    int has_info[NS + 1] = {0};           // 避難所別の情報フラグ（0:情報なし, 1:情報あり）
-    int has_threshold_wait[NS + 1] = {0}; // 避難所別の閾値配送待機フラグ（0:待機なし, 1:待機中）
+    int has_info[NS + NDI] = {0};           // 避難所別の情報フラグ（0:情報なし, 1:情報あり）
+    int has_threshold_wait[NS + NDI] = {0}; // 避難所別の閾値配送待機フラグ（0:待機なし, 1:待機中）
     for (int i = 0; i < info_count; i++)
     {
         // 未回収かつ既に発生済みの情報をチェック
@@ -1325,6 +1485,21 @@ void plot_frame(FILE *pipe, double stop_coords[][2], double vehicle_x[], double 
     int normal_shelter_count = 0;
     for (int i = 1; i < TOTAL_STOPS; i++) // 集積所（i=0）は除外
     {
+        // 集積所かどうかをチェック
+        int is_depot = 0;
+        for (int d = 0; d < NDI; d++)
+        {
+            if (i == dis_idx[d])
+            {
+                is_depot = 1;
+                break; // 集積所と判明したらループを抜ける
+            }
+        }
+        if (is_depot)
+        {
+            continue; // 集積所の場合、次のiに進む
+        }
+
         if (!has_info[i]) // 情報が発生していない避難所のみ
         {
             fprintf(pipe, "%.1f %.1f\n", stop_coords[i][0], stop_coords[i][1]);
@@ -1408,8 +1583,23 @@ void plot_frame(FILE *pipe, double stop_coords[][2], double vehicle_x[], double 
     fprintf(pipe, "unset label\n");
 
     // 物資A・B・余剰B・要求余剰Bの数値表示
-    for (int i = 1; i <= NS; i++) // 避難所のみ（集積所は除く）
+    for (int i = 1; i <= NS + NDI - 1; i++) // 避難所のみ（集積所は除く）
     {
+        // 集積所かどうかをチェック
+        int is_depot = 0;
+        for (int d = 0; d < NDI; d++)
+        {
+            if (i == dis_idx[d])
+            {
+                is_depot = 1;
+                break; // 集積所と判明したらループを抜ける
+            }
+        }
+        if (is_depot)
+        {
+            continue; // 集積所の場合、次のiに進む
+        }
+
         // 各避難所の現在の要求余剰物資B量を計算
         double current_demand = 0.0;
         for (int j = 0; j < info_count; j++)
@@ -1440,15 +1630,15 @@ void plot_frame(FILE *pipe, double stop_coords[][2], double vehicle_x[], double 
         // 各避難所でそれぞれの物資の配送量と要求物資の数値を表示
         // 物資Aの数値表示（青色）- 常に表示
         fprintf(pipe, "set label 'A:%.0f' at %.1f,%.1f tc rgb '#0000FF' font ',11'\n",
-                shelter_supplies[i - 1].supply_a, display_x_a, display_y_a);
+                shelter_supplies[i].supply_a, display_x_a, display_y_a);
 
         // 物資Bの数値表示（赤色）- 常に表示
         fprintf(pipe, "set label 'B:%.0f' at %.1f,%.1f tc rgb '#FF0000' font ',11'\n",
-                shelter_supplies[i - 1].supply_b, display_x_b, display_y_b);
+                shelter_supplies[i].supply_b, display_x_b, display_y_b);
 
         // 余剰物資Bの数値表示（紫色）- 常に表示
         fprintf(pipe, "set label 'ExB:%.0f' at %.1f,%.1f tc rgb '#800080' font ',11'\n",
-                shelter_supplies[i - 1].extra_supply_b, display_x_extra, display_y_extra);
+                shelter_supplies[i].extra_supply_b, display_x_extra, display_y_extra);
 
         // 要求余剰物資Bの数値表示（オレンジ色）- 要求がある場合のみ表示
         if (current_demand > 0.0)
@@ -1498,6 +1688,8 @@ void plot_frame(FILE *pipe, double stop_coords[][2], double vehicle_x[], double 
  */
 int main(int argc, char *argv[])
 {
+    // === 初期化処理 ===
+
     // === コマンドライン引数処理 ===
     int seed_value = 12; // デフォルトのseed値
 
@@ -1520,12 +1712,7 @@ int main(int argc, char *argv[])
             return 1;
         }
     }
-
-    // === 初期化処理 ===
-
-    // 乱数シードの初期化（実行毎に異なる結果を得るため）
-    // srand(time(NULL)); // 時刻ベースのランダムシード（コメントアウト中）
-    srand(seed_value); // コマンドライン引数またはデフォルト値でseed設定
+    srand(seed_value); // 乱数シードの設定
 
     // === gnuplotパイプの初期化 ===
     FILE *gnuplot_pipe = NULL;
@@ -1563,10 +1750,23 @@ int main(int argc, char *argv[])
     }
 
     // === シミュレーション制御変数 ===
-    int current_stop_idx[NV];   // 各車両の現在の停止地点インデックス（0=集積所、1〜NS=避難所）
+    int current_stop_idx[NV];   // 各車両の現在の停止地点インデックス（0など=集積所、1〜NS+NDI-1=避難所）
     int lap_count = 0;          // 完了した周回数
     double elapsed_time = 0.0;  // 経過時間（秒）
     int is_first_departure = 1; // 集積所からの初回出発フラグ
+
+    // === 集積所のcurrent_stop_idx設定 === (例, NS=9,NDI=3 の場合、dis_idx[0]=0, dis_idx[1]=4, dis_idx[2]=8となる)
+    int dis_idx[NDI] = {0}; // 集積所のcurrent_stop_idx
+    if (NDI > 1)
+    {
+        double radix = (double)TOTAL_STOPS / (double)NDI; // 集積所配置の基数
+        // printf("集積所インデックス配置(radix=%.2f): ", radix);
+        for (int i = 0; i < NDI; i++)
+        {
+            // dis_idx[i] = i * radix; // 集積所を均等配置
+            dis_idx[i] = (int)((double)i * radix); // 集積所を均等配置(NSとNDIの関係で割り切れない場合は整数化)
+        }
+    }
 
     // === ドローン制御変数（複数台対応） ===
     DroneInfo drones[ND]; // ドローン情報配列
@@ -1579,8 +1779,8 @@ int main(int argc, char *argv[])
     int collected_count = 0;                                       // 回収済み情報数
 
     // === 物資管理変数 ===
-    ShelterSupply shelter_supplies[NS]; // 各避難所の物資在庫配列
-    SupplyVehicle supply_vehicle[NV];   // 物資運搬車両の状態配列（複数車両対応）
+    ShelterSupply shelter_supplies[NS + NDI]; // 各避難所の物資在庫配列（集積所のインデックスも含むが処理の際は除外する）
+    SupplyVehicle supply_vehicle[NV];         // 物資運搬車両の状態配列（複数車両対応）
 
     // === 余剰物資B運搬統計変数 ===
     double total_extra_supply_by_vehicle = 0.0; // 車両による余剰物資B運搬総量 (kg)
@@ -1613,6 +1813,7 @@ int main(int argc, char *argv[])
         // 物資運搬関連の初期化
         drones[i].state = DRONE_PATROL;                // 通常巡回モード
         drones[i].target_shelter = 0;                  // 目標避難所なし
+        drones[i].target_depot = -1;                   // 目標集積所なし
         drones[i].current_trip = 0;                    // 往復回数0
         drones[i].required_trips = 0;                  // 必要往復回数0
         drones[i].state_start_time = 0.0;              // 状態開始時刻
@@ -1620,6 +1821,11 @@ int main(int argc, char *argv[])
         drones[i].carrying_extra_supply = 0.0;         // 積載中の余剰物資B量
         drones[i].delivery_info_index = -1;            // 物資運搬情報のインデックス（未設定）
         drones[i].supply_scheduled_amount = 0.0;       // 運搬予定物資量
+
+        for (int j = 0; j < MAX_INFO; j++)
+        {
+            drones[i].collect_info_id[j] = 0; // 配送済み情報IDリスト初期化
+        }
 
         // 飛行時間統計用フィールドの初期化
         drones[i].total_flight_time = 0.0;         // 総飛行時間
@@ -1632,11 +1838,12 @@ int main(int argc, char *argv[])
     // === 【物資管理システムの初期化】 ===
     // 各避難所の物資在庫を初期化（空の状態から開始）
     // シミュレーション開始時点では、車両による配送前のため全避難所の在庫は0
-    for (int i = 0; i < NS; i++)
+    for (int i = 0; i <= NS + NDI - 1; i++)
     {
         shelter_supplies[i].supply_a = 0.0;       // 物資A在庫: 0kg
         shelter_supplies[i].supply_b = 0.0;       // 物資B在庫: 0kg
         shelter_supplies[i].extra_supply_b = 0.0; // 余剰物資B在庫: 0kg
+        shelter_supplies[i].extra_supply_L = 0.0; // 余剰物資L在庫: 0kg
     }
 
     // === 物資運搬車両の初期状態設定 ===
@@ -1647,6 +1854,14 @@ int main(int argc, char *argv[])
     supply_vehicle[0].remaining_supply_b = TOTAL_SUPPLY_WEIGHT * SUPPLY_B_RATIO; // 物資B: 1000kg (10%)
     supply_vehicle[0].remaining_extra_supply_b = EXTRA_SUPPLY_B;                 // 余剰物資B: 1000kg
     supply_vehicle[0].is_loaded = 1;                                             // 積載状態フラグ: 積載中
+    for (int i = 0; i < MAX_INFO; i++)
+    {
+        supply_vehicle[0].collect_info_id[i] = 0; // 配送済み情報IDリスト初期化
+    }
+    for (int i = 0; i < MAX_INFO; i++)
+    {
+        supply_vehicle[0].demand_supply_loaded_flag[i] = 0; // 要求物資積載フラグ初期化
+    }
 
     // === 【シミュレーション設定情報の表示】 ===
     printf("=== シミュレーション設定 ===\n");
@@ -1691,15 +1906,15 @@ int main(int argc, char *argv[])
     printf("円の半径: %.1f m, 車両速度: %.2f m/s, 拠点数: %d\n", R, V, TOTAL_STOPS);
 
     // === シミュレーションモデル構造図をPNG出力 ===
-    save_simulation_model_png(stop_coords);
+    save_simulation_model_png(stop_coords, dis_idx);
 
     // === 車両配列の初期化（メインループ前） ===
     // 全車両を集積所から開始
     for (int v = 0; v < NV; v++)
     {
-        current_stop_idx[v] = 0; // 全車両を集積所から開始
+        current_stop_idx[v] = dis_idx[v]; // 全車両を集積所から開始
     }
-    current_stop_idx[1] = 5;
+    // current_stop_idx[1] = 5;
 
     /********************** 【メインシミュレーションループ開始】 *********************************************************************************************/
     // 指定された周回数（NT）まで車両の巡回を継続
@@ -1712,19 +1927,28 @@ int main(int argc, char *argv[])
         while (elapsed_time >= next_info_time && info_count < MAX_INFO)
         {
             // === 新情報の生成と初期化 ===
-            info_list[info_count].shelter_id = generate_random_shelter();               // ランダム避難所（1〜NS）を選択
-            info_list[info_count].generation_time = next_info_time;                     // 発生時刻を記録
-            info_list[info_count].collection_time = -1;                                 // 未回収状態（-1で表現）
-            info_list[info_count].collected = 0;                                        // 回収フラグ: 未回収
-            info_list[info_count].collected_by = COLLECTED_BY_NONE;                     // 回収主体: 未回収
-            info_list[info_count].extra_supply_demand = generate_extra_supply_demand(); // 0〜90kgの需要量をランダム生成
-            info_list[info_count].extra_supply_delivered = 0.0;                         // 配送済み量: 初期0kg
-            info_list[info_count].delivery_completed = 0;                               // 配送完了フラグ: 未完了
-            info_list[info_count].delivery_completion_time = -1;                        // 配送完了時刻: 未完了
-            info_list[info_count].threshold_delivery_time = -1;                         // 閾値までの物資配送時刻: 未設定
-            info_list[info_count].threshold_remaining_amount = 0;                       // 閾値残量: 未設定
-            info_list[info_count].threshold_delivery_wait_flag = 0;                     // 閾値配送待機フラグ: 未設定
-            info_list[info_count].threshold_completed_flag = 0;                         // 閾値配送完了フラグ: 未設定
+            info_list[info_count].shelter_id = generate_random_shelter(dis_idx); // ランダム避難所（1〜NS+NDI-1において集積所を除くインデックス）を選択
+            //
+            info_list[info_count].generation_time = next_info_time;                       // 発生時刻を記録
+            info_list[info_count].collection_time = -1;                                   // 未回収状態（-1で表現）
+            info_list[info_count].collected = 0;                                          // 回収フラグ: 未回収
+            info_list[info_count].collected_by = COLLECTED_BY_NONE;                       // 回収主体: 未回収
+            info_list[info_count].extra_supply_demand = generate_extra_supply_demand();   // 0〜90kgの需要量をランダム生成
+            info_list[info_count].L_extra_supply_demand = generate_extra_supply_demand(); // 0〜90kgの需要量をランダム生成
+            info_list[info_count].extra_supply_delivered = 0.0;                           // 配送済み量: 初期0kg
+            info_list[info_count].L_extra_supply_delivered = 0.0;                         // L配送済み量: 初期0kg
+            info_list[info_count].delivery_completed = 0;                                 // 配送完了フラグ: 未完了
+            info_list[info_count].L_delivery_completed = 0;                               // 余剰物資L配送完了フラグ: 未完了
+            info_list[info_count].delivery_completion_time = -1;                          // 配送完了時刻: 未完了
+            info_list[info_count].L_delivery_completion_time = -1;                        // 余剰物資Lの配送完了時刻: 未完了
+            for (int i = 0; i < NDI; i++)
+            {
+                info_list[info_count].distribution_center_flag[i] = 0; // 集積所共有フラグ: 未設定
+            }
+            info_list[info_count].threshold_delivery_time = -1;     // 閾値までの物資配送時刻: 未設定
+            info_list[info_count].threshold_remaining_amount = 0;   // 閾値残量: 未設定
+            info_list[info_count].threshold_delivery_wait_flag = 0; // 閾値配送待機フラグ: 未設定
+            info_list[info_count].threshold_completed_flag = 0;     // 閾値配送完了フラグ: 未設定
 
             // 情報発生をログ出力（デバッグ・進捗確認用）
             printf("****情報発生: 時刻 %.1f秒 (%.1f分) : 避難所 %d (余剰物資B需要: %.0fkg)\n",
@@ -1744,27 +1968,60 @@ int main(int argc, char *argv[])
         double current_y[NV]; // 車両座標配列（Y座標）
 
         // 現在は車両[0]のみを使用
-        current_x[0] = stop_coords[current_stop_idx[0]][0];
-        current_y[0] = stop_coords[current_stop_idx[0]][1];
-
-        current_x[1] = stop_coords[current_stop_idx[1]][0]; // 車2
-        current_y[1] = stop_coords[current_stop_idx[1]][1];
+        for (int i = 0; i < NV; i++)
+        {
+            current_x[i] = stop_coords[current_stop_idx[i]][0];
+            current_y[i] = stop_coords[current_stop_idx[i]][1];
+        }
+        // current_x[0] = stop_coords[current_stop_idx[0]][0];
+        // current_y[0] = stop_coords[current_stop_idx[0]][1];
+        // current_x[1] = stop_coords[current_stop_idx[1]][0]; // 車2
+        // current_y[1] = stop_coords[current_stop_idx[1]][1];
 
         // === 車両停止中の処理 ===
         // 初回出発時以外は各拠点で停止時間を設ける
         if (!is_first_departure)
         {
             // 停止開始時の描画（現在位置をプロット）
-            plot_frame(gnuplot_pipe, stop_coords, current_x, current_y, drones, elapsed_time, info_list, info_count, shelter_supplies, supply_vehicle);
+            plot_frame(gnuplot_pipe, stop_coords, current_x, current_y, drones, elapsed_time, info_list, info_count, shelter_supplies, supply_vehicle, dis_idx);
 
             // === 停止地点情報の表示 ===
+            // current_stop_idx[0] の値に基づき、集積所または避難所での停止処理を実行
+            int is_depot = 0;
+            for (int d = 0; d < NDI; d++)
+            {
+                if (current_stop_idx[0] == dis_idx[d])
+                {
+                    is_depot = 1; // 集積所であることを示すフラグを設定
+                    break;
+                }
+            }
             // 集積所に停止する場合
-            if (current_stop_idx[0] == 0)
+            if (is_depot) // current_stop_idx[0] == 0など集積所インデックスと一致したとき
             {
                 // vehicle[0]の周回数を基準にする
                 if (current_stop_idx[0] == 0)
                 {
                     printf("周回: %d/%d | 集積所に到着。%d秒間停止します。\n", lap_count + 1, NT, T_STOP);
+                }
+
+                // === 【集積所での情報共有処理】 ===
+                // 車両が回収済みの情報を全て集積所共有
+                for (int i = 0; i < info_count; i++)
+                {
+                    if (supply_vehicle[0].collect_info_id[i]) // 車両が情報を回収済みで、それを保持して集積所に到着した場合
+                    {
+                        info_list[i].distribution_center_flag[current_stop_idx[0]] = 1; // 集積所共有フラグを設定
+                    }
+                }
+
+                // 物資運搬車両の集積所での需要量把握した上での積載処理
+                for (int i = 0; i < info_count; i++)
+                {
+                    if (info_list[i].distribution_center_flag[current_stop_idx[0]]) // 集積所に物資運搬車両またはドローンによって共有された情報に基づき、要求の物資を積載
+                    {
+                        supply_vehicle[0].demand_supply_loaded_flag[i] = 1; // 要求物資積載フラグをセット
+                    }
                 }
 
                 // === 集積所での物資補充処理 ===
@@ -1791,8 +2048,8 @@ int main(int argc, char *argv[])
                     // === 定量配送の実行 ===
                     // 各避難所に対して一定量（1000kg分）の物資A・Bを配送
                     // 物資A: 900kg (90%), 物資B: 100kg (10%) の比率で配送
-                    shelter_supplies[current_stop_idx[0] - 1].supply_a += SUPPLY_A_PER_SHELTER; // 避難所在庫増加
-                    shelter_supplies[current_stop_idx[0] - 1].supply_b += SUPPLY_B_PER_SHELTER;
+                    shelter_supplies[current_stop_idx[0]].supply_a += SUPPLY_A_PER_SHELTER; // 避難所在庫増加
+                    shelter_supplies[current_stop_idx[0]].supply_b += SUPPLY_B_PER_SHELTER;
 
                     // 車両積載量から配送分を減算
                     supply_vehicle[0].remaining_supply_a -= SUPPLY_A_PER_SHELTER;
@@ -1801,8 +2058,8 @@ int main(int argc, char *argv[])
                     // 配送実行のログ出力
                     printf("  物資配送: A=%.0fkg, B=%.0fkg を配送\n", SUPPLY_A_PER_SHELTER, SUPPLY_B_PER_SHELTER);
                     printf("  避難所%d在庫: A=%.0fkg, B=%.0fkg\n",
-                           current_stop_idx[0], shelter_supplies[current_stop_idx[0] - 1].supply_a,
-                           shelter_supplies[current_stop_idx[0] - 1].supply_b);
+                           current_stop_idx[0], shelter_supplies[current_stop_idx[0]].supply_a,
+                           shelter_supplies[current_stop_idx[0]].supply_b);
 
                     // === 車両積載状態の判定 ===
                     // 通常物資A・Bが両方とも空になった場合、積載状態を解除
@@ -1821,12 +2078,14 @@ int main(int argc, char *argv[])
                 for (int i = 0; i < info_count; i++)
                 {
                     // 対象条件: 未回収 かつ 現在の避難所で発生した情報
-                    if (!info_list[i].collected && info_list[i].shelter_id == current_stop_idx[0])
+                    if (!info_list[i].collected && info_list[i].shelter_id == current_stop_idx[0] && supply_vehicle[0].remaining_supply_b > 0)
                     {
                         // === 情報回収の実行 ===
                         info_list[i].collection_time = elapsed_time;      // 回収時刻を記録
                         info_list[i].collected = 1;                       // 回収済みフラグを設定
                         info_list[i].collected_by = COLLECTED_BY_VEHICLE; // 車両による回収を記録
+
+                        supply_vehicle[0].collect_info_id[i] = 1; // 車両の回収情報IDリストに登録
 
                         // === Tc（回収遅延時間）の計算と統計更新 ===
                         // Tc = 回収時刻 - 発生時刻（災害情報システムの重要評価指標）
@@ -1841,7 +2100,7 @@ int main(int argc, char *argv[])
                         // === 【車両による余剰物資B配送処理】 ===
                         // 情報回収と同時に、その情報に関連する余剰物資B需要に対応
                         // 車両に余剰物資Bの残量があり、配送が未完了の場合のみ実行（手法1と手法2においてどちらも実行される）
-                        if (supply_vehicle[0].remaining_extra_supply_b > 0 && !info_list[i].delivery_completed)
+                        if (supply_vehicle[0].remaining_extra_supply_b > 0 && !info_list[i].delivery_completed && supply_vehicle[0].demand_supply_loaded_flag[i] == 1)
                         {
                             double delivery_amount = 0.0;
 
@@ -1850,7 +2109,7 @@ int main(int argc, char *argv[])
                             // === 配送の実行 ===
                             if (delivery_amount > 0)
                             {
-                                shelter_supplies[current_stop_idx[0] - 1].extra_supply_b += delivery_amount; // 避難所在庫増加
+                                shelter_supplies[current_stop_idx[0]].extra_supply_b += delivery_amount; // 避難所在庫増加
                                 supply_vehicle[0].remaining_extra_supply_b -= delivery_amount;
                                 info_list[i].extra_supply_delivered += delivery_amount;
 
@@ -1879,7 +2138,98 @@ int main(int argc, char *argv[])
                     }
                 }
 
-                // ====== 手法5　閾値までの物資はドローンが運搬し、残りの物資は物資運搬車両が担当する ====
+                // == すでにドローンによって情報が回収されているが、物資Lの要求を知るための処理
+                for (int i = 0; i < info_count; i++)
+                {
+                    // 対象条件: ドローンによって既に情報が取得されている、物資Ｌの要求量情報を取得
+                    if (info_list[i].shelter_id == current_stop_idx[0] && supply_vehicle[0].remaining_supply_b > 0 && info_list[i].collected_by == COLLECTED_BY_DRONE)
+                    {
+                        supply_vehicle[0].collect_info_id[i] = 1; // 車両の回収情報IDリストに登録
+                    }
+                }
+
+                // === 【避難所での余剰物資B配送処理】一度集積所で情報を回収し需要に合ったものを積載してきてから運搬（自分で回収した情報で需要に合ったものを積載も含まれる） ===
+                for (int i = 0; i < info_count; i++)
+                {
+                    if (ND >= 0) // ドローンを導入しない場合は余剰物資Bも物資運搬車両が全て配送する、また、ドローンを導入する場合もドローンで運搬しきれない物資Bも、集積所で所望の物資を積載した上で運搬
+                    {
+                        // 対象条件: 現在の避難所で発生した情報, 要求物資積載フラグが立っている, かつ配送未完了,余剰物資あり，運搬未達成
+                        if (info_list[i].shelter_id == current_stop_idx[0] && supply_vehicle[0].demand_supply_loaded_flag[i] == 1 && supply_vehicle[0].remaining_extra_supply_b > 0 && !info_list[i].delivery_completed)
+                        {
+                            double delivery_amount = 0.0;
+
+                            delivery_amount = (info_list[i].extra_supply_demand > supply_vehicle[0].remaining_extra_supply_b) ? supply_vehicle[0].remaining_extra_supply_b : info_list[i].extra_supply_demand;
+
+                            // === 配送の実行 ===
+                            if (delivery_amount > 0)
+                            {
+                                shelter_supplies[current_stop_idx[0]].extra_supply_b += delivery_amount; // 避難所在庫増加
+                                supply_vehicle[0].remaining_extra_supply_b -= delivery_amount;
+                                info_list[i].extra_supply_delivered += delivery_amount;
+
+                                // === 車両による余剰物資B運搬統計の更新 ===
+                                total_extra_supply_by_vehicle += delivery_amount;
+                                vehicle_delivery_count++;
+
+                                if (info_list[i].extra_supply_delivered >= info_list[i].extra_supply_demand) // 運搬完了したら
+                                {
+                                    info_list[i].delivery_completed = 1;
+                                    info_list[i].delivery_completion_time = elapsed_time;
+                                    info_list[i].threshold_delivery_time = elapsed_time; // 運搬車両が情報を見つけたとき、運搬車両が一度に配達するため閾値配送時刻は、同時
+                                    printf("  余剰物資B配送: %.0fkg配送（需要完了）\n", delivery_amount);
+                                }
+                                else
+                                {
+                                    printf("  余剰物資B配送: %.0fkg配送（残り需要 %.0fkg）\n",
+                                           delivery_amount, info_list[i].extra_supply_demand - info_list[i].extra_supply_delivered);
+                                }
+                            }
+                            else
+                            {
+                                printf("  余剰物資B配送: ドローンが運搬中のため車両配送スキップ\n");
+                            }
+                        }
+                    }
+                }
+
+                // === 【避難所での余剰物資Ｌ配送処理】一度集積所で情報を回収し需要に合ったものを積載してきてから（自分で回収した情報で重要に合ったものを積載も含まれる） ===
+                for (int i = 0; i < info_count; i++)
+                {
+                    // 対象条件: 現在の避難所で発生した情報, 要求物資積載フラグが立っている, かつ配送未完了,余剰物資あり
+                    if (info_list[i].shelter_id == current_stop_idx[0] && supply_vehicle[0].demand_supply_loaded_flag[i] == 1 && supply_vehicle[0].remaining_extra_supply_b > 0 && !info_list[i].L_delivery_completed)
+                    {
+                        double delivery_amount = 0.0;
+
+                        delivery_amount = (info_list[i].L_extra_supply_demand > supply_vehicle[0].remaining_extra_supply_b) ? supply_vehicle[0].remaining_extra_supply_b : info_list[i].L_extra_supply_demand;
+
+                        // === 配送の実行 ===
+                        if (delivery_amount > 0)
+                        {
+                            shelter_supplies[current_stop_idx[0]].extra_supply_L += delivery_amount; // 避難所在庫増加
+                            supply_vehicle[0].remaining_extra_supply_b -= delivery_amount;
+                            info_list[i].L_extra_supply_delivered += delivery_amount;
+
+                            // === 車両による余剰物資B運搬統計の更新 ===
+                            // total_extra_supply_by_vehicle += delivery_amount;
+                            // vehicle_delivery_count++;
+
+                            if (info_list[i].L_extra_supply_delivered >= info_list[i].L_extra_supply_demand) // 運搬完了したら
+                            {
+                                info_list[i].L_delivery_completed = 1;
+                                info_list[i].L_delivery_completion_time = elapsed_time;
+                                // info_list[i].threshold_delivery_time = elapsed_time; // 運搬車両が情報を見つけたとき、運搬車両が一度に配達するため閾値配送時刻は、同時
+                                printf("  余剰物資L配送: %.0fkg配送（需要完了）\n", delivery_amount);
+                            }
+                            else
+                            {
+                                printf("  余剰物資L配送: %.0fkg配送（残り需要 %.0fkg）\n",
+                                       delivery_amount, info_list[i].extra_supply_demand - info_list[i].extra_supply_delivered);
+                            }
+                        }
+                    }
+                }
+#if 0 // 手法5
+      //  ====== 手法5　閾値までの物資はドローンが運搬し、残りの物資は物資運搬車両が担当する ====
                 for (int i = 0; i < info_count; i++)
                 {
                     // 現在の避難所において
@@ -1898,7 +2248,7 @@ int main(int argc, char *argv[])
                                 // === 配送の実行 ===
                                 if (delivery_amount > 0)
                                 {
-                                    shelter_supplies[current_stop_idx[0] - 1].extra_supply_b += delivery_amount; // 避難所在庫増加
+                                    shelter_supplies[current_stop_idx[0]].extra_supply_b += delivery_amount; // 避難所在庫増加
                                     supply_vehicle[0].remaining_extra_supply_b -= delivery_amount;
                                     info_list[i].extra_supply_delivered += delivery_amount;
 
@@ -1930,62 +2280,69 @@ int main(int argc, char *argv[])
                     }
                 }
 
+#endif
+                // 余剰物資Bに関する処理
                 //  ====== 手法２：避難所の情報は回収済みだが、ドローンによる余剰物資B配送が未完了のときに車両が到着した場合(手法2:すべてドローンに任せるのではなく車両がのこりの物資を運搬する)
+                // ドローンを導入するとき，余剰物資Bドローンの運搬に多くの時間がかかる場合，所望の物資を積載した物資運搬車両が避難所に到着するまでに，ドローンが物資を運搬し終わらない場合がある
+                //
                 for (int i = 0; i < info_count; i++)
                 {
                     // 現在の避難所において
                     if (info_list[i].shelter_id == current_stop_idx[0])
                     {
-                        // === 【車両による余剰物資B配送処理】 ===
-                        // 車両に余剰物資Bの残量があり、ドローンによる配送が未完了の場合のみ実行
-                        if (supply_vehicle[0].remaining_extra_supply_b > 0 && !info_list[i].delivery_completed && info_list[i].extra_supply_demand > info_list[i].extra_supply_delivered && info_list[i].threshold_delivery_wait_flag == 0)
+                        if (supply_vehicle[0].demand_supply_loaded_flag[i] == 1) // 物資運搬車両が所望の物資を積載してきた場合
                         {
-
-                            double delivery_amount = 0.0;
-
-                            if (ND != 0 && (DELIVERY_METHOD == DELIVERY_METHOD_COORDINATE || DELIVERY_COORDINATATE_FLAG == 1)) // ドローンが存在し、手法２を適用するとき
+                            // === 【車両による余剰物資B配送処理】 ===
+                            // 車両に余剰物資Bの残量があり、ドローンによる配送が未完了の場合のみ実行
+                            if (supply_vehicle[0].remaining_extra_supply_b > 0 && !info_list[i].delivery_completed && info_list[i].extra_supply_demand > info_list[i].extra_supply_delivered && info_list[i].threshold_delivery_wait_flag == 0)
                             {
-                                // === 手法２：ドローンの運搬状況を考慮 ===
-                                // ドローンによる運搬量（運搬中+運搬予定）を計算
-                                double drone_transport_amount = calculate_drone_transport_amount(drones, ND, current_stop_idx[0], info_list, info_count, i);
 
-                                // 車両が配送すべき量 = 需要量 - 既配送量 - ドローン運搬量
-                                double remaining_demand = info_list[i].extra_supply_demand - info_list[i].extra_supply_delivered - drone_transport_amount;
+                                double delivery_amount = 0.0;
 
-                                // 車両の配送量は、残り需要量と車両残量の小さい方
-                                delivery_amount = (remaining_demand > 0) ? ((remaining_demand > supply_vehicle[0].remaining_extra_supply_b) ? supply_vehicle[0].remaining_extra_supply_b : remaining_demand) : 0.0;
-
-                                printf("  配送量計算: 避難所%d, 需要%.0fkg - 既配送%.0fkg - ドローン運搬%.0fkg = 残り需要%.0fkg → 車両配送%.0fkg\n",
-                                       info_list[i].shelter_id, info_list[i].extra_supply_demand, info_list[i].extra_supply_delivered, drone_transport_amount, remaining_demand, delivery_amount);
-
-                                // === 配送の実行 ===
-                                if (delivery_amount > 0)
+                                if (ND != 0 && (DELIVERY_METHOD == DELIVERY_METHOD_COORDINATE || DELIVERY_COORDINATATE_FLAG == 1)) // ドローンが存在し、手法２を適用するとき
                                 {
-                                    shelter_supplies[current_stop_idx[0] - 1].extra_supply_b += delivery_amount; // 避難所在庫増加
-                                    supply_vehicle[0].remaining_extra_supply_b -= delivery_amount;
-                                    info_list[i].extra_supply_delivered += delivery_amount;
+                                    // === 手法２：ドローンの運搬状況を考慮 ===
+                                    // ドローンによる運搬量（運搬中+運搬予定）を計算
+                                    double drone_transport_amount = calculate_drone_transport_amount(drones, ND, current_stop_idx[0], info_list, info_count, i);
 
-                                    // === 車両による余剰物資B運搬統計の更新 ===
-                                    total_extra_supply_by_vehicle += delivery_amount;
-                                    vehicle_delivery_count++;
+                                    // 車両が配送すべき量 = 需要量 - 既配送量 - ドローン運搬量
+                                    double remaining_demand = info_list[i].extra_supply_demand - info_list[i].extra_supply_delivered - drone_transport_amount;
 
-                                    if (info_list[i].extra_supply_delivered >= info_list[i].extra_supply_demand)
+                                    // 車両の配送量は、残り需要量と車両残量の小さい方
+                                    delivery_amount = (remaining_demand > 0) ? ((remaining_demand > supply_vehicle[0].remaining_extra_supply_b) ? supply_vehicle[0].remaining_extra_supply_b : remaining_demand) : 0.0;
+
+                                    printf("  配送量計算: 避難所%d, 需要%.0fkg - 既配送%.0fkg - ドローン運搬%.0fkg = 残り需要%.0fkg → 車両配送%.0fkg\n",
+                                           info_list[i].shelter_id, info_list[i].extra_supply_demand, info_list[i].extra_supply_delivered, drone_transport_amount, remaining_demand, delivery_amount);
+
+                                    // === 配送の実行 ===
+                                    if (delivery_amount > 0)
                                     {
-                                        info_list[i].delivery_completed = 1;
-                                        info_list[i].delivery_completion_time = elapsed_time;
-                                        printf("  余剰物資B配送: %.0fkg配送（需要完了）\n", delivery_amount);
+                                        shelter_supplies[current_stop_idx[0]].extra_supply_b += delivery_amount; // 避難所在庫増加
+                                        supply_vehicle[0].remaining_extra_supply_b -= delivery_amount;
+                                        info_list[i].extra_supply_delivered += delivery_amount;
+
+                                        // === 車両による余剰物資B運搬統計の更新 ===
+                                        total_extra_supply_by_vehicle += delivery_amount;
+                                        vehicle_delivery_count++;
+
+                                        if (info_list[i].extra_supply_delivered >= info_list[i].extra_supply_demand)
+                                        {
+                                            info_list[i].delivery_completed = 1;
+                                            info_list[i].delivery_completion_time = elapsed_time;
+                                            printf("  余剰物資B配送: %.0fkg配送（需要完了）\n", delivery_amount);
+                                        }
+                                        else
+                                        {
+                                            printf("  余剰物資B配送: %.0fkg配送（残り需要 %.0fkg）\n",
+                                                   delivery_amount, info_list[i].extra_supply_demand - info_list[i].extra_supply_delivered);
+                                        }
+
+                                        // break;
                                     }
                                     else
                                     {
-                                        printf("  余剰物資B配送: %.0fkg配送（残り需要 %.0fkg）\n",
-                                               delivery_amount, info_list[i].extra_supply_demand - info_list[i].extra_supply_delivered);
+                                        printf("  余剰物資B配送: ドローンが運搬中のため車両配送スキップ\n");
                                     }
-
-                                    // break;
-                                }
-                                else
-                                {
-                                    printf("  余剰物資B配送: ドローンが運搬中のため車両配送スキップ\n");
                                 }
                             }
                         }
@@ -1999,7 +2356,17 @@ int main(int argc, char *argv[])
             // 停止期間中も時間を進めてドローンの位置更新と描画を実行
             // 集積所、避難所問わず、車両が停止時間中はドローンの状態更新を行う
             double stop_start_time = elapsed_time;
-            double stop_end_time = elapsed_time + T_STOP;
+            double stop_end_time = 0.0;
+
+            // 集積所に停止する場合
+            if (is_depot) // current_stop_idx[0] == 0
+            {
+                stop_end_time = elapsed_time + T_STOP_DIS;
+            }
+            else // 避難所に停止する場合
+            {
+                stop_end_time = elapsed_time + T_STOP; //
+            }
 
             // 停止時間が終了するまでのループ
             while (elapsed_time < stop_end_time)
@@ -2008,11 +2375,11 @@ int main(int argc, char *argv[])
                 // 指定間隔（2分）ごとに描画フレームを生成
                 if (elapsed_time >= next_draw_time)
                 {
-                    plot_frame(gnuplot_pipe, stop_coords, current_x, current_y, drones, elapsed_time, info_list, info_count, shelter_supplies, supply_vehicle);
+                    plot_frame(gnuplot_pipe, stop_coords, current_x, current_y, drones, elapsed_time, info_list, info_count, shelter_supplies, supply_vehicle, dis_idx);
                     next_draw_time += DRAW_INTERVAL; // 次の描画時刻を更新
                 }
 
-                /************************************************ 車両移動中と同様の処理l.2009 ******************************************************************/
+                /************************************************ドローンの処理 車両移動中と同様の処理 ******************************************************************/
                 // === 時間ステップ進行 ===
                 double time_step = 1.0; // 1秒刻みで時間を進める
                 elapsed_time += time_step;
@@ -2034,14 +2401,19 @@ int main(int argc, char *argv[])
                         // 情報検出チェック（通常巡回モードのみ）
                         if (drones[i].state == DRONE_PATROL)
                         {
-                            int detected_shelter = check_drone_info_detection(&drones[i], stop_coords, info_list, info_count, elapsed_time);
+                            int detected_shelter = check_drone_info_detection(&drones[i], stop_coords, info_list, info_count, elapsed_time, dis_idx);
                             if (detected_shelter > 0) // 情報を検出した場合
                             {
                                 // 情報を検出、物資運搬モードに移行
                                 drones[i].target_shelter = detected_shelter;
                                 drones[i].current_trip = 1;
-                                drones[i].target_x = stop_coords[0][0]; // 集積所座標
-                                drones[i].target_y = stop_coords[0][1]; // 集積所座標
+                                // drones[i].target_x = stop_coords[0][0]; // 集積所座標
+                                // drones[i].target_y = stop_coords[0][1]; // 集積所座標
+                                int target_depot_id = find_nearest_depot(drones, i, stop_coords, dis_idx, NDI);
+                                drones[i].target_depot = target_depot_id;             // 最寄り集積所IDを設定
+                                drones[i].target_x = stop_coords[target_depot_id][0]; // 最寄り集積所座標を目的として設定
+                                drones[i].target_y = stop_coords[target_depot_id][1];
+                                // 近い集積所へ飛行する処理追加？(上に一つl.776、これ含め下に4つあり)
                                 update_drone_flight_time(&drones[i], elapsed_time, DRONE_TO_DEPOT);
 
                                 // ドローンによる情報回収処理（検出と同時に回収）
@@ -2051,6 +2423,8 @@ int main(int argc, char *argv[])
                                         info_list[j].shelter_id == detected_shelter &&
                                         info_list[j].generation_time <= elapsed_time)
                                     {
+                                        drones[i].collect_info_id[j] = 1; // ドローンの回収情報IDリストに登録
+
                                         info_list[j].collected = 1;
                                         info_list[j].collection_time = elapsed_time;    // ドローン回収時刻を記録
                                         info_list[j].collected_by = COLLECTED_BY_DRONE; // ドローンによる回収を記録
@@ -2079,14 +2453,19 @@ int main(int argc, char *argv[])
                                 if (DELIVERY_METHOD == DELIVERY_METHOD_MULTI_DRONE) // 手法3のとき
                                 {
                                     // 手法3: 協調運搬の判定
-                                    int cooperative_shelter = check_drone_cooperative_transport(&drones[i], drones, ND, stop_coords, info_list, info_count);
+                                    int cooperative_shelter = check_drone_cooperative_transport(&drones[i], drones, ND, stop_coords, info_list, info_count, dis_idx);
                                     if (cooperative_shelter > 0)
                                     {
                                         // 協調運搬モードに移行
                                         drones[i].target_shelter = cooperative_shelter;
                                         drones[i].current_trip = 1;
-                                        drones[i].target_x = stop_coords[0][0]; // 集積所座標
-                                        drones[i].target_y = stop_coords[0][1]; // 集積所座標
+                                        // drones[i].target_x = stop_coords[0][0]; // 集積所座標
+                                        // drones[i].target_y = stop_coords[0][1]; // 集積所座標
+                                        int target_depot_id = find_nearest_depot(drones, i, stop_coords, dis_idx, NDI);
+                                        drones[i].target_depot = target_depot_id;             // 最寄り集積所IDを設定
+                                        drones[i].target_x = stop_coords[target_depot_id][0]; // 最寄り集積所座標を目的として設定
+                                        drones[i].target_y = stop_coords[target_depot_id][1];
+                                        // 近い集積所へ飛行する処理追加？
                                         update_drone_flight_time(&drones[i], elapsed_time, DRONE_TO_DEPOT);
 
                                         // 協調運搬の必要往復回数を計算
@@ -2114,7 +2493,7 @@ int main(int argc, char *argv[])
                         }
 
                         // ドローンの状態更新
-                        update_drone_state(&drones[i], drones, ND, stop_coords, elapsed_time, time_step, info_list, info_count, shelter_supplies, &total_extra_supply_by_drone, &drone_delivery_count);
+                        update_drone_state(&drones[i], drones, ND, stop_coords, elapsed_time, time_step, info_list, info_count, shelter_supplies, &total_extra_supply_by_drone, &drone_delivery_count, i, dis_idx);
                     }
                 }
                 /******************************************************************************************************************/
@@ -2128,7 +2507,7 @@ int main(int argc, char *argv[])
             // === 初回出発時の処理 ===
             // シミュレーション開始時は停止せず、開始地点を描画
             printf("シミュレーション開始: 集積所から出発\n");
-            plot_frame(gnuplot_pipe, stop_coords, current_x, current_y, drones, elapsed_time, info_list, info_count, shelter_supplies, supply_vehicle);
+            plot_frame(gnuplot_pipe, stop_coords, current_x, current_y, drones, elapsed_time, info_list, info_count, shelter_supplies, supply_vehicle, dis_idx);
             next_draw_time = DRAW_INTERVAL; // 最初の描画後、次の描画時刻を設定
             is_first_departure = 0;         // 初回出発フラグをリセット
         }
@@ -2136,7 +2515,7 @@ int main(int argc, char *argv[])
         // === 【次の目的地の決定】 ===
         // 車両の停止処理が完了した後、次の目的地を決定
         // 円周上の拠点を時計回りに順次訪問
-        // インデックス0=集積所, 1〜NS=避難所1〜10
+        // インデックス0その他=集積所, 集積所を除く1〜NS+NDI-1=避難所
         int next_stop_idx[NV]; // 各車両の次の停止地点インデックス
 
         // 全車両の次の停止地点を計算
@@ -2216,7 +2595,7 @@ int main(int argc, char *argv[])
             // === 描画タイミングの判定 ===
             if (elapsed_time >= next_draw_time)
             {
-                plot_frame(gnuplot_pipe, stop_coords, current_x, current_y, drones, elapsed_time, info_list, info_count, shelter_supplies, supply_vehicle);
+                plot_frame(gnuplot_pipe, stop_coords, current_x, current_y, drones, elapsed_time, info_list, info_count, shelter_supplies, supply_vehicle, dis_idx);
                 next_draw_time += DRAW_INTERVAL; // 次の描画時刻を更新
             }
 
@@ -2252,16 +2631,21 @@ int main(int argc, char *argv[])
                     if (drones[i].state == DRONE_PATROL)
                     {
                         // 検出半径以内の避難所で未回収情報があるかチェック
-                        int detected_shelter = check_drone_info_detection(&drones[i], stop_coords, info_list, info_count, elapsed_time);
+                        int detected_shelter = check_drone_info_detection(&drones[i], stop_coords, info_list, info_count, elapsed_time, dis_idx);
 
                         if (detected_shelter > 0) // 情報を検出した場合
                         {
                             // === 物資運搬モードへの移行 ===
                             // 情報検出と同時に、ドローンを物資運搬モードに切り替え
-                            drones[i].target_shelter = detected_shelter;                        // 配送先避難所を設定
-                            drones[i].current_trip = 1;                                         // 往復回数カウンタを初期化
-                            drones[i].target_x = stop_coords[0][0];                             // 集積所X座標を目標に設定
-                            drones[i].target_y = stop_coords[0][1];                             // 集積所Y座標を目標に設定
+                            drones[i].target_shelter = detected_shelter; // 配送先避難所を設定
+                            drones[i].current_trip = 1;                  // 往復回数カウンタを初期化
+                            // drones[i].target_x = stop_coords[0][0];      // 集積所X座標を目標に設定
+                            // drones[i].target_y = stop_coords[0][1];      // 集積所Y座標を目標に設定
+                            int target_depot_id = find_nearest_depot(drones, i, stop_coords, dis_idx, NDI);
+                            drones[i].target_depot = target_depot_id;             // 最寄り集積所IDを設定
+                            drones[i].target_x = stop_coords[target_depot_id][0]; // 最寄り集積所座標を目的として設定
+                            drones[i].target_y = stop_coords[target_depot_id][1];
+                            // 近い集積所へ飛行する処理追加？
                             update_drone_flight_time(&drones[i], elapsed_time, DRONE_TO_DEPOT); // 状態変更と飛行時間記録
 
                             // === ドローンによる情報回収処理（検出と同時に回収） ===
@@ -2274,6 +2658,8 @@ int main(int argc, char *argv[])
                                     info_list[j].shelter_id == detected_shelter &&
                                     info_list[j].generation_time <= elapsed_time)
                                 {
+                                    drones[i].collect_info_id[j] = 1; // ドローンの回収情報IDリストに登録
+
                                     info_list[j].collected = 1;                     // 回収済みフラグを設定
                                     info_list[j].collection_time = elapsed_time;    // ドローン回収時刻を記録
                                     info_list[j].collected_by = COLLECTED_BY_DRONE; // ドローンによる回収を記録
@@ -2307,14 +2693,19 @@ int main(int argc, char *argv[])
                             if (DELIVERY_METHOD == DELIVERY_METHOD_MULTI_DRONE) // 手法3のとき
                             {
                                 // 手法3: 協調運搬の判定
-                                int cooperative_shelter = check_drone_cooperative_transport(&drones[i], drones, ND, stop_coords, info_list, info_count);
+                                int cooperative_shelter = check_drone_cooperative_transport(&drones[i], drones, ND, stop_coords, info_list, info_count, dis_idx);
                                 if (cooperative_shelter > 0)
                                 {
                                     // 協調運搬モードに移行
                                     drones[i].target_shelter = cooperative_shelter;
                                     drones[i].current_trip = 1;
-                                    drones[i].target_x = stop_coords[0][0]; // 集積所座標
-                                    drones[i].target_y = stop_coords[0][1]; // 集積所座標
+                                    // drones[i].target_x = stop_coords[0][0]; // 集積所座標
+                                    // drones[i].target_y = stop_coords[0][1]; // 集積所座標
+                                    int target_depot_id = find_nearest_depot(drones, i, stop_coords, dis_idx, NDI);
+                                    drones[i].target_depot = target_depot_id;             // 最寄り集積所IDを設定
+                                    drones[i].target_x = stop_coords[target_depot_id][0]; // 最寄り集積所座標を目的として設定
+                                    drones[i].target_y = stop_coords[target_depot_id][1];
+                                    // 近い集積所へ飛行する処理追加？
                                     update_drone_flight_time(&drones[i], elapsed_time, DRONE_TO_DEPOT);
 
                                     // 協調運搬の必要往復回数を計算
@@ -2343,7 +2734,7 @@ int main(int argc, char *argv[])
 
                     // === ドローンの状態更新 ===
                     // 現在の状態（巡回・移動・停止）に応じた位置更新・状態遷移を実行
-                    update_drone_state(&drones[i], drones, ND, stop_coords, elapsed_time, time_step, info_list, info_count, shelter_supplies, &total_extra_supply_by_drone, &drone_delivery_count);
+                    update_drone_state(&drones[i], drones, ND, stop_coords, elapsed_time, time_step, info_list, info_count, shelter_supplies, &total_extra_supply_by_drone, &drone_delivery_count, i, dis_idx);
                 }
             }
             /******************************************************************************************************************/
@@ -2681,6 +3072,41 @@ int main(int argc, char *argv[])
         {
             printf("警告: ETr.txtファイルの作成に失敗しました\n");
         }
+
+        // === E(TL).txt ファイルの出力（TL平均値のみ） ===
+        // TL平均値を計算
+        double total_tl_time = 0.0;
+        int completed_tl_deliveries = 0;
+
+        for (int i = 0; i < info_count; i++)
+        {
+            if (info_list[i].L_delivery_completed && info_list[i].delivery_completion_time > 0)
+            {
+                double tl = info_list[i].L_delivery_completion_time - info_list[i].generation_time;
+                total_tl_time += tl;
+                completed_tl_deliveries++;
+            }
+        }
+
+        if (completed_tl_deliveries > 0)
+        {
+            double avg_tl = total_tl_time / completed_tl_deliveries;
+            FILE *tl_avg_file = fopen("Results/ETl.txt", "a");
+            if (tl_avg_file != NULL)
+            {
+                fprintf(tl_avg_file, "%.3f\n", avg_tl / 3600); // TL平均値[hour]のみを出力
+                fclose(tl_avg_file);
+                printf("TL平均値をResults/ETl.txtに追記しました\n");
+            }
+            else
+            {
+                printf("警告: ETl.txtファイルの作成に失敗しました\n");
+            }
+        }
+        else
+        {
+            printf("警告: TL配送完了件数が0のため、ETl.txtに出力できませんでした\n");
+        }
     }
     else
     {
@@ -2770,6 +3196,58 @@ int main(int argc, char *argv[])
         printf("配送完了件数: %d件\n", completed_deliveries);
         printf("Tr平均: %.2f秒 (%.2f分)\n", avg_tr, avg_tr / 60.0);
         printf("Tr総計: %.2f秒 (%.2f時間)\n", total_tr_time, total_tr_time / 3600.0);
+    }
+    else
+    {
+        printf("配送完了した情報がありません\n");
+    }
+
+    // === TL（配送時間）統計 ===
+    printf("\n=== TL（配送時間）統計 ===\n");
+    double total_tl_time = 0.0;
+    int completed_tl_deliveries = 0;
+
+    // TL値をファイルに出力（時間単位、1行ずつ）
+    FILE *tl_file = fopen("Results/tl_values.txt", "w");
+    if (tl_file != NULL)
+    {
+        for (int i = 0; i < info_count; i++)
+        {
+            if (info_list[i].L_delivery_completed && info_list[i].delivery_completion_time > 0)
+            {
+                double tl = info_list[i].L_delivery_completion_time - info_list[i].generation_time;
+                double tl_hours = tl / 3600.0; // 秒から時間に変換
+                // fprintf(tl_file, "%.6f\n", tl_hours); // 1行ずつTl値（時間単位）を出力
+                fprintf(tl_file, "shelter[%d] t = %f [hour] %.6f\n", info_list[i].shelter_id, info_list[i].delivery_completion_time / 3600, tl_hours); // 1行ずつTl値（時間単位）を出力 debug用
+                total_tl_time += tl;
+                completed_tl_deliveries++;
+            }
+        }
+        fclose(tl_file);
+        printf("Tl値（時間単位）をResults/tl_values.txtに出力しました\n");
+    }
+    else
+    {
+        printf("警告: Tl値ファイルの作成に失敗しました\n");
+
+        // ファイル出力に失敗した場合でも統計計算は実行
+        for (int i = 0; i < info_count; i++)
+        {
+            if (info_list[i].L_delivery_completed && info_list[i].delivery_completion_time > 0)
+            {
+                double tl = info_list[i].delivery_completion_time - info_list[i].generation_time;
+                total_tl_time += tl;
+                completed_tl_deliveries++;
+            }
+        }
+    }
+
+    if (completed_tl_deliveries > 0)
+    {
+        double avg_tl = total_tl_time / completed_tl_deliveries;
+        printf("配送完了件数: %d件\n", completed_tl_deliveries);
+        printf("Tl平均: %.2f秒 (%.2f分)\n", avg_tl, avg_tl / 60.0);
+        printf("Tl総計: %.2f秒 (%.2f時間)\n", total_tl_time, total_tl_time / 3600.0);
     }
     else
     {
@@ -2867,7 +3345,7 @@ int main(int argc, char *argv[])
  *
  * @param stop_coords 停止地点座標配列
  */
-void save_simulation_model_png(double stop_coords[][2])
+void save_simulation_model_png(double stop_coords[][2], int dis_idx[NDI])
 {
     FILE *pipe = popen("gnuplot -persist", "w");
     if (pipe == NULL)
@@ -2916,12 +3394,32 @@ void save_simulation_model_png(double stop_coords[][2])
     fprintf(pipe, "'-' with points pointtype 7 pointsize 2 linecolor rgb '#0000FF' notitle\n");
 
     // 集積所データ
-    fprintf(pipe, "%.1f %.1f\n", stop_coords[0][0], stop_coords[0][1]);
+    for (int i = 0; i < NDI; i++)
+    {
+        fprintf(pipe, "%.1f %.1f\n", stop_coords[dis_idx[i]][0], stop_coords[dis_idx[i]][1]); // 集積所のインデックスを参照して強調
+    }
     fprintf(pipe, "e\n");
+    // fprintf(pipe, "%.1f %.1f\n", stop_coords[0][0], stop_coords[0][1]);
+    // fprintf(pipe, "e\n");
 
     // 避難所データ
-    for (int i = 1; i <= NS; i++)
+    for (int i = 1; i <= NS + NDI - 1; i++)
     {
+        // 集積所かどうかをチェック
+        int is_depot = 0;
+        for (int d = 0; d < NDI; d++)
+        {
+            if (i == dis_idx[d])
+            {
+                is_depot = 1;
+                break; // 集積所と判明したらループを抜ける
+            }
+        }
+        if (is_depot)
+        {
+            continue; // 集積所の場合、次のiに進む
+        }
+
         fprintf(pipe, "%.1f %.1f\n", stop_coords[i][0], stop_coords[i][1]);
     }
     fprintf(pipe, "e\n");
