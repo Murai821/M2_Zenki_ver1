@@ -10,7 +10,7 @@ echo "プログラムをコンパイル中..."
 #gcc -o shell_simple_ver8_3_1 shell_simple_ver8_3_1.c -lm
 #gcc -o shell_simple_seedchange shell_simple_seedchange.c -lm
 #gcc -o shell_simple_ver9_2 shell_simple_ver9_2.c -lm
-gcc -o shell_simple_ver9_3 shell_simple_ver9_3.c -lm
+gcc -o shell_simple_ver9_3_1 shell_simple_ver9_3_1.c -lm
 
 if [ $? -ne 0 ]; then
     echo "エラー: コンパイルに失敗しました"
@@ -24,8 +24,10 @@ mkdir -p Results
 > Results/numerical_data.txt
 > Results/ETr.txt
 > Results/ETl.txt
+> Results/Rdro.txt
 > Results/Ave_ETr.txt
 > Results/Ave_ETl.txt
+> Results/Ave_Rdro.txt
 
 echo "実行開始..."
 echo
@@ -48,7 +50,7 @@ do
         #./shell_simple_ver8_3_1 ${nd} ${seed} > /dev/null 2>&1
         #./shell_simple_seedchange ${nd} ${seed} > /dev/null 2>&1
         #./shell_simple_ver9_2 ${nd} ${seed} > /dev/null 2>&1
-        ./shell_simple_ver9_3 ${nd} ${seed} > /dev/null 2>&1
+        ./shell_simple_ver9_3_1 ${nd} ${seed} > /dev/null 2>&1
 
         #> Results/ETr.txt
 
@@ -67,9 +69,13 @@ do
     gcc ETl_ave.c -o ETl_ave -lm
     ./ETl_ave 
 
+    gcc ERdro_ave.c -o ERdro_ave -lm
+    ./ERdro_ave
+
     # 次のドローン台数のために、ETr.txtとETl.txtをクリア
     > Results/ETr.txt
     > Results/ETl.txt
+    > Results/Rdro.txt
     
     echo "ドローン台数${nd}台の全Seed値での実行完了"
     echo

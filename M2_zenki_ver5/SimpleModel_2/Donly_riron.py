@@ -50,7 +50,7 @@ def average_delay(lam=1.0, service_time=0.7, c=1):
 
 
 R = 3  # 円の半径
-N = 6  # 避難所数
+N = 10  # 避難所数
 NL = N-1  # 直線の本数
 NT = (NL-1)//2 if NL%2 == 1 else NL//2  # NLが奇数なら(NL-1)/2、偶数ならNL/2
 VD = 20  # ドローン速度
@@ -88,6 +88,9 @@ y = [round(val * 2, 3) for val in x]
 # TD配列: yの各値をVDで割って1/3を足す
 TD = [round(val / VD + 1/3, 3) for val in y]#ドローンの物資運搬時間
 
+# TD配列の平均値を計算
+TD_ave = round(sum(TD) / len(TD), 3) if len(TD) > 0 else 0
+
 TA = (2*math.pi*R)/(ND*VD) #到着間隔の時間
 
 print(f"R = {R}")
@@ -98,6 +101,7 @@ print(f"VD = {VD}")
 print(f"x配列: {x}")
 print(f"y配列: {y}")
 print(f"TD配列: {TD}")
+print(f"TD_ave: {TD_ave}")
 print(f"TA: {round(TA,3)}")
 
 for c in range(1,5):
