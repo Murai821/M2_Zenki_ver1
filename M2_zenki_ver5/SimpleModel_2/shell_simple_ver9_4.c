@@ -71,8 +71,8 @@
  * 　　　　情報を集積所でいち早く入手できた場合（物資Bの運搬遅延を短縮できた場合）の確率を Psh (Pshorten) 算出
  *         TVとドローンの情報を回収するまでの時間、ETc_TVとETr_droの算出・ファイル出力追加
  * 11/27: ドローンの情報回収遅延時間 Tc_droについて、運搬車両が先に回収済みだがあとからドローンが避難所に到着して情報を回収する場合の遅延時間もカウントするように修正
- *        バグ修正（順回路の最後の避難所に関して、運搬車両の情報検知がおこなわれないバグ修正（発見条件で余剰物資Bでなく物資Bの残物資量を参照していた））
- * 11/28: 各避難所ごとのETl算出・ファイル出力追加
+ *        バグ修正（最後の避難所に関して、運搬車両の情報検知がおこなわれないバグ修正（発見条件で余剰物資Bでなく物資Bの残物資量を参照していた））
+ *
  * プログラム：集積所を複数配置したときのドローンと物資運搬車両のシミュレーション（物資運搬車両は一台、ドローン複数）、ドローンは最寄りの集積所に向かう
  *
  */
@@ -97,8 +97,8 @@
 // === シミュレーション設定 ===
 #define NS 12              // 避難所の数（集積所除く）
 #define NDI 4              // 集積所の数(NV：物資運搬車両の台数と同じにする)
-#define NT 5               // シミュレーションの周回数
-#define ND 6               // ドローンの台数（0の場合はドローンなし、最大制限なし）
+#define NT 10              // シミュレーションの周回数
+int ND = 6;                // ドローンの台数（0の場合はドローンなし、最大制限なし）
 #define NV 2               // 車両の台数（複数台対応）
 #define ENABLE_GIF 0       // GIF出力の有効/無効 (1:有効, 0:無効) | 処理軽量化用
 #define CLEAN_PNG_OUTPUT 1 // PNG出力時の軸ラベル・枠線削除 (1:削除, 0:通常表示)
@@ -641,7 +641,7 @@ int find_nearest_depot(DroneInfo drones[], int i, double stop_coords[][2], int d
  * @brief 運搬車両の次の集積所を決定する関数
  *
  * 運搬車両の次の集積所next_depot_idと現在のドローンの座標との距離を導出し、
- * 運搬車両の向かう集積所を決定する。
+ * それを速度で割った時間をt1として計算する。
  *
  * @param vehicle 運搬車両情報
  * @param current_stop_idx 現在の停止地点インデックス
@@ -1844,13 +1844,33 @@ void plot_frame(FILE *pipe, double stop_coords[][2], double vehicle_x[], double 
  *
  * @return 0: 正常終了, その他: エラー
  */
-int main(void)
+int main(int argc, char *argv[])
 {
     // === 初期化処理 ===
 
-    // 乱数シードの初期化（実行毎に異なる結果を得るため）
-    // srand(time(NULL)); // 時刻ベースのランダムシード（コメントアウト中）
-    srand(22); // 固定シードで再現性を確保
+    // === コマンドライン引数処理 ===
+    int seed_value = 12; // デフォルトのseed値
+
+    if (argc >= 2)
+    {
+        ND = atoi(argv[1]);
+        if (ND < 0)
+        {
+            printf("エラー: ドローン台数は0以上である必要があります\n");
+            return 1;
+        }
+    }
+
+    if (argc >= 3)
+    {
+        seed_value = atoi(argv[2]);
+        if (seed_value < 0)
+        {
+            printf("エラー: シード値は0以上である必要があります\n");
+            return 1;
+        }
+    }
+    srand(seed_value); // 乱数シードの設定
 
     // === gnuplotパイプの初期化 ===
     FILE *gnuplot_pipe = NULL;
@@ -2669,6 +2689,7 @@ int main(void)
                                     int cooperative_shelter = check_drone_cooperative_transport(&drones[i], drones, ND, stop_coords, info_list, info_count, dis_idx);
                                     if (cooperative_shelter > 0)
                                     {
+                                        // printf("ddddddddddddddddddddddddddddddddddddddddddddddddddddddd\n");
                                         //  ETc_dro(先に運搬車両が回収済みであとからドローンがやってきた場合)
                                         info_list[drones[i].delivery_info_index].collected_by_drone_later = 1;         // ドローンによる後続運搬フラグを設定
                                         info_list[drones[i].delivery_info_index].collection_time_later = elapsed_time; // ドローンが後に回収した時刻を設定
@@ -3793,7 +3814,6 @@ int main(void)
             total_l_deliveries++;
             if (info_list[i].fast_detection_flag)
             {
-                printf("shelter[%d]: L delivery shortened.\n", info_list[i].shelter_id); // debug
                 shortened_count++;
             }
         }

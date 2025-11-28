@@ -10,7 +10,10 @@ echo "プログラムをコンパイル中..."
 #gcc -o shell_simple_ver8_3_1 shell_simple_ver8_3_1.c -lm
 #gcc -o shell_simple_seedchange shell_simple_seedchange.c -lm
 #gcc -o shell_simple_ver9_2 shell_simple_ver9_2.c -lm
-gcc -o shell_simple_ver9_3_1 shell_simple_ver9_3_1.c -lm
+#gcc -o shell_simple_ver9_3_1 shell_simple_ver9_3_1.c -lm
+#gcc -o shell_simple_ver9_4 shell_simple_ver9_4.c -lm
+gcc -o shell_simple_ver9_5 shell_simple_ver9_5.c -lm
+# プログラム変更はseed値変更のfor文の中でも変更する（プログラム名変更箇所は二箇所）
 
 if [ $? -ne 0 ]; then
     echo "エラー: コンパイルに失敗しました"
@@ -25,22 +28,31 @@ mkdir -p Results
 > Results/ETr.txt
 > Results/ETl.txt
 > Results/Rdro.txt
+> Results/Rsh.txt
+> Results/Tc_dro.txt
+> Results/Tc_TV.txt
 > Results/Ave_ETr.txt
 > Results/Ave_ETl.txt
 > Results/Ave_Rdro.txt
+> Results/Ave_Rsh.txt
+> Results/Ave_Tc_dro.txt
+> Results/Ave_Tc_TV.txt
+> Results/tl_shelter_avg_total.txt
 
 echo "実行開始..."
 echo
 
 # ドローン台数0から20まで、各ドローン台数でseed値1から10まで順次実行
-for nd in {0..11}
+for nd in {0..8}
 do
     echo "========================================"
     echo "ドローン台数: ${nd}台での実行開始"
     echo "========================================"
+
+    > Results/tl_shelter_avg_total.txt
     
     # seed値1から10まで順次実行
-    for seed in {12..32}
+    for seed in {12..33}
     do
         echo "----------------------------------------"
         echo "ドローン台数: ${nd}台, Seed値: ${seed}"
@@ -50,7 +62,9 @@ do
         #./shell_simple_ver8_3_1 ${nd} ${seed} > /dev/null 2>&1
         #./shell_simple_seedchange ${nd} ${seed} > /dev/null 2>&1
         #./shell_simple_ver9_2 ${nd} ${seed} > /dev/null 2>&1
-        ./shell_simple_ver9_3_1 ${nd} ${seed} > /dev/null 2>&1
+        #./shell_simple_ver9_3_1 ${nd} ${seed} > /dev/null 2>&1
+        #./shell_simple_ver9_4 ${nd} ${seed} > /dev/null 2>&1
+        ./shell_simple_ver9_5 ${nd} ${seed} > /dev/null 2>&1
 
         #> Results/ETr.txt
 
@@ -72,10 +86,26 @@ do
     gcc ERdro_ave.c -o ERdro_ave -lm
     ./ERdro_ave
 
+    gcc ERsh_ave.c -o ERsh_ave -lm
+    ./ERsh_ave
+
+    gcc ETc_dro_ave.c -o ETc_dro_ave -lm
+    ./ETc_dro_ave
+
+    gcc ETc_TV_ave.c -o ETc_TV_ave -lm
+    ./ETc_TV_ave
+
+    gcc ETl_shelter.c -o ETl_shelter -lm
+    ./ETl_shelter
+
     # 次のドローン台数のために、ETr.txtとETl.txtをクリア
     > Results/ETr.txt
     > Results/ETl.txt
     > Results/Rdro.txt
+    > Results/Rsh.txt
+    > Results/Tc_dro.txt
+    > Results/Tc_TV.txt
+    > Results/tl_shelter_avg_total.txt
     
     echo "ドローン台数${nd}台の全Seed値での実行完了"
     echo
