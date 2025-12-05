@@ -8,7 +8,8 @@ echo "ドローン台数0から8まで順次実行開始..."
 # プログラムをコンパイル
 echo "プログラムをコンパイル中..."
 #gcc -o shell_simple_ver9_4 shell_simple_ver9_4.c -lm
-gcc -o shell_simple_ver9_5 shell_simple_ver9_5.c -lm
+#gcc -o shell_simple_ver9_5 shell_simple_ver9_5.c -lm
+gcc -o shell_simple_ver9_5_1 shell_simple_ver9_5_1.c -lm
 # プログラム変更はseed値変更のfor文の中でも変更する（プログラム名変更箇所は二箇所）
 
 if [ $? -ne 0 ]; then
@@ -48,7 +49,7 @@ do
     > Results/tb_shelter_avg_total.txt
 
     # seed値1から10まで順次実行
-    for seed in {12..33}
+    for seed in {12..63}
     do
         echo "----------------------------------------"
         echo "ドローン台数: ${nd}台, Seed値: ${seed}"
@@ -56,7 +57,8 @@ do
         
         # プログラム実行（標準出力を抑制し、エラーのみ表示）
         #./shell_simple_ver9_4 ${nd} ${seed} > /dev/null 2>&1
-        ./shell_simple_ver9_5 ${nd} ${seed} > /dev/null 2>&1
+        #./shell_simple_ver9_5 ${nd} ${seed} > /dev/null 2>&1
+        ./shell_simple_ver9_5_1 ${nd} ${seed} > /dev/null 2>&1
 
         #> Results/ETr.txt
 
@@ -69,6 +71,7 @@ do
         echo
     done
 
+    #統計処理のプログラム実行
     gcc ETa_ave.c -o ETa_ave -lm
     ./ETa_ave
 

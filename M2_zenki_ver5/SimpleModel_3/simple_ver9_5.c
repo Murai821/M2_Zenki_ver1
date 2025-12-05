@@ -74,6 +74,7 @@
  *        バグ修正（順回路の最後の避難所に関して、運搬車両の情報検知がおこなわれないバグ修正（発見条件で余剰物資Bでなく物資Bの残物資量を参照していた））
  * 11/28: 各避難所ごとのETl算出・ファイル出力追加
  *        プログラムの簡素化
+ * 12/2: Rshの割合算出のバグ修正、ドローンが集積所に向かう際に運搬車両が集積所で待機している場合の残り待機時間とドローンの飛行時間を考慮した算出に変更
  * プログラム：集積所を複数配置したときのドローンと物資運搬車両のシミュレーション（物資運搬車両は一台、ドローン複数）、ドローンは最寄りの集積所に向かう
  *
  */
@@ -97,9 +98,9 @@
 
 // === シミュレーション設定 ===
 #define NS 12              // 避難所の数（集積所除く）
-#define NDI 3              // 集積所の数(NV：物資運搬車両の台数と同じにする)
-#define NT 10              // シミュレーションの周回数
-#define ND 6               // ドローンの台数（0の場合はドローンなし、最大制限なし）
+#define NDI 1              // 集積所の数(NV：物資運搬車両の台数と同じにする)
+#define NT 5               // シミュレーションの周回数
+#define ND 1               // ドローンの台数（0の場合はドローンなし、最大制限なし）
 #define NV 2               // 車両の台数（複数台対応）
 #define ENABLE_GIF 0       // GIF出力の有効/無効 (1:有効, 0:無効) | 処理軽量化用
 #define CLEAN_PNG_OUTPUT 1 // PNG出力時の軸ラベル・枠線削除 (1:削除, 0:通常表示)
@@ -279,7 +280,7 @@ int check_drone_info_detection(DroneInfo *drone, double stop_coords[][2], Info *
 int check_drone_cooperative_transport(DroneInfo *drone, DroneInfo drones[], int drone_count, double stop_coords[][2], Info *info_list, int info_count, int dis_idx[NDI]);
 int check_drone_depot_detection(DroneInfo *drone, double stop_coords[][2], int dis_idx[NDI]);
 int find_nearest_depot(DroneInfo drones[], int i, double stop_coords[][2], int dis_idx[NDI], int ndi_count);
-int find_vehicle_next_depot(SupplyVehicle supply_vehicle[], int current_stop_idx[], int next_stop_idx[], DroneInfo drones[], int i, double stop_coords[][2], int dis_idx[NDI], int ndi_count, double vehicle_x[], double vehicle_y[]);
+int find_vehicle_next_depot(SupplyVehicle supply_vehicle[], int current_stop_idx[], int next_stop_idx[], DroneInfo drones[], int i, double stop_coords[][2], int dis_idx[NDI], int ndi_count, double vehicle_x[], double vehicle_y[], double ve_stop_end_time, int ve_stop_flag, int is_depot, double elapsed_time);
 void save_simulation_model_png(double stop_coords[][2], int dis_idx[NDI]);
 
 /**
@@ -644,7 +645,7 @@ int find_nearest_depot(DroneInfo drones[], int i, double stop_coords[][2], int d
  * @param ndi_count 集積所数（NDI）
  * @return 次の集積所のID、または-1（エラー）
  */
-int find_vehicle_next_depot(SupplyVehicle supply_vehicle[], int current_stop_idx[], int next_stop_idx[], DroneInfo drones[], int i, double stop_coords[][2], int dis_idx[NDI], int ndi_count, double vehicle_x[], double vehicle_y[])
+int find_vehicle_next_depot(SupplyVehicle supply_vehicle[], int current_stop_idx[], int next_stop_idx[], DroneInfo drones[], int i, double stop_coords[][2], int dis_idx[NDI], int ndi_count, double vehicle_x[], double vehicle_y[], double ve_stop_end_time, int ve_stop_flag, int is_depot, double elapsed_time)
 {
     // 集積所が1つ以下の場合は処理不要
     if (ndi_count <= 1)
@@ -652,8 +653,17 @@ int find_vehicle_next_depot(SupplyVehicle supply_vehicle[], int current_stop_idx
         return dis_idx[0]; // 最初の集積所を返す
     }
 
+    int ve_next_depot_id;
     // == ドローンが物資運搬車両が次に向かう集積所へ飛行するのに要する時間を算出
-    int ve_next_depot_id = supply_vehicle[0].next_depot_id;
+    if (is_depot == 1 && ve_stop_flag == 1 && ve_stop_end_time > elapsed_time) // 車両が集積所で停止中の場合
+    {
+        ve_next_depot_id = current_stop_idx[0];
+    }
+    else
+    {
+        ve_next_depot_id = supply_vehicle[0].next_depot_id; // それ以外の場合
+    }
+
     // ドローンの現在座標と次の集積所との距離を計算
     double dx = drones[i].x - stop_coords[ve_next_depot_id][0];
     double dy = drones[i].y - stop_coords[ve_next_depot_id][1];
@@ -663,10 +673,27 @@ int find_vehicle_next_depot(SupplyVehicle supply_vehicle[], int current_stop_idx
 
     // == 物資運搬車両が次の集積所へ到達するまでの時間を算出（円周上移動）
     int ve_next_is_depot_flag = 0; // 次の目的地が集積所かどうかのフラグ
-    double t2 = 0.0;               // 車両の移動時間
+    double t2 = 999999.0;          // 車両の移動時間
 
+    // 運搬車両の次の次の集積所IDを計算
+    int next_next_depot_idx = -1;
+    if (supply_vehicle[0].next_depot_idx + 1 >= NDI)
+    {
+        next_next_depot_idx = 0;
+    }
+    else
+    {
+        next_next_depot_idx = supply_vehicle[0].next_depot_idx + 1;
+    }
+    int ve_next_next_depot_id = dis_idx[next_next_depot_idx];
+
+    // 車両が集積所で停止中の場合
+    if (is_depot == 1 && ve_stop_flag == 1 && ve_stop_end_time > elapsed_time)
+    {
+        t2 = ve_stop_end_time - elapsed_time;
+    }
     // 物資運搬車両の次の目的が集積所なら
-    if (next_stop_idx[0] == supply_vehicle[0].next_depot_id)
+    else if (next_stop_idx[0] == supply_vehicle[0].next_depot_id)
     {
         ve_next_is_depot_flag = 1;
         // 車両の現在位置から角度を計算（atan2を使用）
@@ -689,10 +716,21 @@ int find_vehicle_next_depot(SupplyVehicle supply_vehicle[], int current_stop_idx
 
         // 車両の移動時間を計算
         t2 = arc_distance / V; // 車両の速度V
+
+        t2 = t2 + T_STOP;
     }
 
-    // ドローンと物資運搬車両の到着時間を比較
-    if (t1 <= t2 || ve_next_is_depot_flag == 0)
+    // ドローンと物資運搬車両の時間を比較
+    // 集積所に飛行する時間 <= 車両の残りの停止時間
+    if (t1 <= t2 && is_depot == 1)
+    {
+        return current_stop_idx[0];
+    }
+    else if (t1 > t2 && is_depot == 1)
+    {
+        return supply_vehicle[0].next_depot_id;
+    }
+    else if (t1 <= t2 && ve_next_is_depot_flag == 1)
     {
         // ドローンが先に到着する場合、次の集積所を返す
         return ve_next_depot_id;
@@ -700,19 +738,11 @@ int find_vehicle_next_depot(SupplyVehicle supply_vehicle[], int current_stop_idx
     else if (t1 > t2 && ve_next_is_depot_flag == 1)
     {
         // 物資運搬車両が先に到着する場合、次の次の集積所を返す
-        int next_next_depot_idx = -1;
-
-        if (supply_vehicle[0].next_depot_idx + 1 >= NDI)
-        {
-            next_next_depot_idx = 0;
-        }
-        else
-        {
-            next_next_depot_idx = supply_vehicle[0].next_depot_idx + 1;
-        }
-
-        int ve_next_next_depot_id = dis_idx[next_next_depot_idx];
         return ve_next_next_depot_id;
+    }
+    else
+    {
+        return supply_vehicle[0].next_depot_id;
     }
 }
 
@@ -982,7 +1012,7 @@ void update_drone_state(DroneInfo *drone, DroneInfo drones[], int drone_count, d
                 }
                 else if (DRONE_TO_DEPOT_OPTION == 2)
                 {
-                    target_depot_id = find_vehicle_next_depot(supply_vehicle, current_stop_idx, next_stop_idx, drones, drone_index, stop_coords, dis_idx, NDI, vehicle_x, vehicle_y);
+                    target_depot_id = find_vehicle_next_depot(supply_vehicle, current_stop_idx, next_stop_idx, drones, drone_index, stop_coords, dis_idx, NDI, vehicle_x, vehicle_y, 0.0, -1, -1, elapsed_time);
                     // int target_depot_id = supply_vehicle[0].next_depot_id; // 常に車両の次の集積所に向かう
                 }
 
@@ -2214,7 +2244,7 @@ int main(void)
                 for (int i = 0; i < info_count; i++)
                 {
                     // 対象条件: ドローンによって既に情報が取得されている、物資Ｌの要求量情報を取得
-                    if (info_list[i].shelter_id == current_stop_idx[0] && supply_vehicle[0].remaining_supply_gb > 0 && info_list[i].collected_by == COLLECTED_BY_DRONE)
+                    if (info_list[i].shelter_id == current_stop_idx[0] && supply_vehicle[0].remaining_extra_supply_b > 0 && info_list[i].collected_by == COLLECTED_BY_DRONE)
                     {
                         supply_vehicle[0].collect_info_id[i] = 1; // 車両の回収情報IDリストに登録
                     }
@@ -2329,27 +2359,31 @@ int main(void)
                     next_draw_time += DRAW_INTERVAL; // 次の描画時刻を更新
                 }
 
-                // == 物資運搬車両の集積所での停止時間中の集積所との情報交換処理（停止中にあとからドローンが集積所にやってきた場合も）
-                // === 【集積所での情報共有処理】 ===
-                // 車両が回収済みの情報を全て集積所共有
-                for (int i = 0; i < info_count; i++)
+                // 集積所に停止する場合
+                if (is_depot) // current_stop_idx[0] == 0など集積所インデックスと一致したとき
                 {
-                    // 集積所 -> 運搬車両
-                    if (supply_vehicle[0].collect_info_id[i] == 0 && facilities[current_stop_idx[0]].collect_info_id[i] == 1)
+                    // == 物資運搬車両の集積所での停止時間中の集積所との情報交換処理（停止中にあとからドローンが集積所にやってきた場合も）
+                    // === 【集積所での情報共有処理】 ===
+                    // 車両が回収済みの情報を全て集積所共有
+                    for (int i = 0; i < info_count; i++)
                     {
-                        supply_vehicle[0].collect_info_id[i] = 1; // 運搬車両での情報収集フラグを設定
+                        // 集積所 -> 運搬車両
+                        if (supply_vehicle[0].collect_info_id[i] == 0 && facilities[current_stop_idx[0]].collect_info_id[i] == 1)
+                        {
+                            supply_vehicle[0].collect_info_id[i] = 1; // 運搬車両での情報収集フラグを設定
 
-                        info_list[i].TV_collection_time = elapsed_time; // 情報リストに運搬車両回収時刻を設定
+                            info_list[i].TV_collection_time = elapsed_time; // 情報リストに運搬車両回収時刻を設定
 
-                        info_list[i].fast_detection_flag = 1; // 迅速発見フラグを設定
+                            info_list[i].fast_detection_flag = 1; // 迅速発見フラグを設定
+                        }
                     }
-                }
-                // 物資運搬車両の集積所での需要量把握した上での積載処理
-                for (int i = 0; i < info_count; i++)
-                {
-                    if (facilities[current_stop_idx[0]].collect_info_id[i] == 1) // 集積所に物資運搬車両またはドローンによって共有された情報に基づき、要求の物資を積載
+                    // 物資運搬車両の集積所での需要量把握した上での積載処理
+                    for (int i = 0; i < info_count; i++)
                     {
-                        supply_vehicle[0].demand_supply_loaded_flag[i] = 1; // 要求物資積載フラグをセット
+                        if (facilities[current_stop_idx[0]].collect_info_id[i] == 1 && supply_vehicle[0].demand_supply_loaded_flag[i] == 0) // 集積所に物資運搬車両またはドローンによって共有された情報に基づき、要求の物資を積載
+                        {
+                            supply_vehicle[0].demand_supply_loaded_flag[i] = 1; // 要求物資積載フラグをセット
+                        }
                     }
                 }
 
@@ -2390,7 +2424,7 @@ int main(void)
                                 }
                                 else if (DRONE_TO_DEPOT_OPTION == 2)
                                 {
-                                    target_depot_id = find_vehicle_next_depot(supply_vehicle, current_stop_idx, next_stop_idx, drones, i, stop_coords, dis_idx, NDI, current_x, current_y);
+                                    target_depot_id = find_vehicle_next_depot(supply_vehicle, current_stop_idx, next_stop_idx, drones, i, stop_coords, dis_idx, NDI, current_x, current_y, stop_end_time, 1, is_depot, elapsed_time);
                                     // target_depot_id = supply_vehicle[0].next_depot_id; // 常に車両の次の集積所に向かう
                                 }
 
@@ -2440,6 +2474,8 @@ int main(void)
                                     int cooperative_shelter = check_drone_cooperative_transport(&drones[i], drones, ND, stop_coords, info_list, info_count, dis_idx);
                                     if (cooperative_shelter > 0)
                                     {
+                                        drones[i].collect_info_id[drones[i].delivery_info_index] = 1; // ドローンの回収情報IDリストに登録
+
                                         //  ETc_dro(先に運搬車両が回収済みであとからドローンがやってきた場合)
                                         info_list[drones[i].delivery_info_index].collected_by_drone_later = 1;               // ドローンによる後続運搬フラグを設定
                                         info_list[drones[i].delivery_info_index].drone_collection_time_later = elapsed_time; // ドローンが後に回収した時刻を設定
@@ -2456,7 +2492,7 @@ int main(void)
                                         }
                                         else if (DRONE_TO_DEPOT_OPTION == 2)
                                         {
-                                            target_depot_id = find_vehicle_next_depot(supply_vehicle, current_stop_idx, next_stop_idx, drones, i, stop_coords, dis_idx, NDI, current_x, current_y);
+                                            target_depot_id = find_vehicle_next_depot(supply_vehicle, current_stop_idx, next_stop_idx, drones, i, stop_coords, dis_idx, NDI, current_x, current_y, stop_end_time, 1, is_depot, elapsed_time);
                                             // target_depot_id = supply_vehicle[0].next_depot_id; // 常に車両の次の集積所に向かう
                                         }
 
@@ -2666,7 +2702,7 @@ int main(void)
                             }
                             else if (DRONE_TO_DEPOT_OPTION == 2)
                             {
-                                target_depot_id = find_vehicle_next_depot(supply_vehicle, current_stop_idx, next_stop_idx, drones, i, stop_coords, dis_idx, NDI, current_x, current_y);
+                                target_depot_id = find_vehicle_next_depot(supply_vehicle, current_stop_idx, next_stop_idx, drones, i, stop_coords, dis_idx, NDI, current_x, current_y, 0.0, -1, -1, elapsed_time);
                                 // target_depot_id = supply_vehicle[0].next_depot_id; // 常に車両の次の集積所に向かう
                             }
 
@@ -2724,6 +2760,8 @@ int main(void)
                                 int cooperative_shelter = check_drone_cooperative_transport(&drones[i], drones, ND, stop_coords, info_list, info_count, dis_idx);
                                 if (cooperative_shelter > 0)
                                 {
+                                    drones[i].collect_info_id[drones[i].delivery_info_index] = 1; // ドローンの回収情報IDリストに登録
+
                                     //  ETc_dro(先に運搬車両が回収済みであとからドローンがやってきた場合)
                                     info_list[drones[i].delivery_info_index].collected_by_drone_later = 1;               // ドローンによる後続運搬フラグを設定
                                     info_list[drones[i].delivery_info_index].drone_collection_time_later = elapsed_time; // ドローンが後に回収した時刻を設定
@@ -2740,7 +2778,7 @@ int main(void)
                                     }
                                     else if (DRONE_TO_DEPOT_OPTION == 2)
                                     {
-                                        target_depot_id = find_vehicle_next_depot(supply_vehicle, current_stop_idx, next_stop_idx, drones, i, stop_coords, dis_idx, NDI, current_x, current_y);
+                                        target_depot_id = find_vehicle_next_depot(supply_vehicle, current_stop_idx, next_stop_idx, drones, i, stop_coords, dis_idx, NDI, current_x, current_y, 0.0, -1, -1, elapsed_time);
                                         // target_depot_id = supply_vehicle[0].next_depot_id; // 常に車両の次の集積所に向かう
                                     }
 
@@ -3217,7 +3255,7 @@ int main(void)
             {
                 fprintf(tl_avg_file, "%.3f\n", avg_tl / 3600); // TL平均値[hour]のみを出力
                 fclose(tl_avg_file);
-                printf("TL平均値をResults/ETb.txtに追記しました\n");
+                printf("TB平均値をResults/ETb.txtに追記しました\n");
             }
             else
             {
@@ -3480,6 +3518,8 @@ int main(void)
             if (info_list[i].fast_detection_flag)
             {
                 shortened_count++;
+                // debug
+                printf("shelter[%d] 物資B配送短縮\n", info_list[i].shelter_id);
             }
         }
     }
