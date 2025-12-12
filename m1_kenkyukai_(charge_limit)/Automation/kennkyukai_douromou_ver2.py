@@ -119,6 +119,7 @@ points_file_path = os.path.join(current_directory, "pythonfile/points.txt")
 adjacency_matrix_file_path = os.path.join(current_directory, "pythonfile/adjacency_matrix.txt")
 plot_image_path = os.path.join(current_directory, "pythonfile/network_plot.png")
 jyunkairo_image_path = os.path.join(current_directory, "pythonfile/jyunkairo_plot.png")
+circuit_image_path = os.path.join(current_directory, "pythonfile/Circuit.png")
 tsp_result_file_path = os.path.join(current_directory, "pythonfile/tsp_result.txt")
 
 # plot_image_path = os.path.join(network_directory, "network_plot.png")
@@ -203,3 +204,36 @@ nx.draw_networkx_labels(G, pos=pos, font_size=8)  # ラベルのフォントサ�
 nx.draw_networkx_edges(G, pos=pos, edgelist=[(u, v) for u, v in zip(tsp, tsp[1:]+tsp[:1])], edge_color='r')
 # 画像を保存
 plt.savefig(jyunkairo_image_path)
+
+# TSPの近似解のみを表示する新しいプロット（Circuit.png）
+plt.figure(figsize=(8, 8))
+
+# 点をプロット（network_plot.pngと同じ形式）
+plt.plot(points[:, 0], points[:, 1], 'o', color='k', markersize=2, linewidth=linewi)
+
+# TSPの経路を線で結ぶ（黒線）
+tsp_edges = [(tsp[i], tsp[(i+1) % len(tsp)]) for i in range(len(tsp))]
+for edge in tsp_edges:
+    u, v = edge
+    x1, y1 = positions[u]
+    x2, y2 = positions[v]
+    plt.plot([x1, x2], [y1, y2], color='k', linewidth=linewi)
+
+# 円を描画（network_plot.pngと同じ）
+circle = plt.Circle(center_point, circle_radius-0.1, color='b', fill=False, linestyle='--', linewidth=linewi)
+plt.gca().add_artist(circle)
+
+# 円を描画　サービスエリア（network_plot.pngと同じ）
+circle_2 = plt.Circle(center_point, 4.9, color='g', fill=False, linestyle='--', linewidth=linewi)
+plt.gca().add_artist(circle_2)
+
+# グラフの設定（network_plot.pngと同じ）
+plt.xlim(0, 10)
+plt.ylim(0, 10)
+plt.axis('off')  # すべての軸を非表示
+plt.gca().set_aspect('equal', adjustable='box')
+
+# Circuit.pngとして保存
+plt.savefig(circuit_image_path)
+print(f"TSP回路図が {circuit_image_path} に保存されました。")
+plt.close()  # 現在の図を閉じる
