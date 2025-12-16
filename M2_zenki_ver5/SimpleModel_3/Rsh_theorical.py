@@ -13,12 +13,6 @@ def calculate_rsh(Np, Ns):
     sigma_start_calc = Np + Ns - 1 - int(Ns/Np - 1)  # 計算値（小数点可能）
     sigma_start = int(sigma_start_calc)  # 整数に変換
     sigma_end = Np + Ns - 1  # シグマの終了値 (Np + Ns - 1)
-    
-    #print(f"集積所数 Np: {Np}, 避難所数 Ns: {Ns}")
-    #print(f"シグマの開始値計算: {sigma_start_calc}")
-    #print(f"シグマの範囲: k = {sigma_start} から {sigma_end}")
-    #print(f"計算範囲: Σ(k={sigma_start} to {sigma_end})")
-    
     denominator = Ns
     numerator = 0
     
@@ -29,7 +23,6 @@ def calculate_rsh(Np, Ns):
     
     Rsh = numerator / denominator 
     
-    #print(f"Rshの理論値: {Rsh}")
     return Rsh
 
 # 使用例
