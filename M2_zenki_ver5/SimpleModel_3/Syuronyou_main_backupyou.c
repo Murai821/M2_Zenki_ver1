@@ -4,7 +4,7 @@
 #include <string.h>
 #include "Syuronyou_header.h"
 
-/************* メイン関数 ******/
+/****************************************** メイン関数 ************************************************************/
 int main(void)
 {
     // === 初期化処理 ===
@@ -165,7 +165,7 @@ int main(void)
         next_stop_idx[v] = (current_stop_idx[v] + 1) % TOTAL_STOPS; // 次の停止地点を設定
     }
 
-    /********************** 【メインシミュレーションループ開始】 ****************/
+    /********************** 【メインシミュレーションループ開始】 *********************************************************************************************/
     // 指定された周回数（NT）まで車両の巡回を継続
     while (lap_count < NT)
     {
@@ -292,7 +292,7 @@ int main(void)
                         supply_vehicle[v].is_loaded = 1;                                               // 積載状態フラグを設定
                     }
                 }
-                else /***************** 避難所に停止する場合（current_stop_idx[] が０でないとき）********************/
+                else /***************** 避難所に停止する場合（current_stop_idx[] が０でないとき）******************************************/
                 {
                     // === 【避難所での物資配送処理】 ===
                     // 車両が通常物資（A・B）を積載中で、両方とも残量がある場合のみ配送実行
@@ -437,7 +437,7 @@ int main(void)
                         }
                     }
                 }
-                //*************** 物資運搬車両の物資運搬処理ここまで *********************/
+                //************************************* 物資運搬車両の物資運搬処理ここまで ********************************************************************/
 
                 // === 車両停止時間中のドローン処理ループ ===
                 // 停止期間中も時間を進めてドローンの位置更新と描画を実行
@@ -469,7 +469,7 @@ int main(void)
                         }
                     }
 
-                    /*****************ドローンの処理 車両移動中と同様の処理****************/
+                    /************************************************ドローンの処理 車両移動中と同様の処理******************************************************************/
                     // === 時間ステップ進行 ===
                     double time_step = 1.0; // 1秒刻みで時間を進める
                     elapsed_time += time_step;
@@ -758,7 +758,7 @@ int main(void)
                 next_draw_time += DRAW_INTERVAL; // 次の描画時刻を更新
             }
 
-            /************************ 車両停止中と同様の処理 *****************************/
+            /************************************************* 車両停止中と同様の処理 *****************************************************************/
             // === 【時間ステップ進行】 ===
             double time_step = 1.0; // 1秒ステップ（バランスの取れた精度と計算速度）
             elapsed_time += time_step;
@@ -929,7 +929,7 @@ int main(void)
                     update_drone_state(&drones[i], drones, ND, stop_coords, elapsed_time, time_step, info_list, info_count, facilities, &total_extra_supply_by_drone, &drone_delivery_count, i, dis_idx, supply_vehicle, current_stop_idx, next_stop_idx, current_x, current_y);
                 }
             }
-            /*******************************************************************/
+            /******************************************************************************************************************/
         }
 
         // === 移動完了時の正確な位置調整 ===
@@ -941,5 +941,677 @@ int main(void)
             current_stop_idx[v] = next_stop_idx[v];
         }
     }
+
+    // ======================== 各統計処理について =========================================================================================================================== //
+
+    // === 【シミュレーション終了処理】 ===
+    printf("\n=== シミュレーション終了 ===\n");
+    printf("完了周回数: %d周\n", lap_count);
+    printf("総経過時間: %.0f秒 (%.1f時間)\n", elapsed_time, elapsed_time / 3600.0);
+
+    // === 【車両移動距離の計算と表示】 ===
+    // 物理的な移動実績を評価指標として算出
+    double total_distance = lap_count * 2.0 * PI * R; // 総移動距離 = 周回数 × 円周（2πR）
+    printf("車両総移動距離: %.1f m (%.2f km)\n", total_distance, total_distance / 1000.0);
+    printf("車両平均速度: %.2f m/s (%.1f km/h)\n", V, V * 3.6); // m/s → km/h変換
+
+    // === 【情報発生・回収の統計情報】 ===
+    printf("\n=== 情報回収システム統計 ===\n");
+    printf("情報発生率: %.2f [/hour]\n", LAMBDA); // 発生率
+    printf("総情報発生数: %d件\n", info_count);
+
+    // === 全情報の回収状況を再集計（車両・ドローン混合） ===
+    // info_listを全走査して最終的な回収状況を正確に把握
+    int total_collected_count = 0;
+    for (int i = 0; i < info_count; i++)
+    {
+        if (info_list[i].collected)
+        {
+            total_collected_count++;
+        }
+    }
+
+    // 回収実績の詳細表示
+    // collected_count: 車両による回収数（Tc統計記録済み）
+    // total_collected_count - collected_count: ドローンによる回収数
+    printf("回収済み情報数: %d件（車両: %d件, ドローン: %d件）\n",
+           total_collected_count, collected_count, total_collected_count - collected_count);
+    printf("未回収情報数: %d件\n", info_count - total_collected_count);
+
+    // === 【Tc（回収遅延時間）の統計解析】 ====================================================================================
+    // 災害情報システムの重要評価指標
+    // Tc = 情報発生時刻から回収時刻までの遅延時間
+
+    // collected_byフィールドに基づく正確な分類統計
+    double vehicle_tc_total = 0.0;  // 車両回収分のTc総計
+    double drone_tc_total = 0.0;    // ドローン回収分のTc総計
+    double all_tc_total = 0.0;      // 全体のTc総計
+    int vehicle_collected_calc = 0; // 車両回収数
+    int drone_collected_calc = 0;   // ドローン回収数
+
+    // 全回収済み情報を回収主体別に分類して統計計算
+    for (int i = 0; i < info_count; i++)
+    {
+        if (info_list[i].collected && info_list[i].collection_time >= 0)
+        {
+            double tc = info_list[i].collection_time - info_list[i].generation_time;
+            all_tc_total += tc;
+
+            // 回収主体に基づく分類
+            if (info_list[i].collected_by == COLLECTED_BY_VEHICLE)
+            {
+                vehicle_tc_total += tc;
+                vehicle_collected_calc++;
+            }
+            else if (info_list[i].collected_by == COLLECTED_BY_DRONE)
+            {
+                drone_tc_total += tc;
+                drone_collected_calc++;
+            }
+        }
+
+        // TVが先に回収してあとからドローンも回収する場合の遅延もカウント
+        if (info_list[i].collected_by_drone_later == 1 && info_list[i].drone_collection_time_later >= 0)
+        {
+            double tc_later = info_list[i].drone_collection_time_later - info_list[i].generation_time;
+            all_tc_total += tc_later;
+            drone_tc_total += tc_later;
+            drone_collected_calc++;
+        }
+    }
+
+    // コンソールにも表示（従来通り）
+    if (total_collected_count > 0)
+    {
+
+        // 車両回収分の統計
+        if (vehicle_collected_calc > 0)
+        {
+            double vehicle_avg_tc = vehicle_tc_total / vehicle_collected_calc;
+        }
+
+        // ドローン回収分の統計
+        if (drone_collected_calc > 0)
+        {
+            double drone_avg_tc = drone_tc_total / drone_collected_calc;
+
+            // === Tc_dro.txt ファイルの出力（ドローン回収分のTc平均値） ===
+            FILE *drone_tc_file = fopen("Results/Tc_dro.txt", "a");
+            if (drone_tc_file != NULL)
+            {
+                fprintf(drone_tc_file, "%.3f\n", drone_avg_tc / 3600); // ドローン回収分のTc平均値を秒単位で出力
+                fclose(drone_tc_file);
+                printf("ドローン回収分Tc平均値をResults/Tc_dro.txtに追記しました\n");
+            }
+            else
+            {
+                printf("警告: Tc_dro.txtファイルの作成に失敗しました\n");
+            }
+        }
+        else
+        {
+
+            // === Tc_dro.txt ファイルの出力（ドローン回収分が0件の場合） ===
+            FILE *drone_tc_file = fopen("Results/Tc_dro.txt", "a");
+            if (drone_tc_file != NULL)
+            {
+                fprintf(drone_tc_file, "0.000\n"); // 回収数が0の場合は0を出力
+                fclose(drone_tc_file);
+                printf("ドローン回収分Tc平均値をResults/Tc_dro.txtに追記しました（0値）\n");
+            }
+            else
+            {
+                printf("警告: Tc_dro.txtファイルの作成に失敗しました\n");
+            }
+        }
+
+        // 全体統計（車両＋ドローン）
+        double all_avg_tc = all_tc_total / total_collected_count;
+    }
+    else
+    {
+        printf("Tc統計: 計算不可（回収済み情報なし）\n");
+    }
+
+    //======= TV_collection_timeの平均値を計算してTc_TVとして表示
+    double tv_collection_total = 0.0;
+    int tv_collection_count = 0;
+
+    for (int i = 0; i < info_count; i++)
+    {
+        if (info_list[i].TV_collection_time > 0)
+        {
+            double tc_tv = info_list[i].TV_collection_time - info_list[i].generation_time;
+            tv_collection_total += tc_tv;
+            tv_collection_count++;
+        }
+    }
+
+    if (tv_collection_count > 0)
+    {
+        double tc_tv_avg = tv_collection_total / tv_collection_count;
+
+        // === Tc_TV.txt ファイルの出力（車両回収時間平均値） ===
+        FILE *tc_tv_file = fopen("Results/Tc_TV.txt", "a");
+        if (tc_tv_file != NULL)
+        {
+            double tc_tv_avg_hours = tc_tv_avg / 3600.0;    // 秒を時間に変換
+            fprintf(tc_tv_file, "%.6f\n", tc_tv_avg_hours); // 車両回収時間平均値を時間単位で出力
+            fclose(tc_tv_file);
+            printf("Tc_TV平均値をResults/Tc_TV.txtに追記しました\n");
+        }
+        else
+        {
+            printf("警告: Tc_TV.txtファイルの作成に失敗しました\n");
+        }
+    }
+    else
+    {
+        printf("Tc_TV（車両回収時間）: 車両による回収実績なし\n");
+
+        // === Tc_TV.txt ファイルの出力（車両回収実績なしの場合） ===
+        FILE *tc_tv_file = fopen("Results/Tc_TV.txt", "a");
+        if (tc_tv_file != NULL)
+        {
+            fprintf(tc_tv_file, "0.000000\n"); // 回収実績なしの場合は0を出力
+            fclose(tc_tv_file);
+            printf("Tc_TV平均値をResults/Tc_TV.txtに追記しました（0値）\n");
+        }
+        else
+        {
+            printf("警告: Tc_TV.txtファイルの作成に失敗しました\n");
+        }
+    }
+
+    // === 【ドローン飛行時間統計（Pf: 物資運搬割合）】 ===================================================================
+    // Pf = 物資運搬時間 / 総飛行時間 × 100 (%)
+    // 高いPf値ほど、無駄な飛行時間が少なく効率的な運用を表す
+    if (ND > 0)
+    {
+        double total_flight_time_all = 0.0;           // 全ドローンの総飛行時間（状態間）
+        double total_timestep_flight_time = 0.0;      // 全ドローンのtime_step飛行時間
+        double total_supply_transport_time = 0.0;     // 全ドローンの物資運搬時間
+        double total_few_supply_transport_time = 0.0; // 全ドローンの少量物資運搬時間
+        int active_drones = 0;                        // 活動したドローン数
+
+        for (int i = 0; i < ND; i++)
+        {
+            if (drones[i].active)
+            {
+                // シミュレーション終了時点での最終状態時間を更新
+                update_drone_flight_time(&drones[i], elapsed_time, drones[i].state);
+
+                total_flight_time_all += drones[i].total_flight_time;
+                total_timestep_flight_time += drones[i].timestep_flight_time;
+                total_supply_transport_time += drones[i].supply_transport_time;
+                total_few_supply_transport_time += drones[i].few_supply_transport_time;
+                active_drones++;
+            }
+        }
+
+        for (int i = 0; i < ND; i++)
+        {
+            if (drones[i].active)
+            {
+                // 個別ドローンの統計
+                double pf_individual = (drones[i].total_flight_time > 0) ? (drones[i].supply_transport_time / drones[i].total_flight_time) * 100.0 : 0.0;
+                double pf_timestep = (drones[i].timestep_flight_time > 0) ? (drones[i].supply_transport_time / drones[i].timestep_flight_time) * 100.0 : 0.0;
+                double pf_few_state = (drones[i].supply_transport_time > 0) ? (drones[i].few_supply_transport_time / drones[i].supply_transport_time) * 100.0 : 0.0;
+                double pf_few_timestep = (drones[i].supply_transport_time > 0) ? (drones[i].few_supply_transport_time / drones[i].supply_transport_time) * 100.0 : 0.0;
+            }
+        }
+
+        // 全ドローン平均のPf計算
+        if (active_drones > 0 && total_flight_time_all > 0 && total_timestep_flight_time > 0)
+        {
+            double avg_flight_time = total_flight_time_all / active_drones;
+            double avg_timestep_flight_time = total_timestep_flight_time / active_drones;
+            double avg_supply_transport_time = total_supply_transport_time / active_drones;
+            double avg_few_supply_transport_time = total_few_supply_transport_time / active_drones;
+            double avg_pf_state = (avg_supply_transport_time / avg_flight_time) * 100.0;
+            double avg_pf_timestep = (avg_supply_transport_time / avg_timestep_flight_time) * 100.0;
+            double avg_pf_few_state = (avg_supply_transport_time > 0) ? (avg_few_supply_transport_time / avg_supply_transport_time) * 100.0 : 0.0;
+            double avg_pf_few_timestep = (avg_supply_transport_time > 0) ? (avg_few_supply_transport_time / avg_supply_transport_time) * 100.0 : 0.0;
+        }
+    }
+
+    // === 【余剰物資A運搬統計】 ==============================================================================================
+    double total_extra_supply = total_extra_supply_by_vehicle + total_extra_supply_by_drone;
+    int total_delivery_count = vehicle_delivery_count + drone_delivery_count;
+
+    // === 余剰物資A運搬統計のファイル出力 ===
+    // numerical_data.txt の格納部分を削除
+
+    // 必要な変数の定義（削除されたコードブロックから移動）
+    double ta_avg = 0.0;
+    double zero_value = 0.0;
+    double drone_ratio_value = 0.0;
+
+    // Ta平均値の計算
+    double total_ta_time = 0.0;
+    int completed_deliveries = 0;
+
+    for (int i = 0; i < info_count; i++)
+    {
+        if (info_list[i].A_extra_delivery_completed && info_list[i].A_extra_delivery_completion_time > 0)
+        {
+            double ta = info_list[i].A_extra_delivery_completion_time - info_list[i].generation_time;
+            total_ta_time += ta;
+            completed_deliveries++;
+        }
+    }
+
+    if (completed_deliveries > 0)
+    {
+        ta_avg = total_ta_time / completed_deliveries;
+    }
+
+    // ドローン運搬割合の計算
+    if (total_extra_supply > 0)
+    {
+        drone_ratio_value = (total_extra_supply_by_drone / total_extra_supply);
+    }
+
+    // === E(TA).txt ファイルの出力（Tr平均値のみ） ===
+    FILE *ta_avg_file = fopen("Results/ETa.txt", "a");
+    if (ta_avg_file != NULL)
+    {
+        fprintf(ta_avg_file, "%.3f\n", ta_avg / 3600); // Ta平均値[hour]のみを出力
+        fclose(ta_avg_file);
+        printf("Ta平均値をResults/ETa.txtに追記しました\n");
+    }
+    else
+    {
+        printf("警告: ETa.txtファイルの作成に失敗しました\n");
+    }
+
+    // === Rdro.txt ファイルの出力（ドローン運搬割合のみ） ===
+    FILE *drone_ratio_file = fopen("Results/Rdro.txt", "a");
+    if (drone_ratio_file != NULL)
+    {
+        if (ND == 0)
+        {
+            fprintf(drone_ratio_file, "%.3f\n", zero_value); // ND=0の場合は0を出力
+        }
+        else
+        {
+            fprintf(drone_ratio_file, "%.3f\n", drone_ratio_value); // ドローン運搬割合を出力
+        }
+        fclose(drone_ratio_file);
+        printf("ドローン運搬割合をResults/Rdro.txtに追記しました\n");
+    }
+    else
+    {
+        printf("警告: Rdro.txtファイルの作成に失敗しました\n");
+    }
+
+    // === E(TB).txt ファイルの出力（TB平均値のみ） ===
+    // TB平均値を計算
+    double total_tb_time = 0.0;
+    int completed_tb_deliveries = 0;
+
+    for (int i = 0; i < info_count; i++)
+    {
+        if (info_list[i].B_extra_delivery_completed && info_list[i].A_extra_delivery_completion_time > 0)
+        {
+            double tb = info_list[i].B_extra_delivery_completion_time - info_list[i].generation_time;
+            total_tb_time += tb;
+            completed_tb_deliveries++;
+        }
+    }
+
+    if (completed_tb_deliveries > 0)
+    {
+        double avg_tl = total_tb_time / completed_tb_deliveries;
+        FILE *tl_avg_file = fopen("Results/ETb.txt", "a");
+        if (tl_avg_file != NULL)
+        {
+            fprintf(tl_avg_file, "%.3f\n", avg_tl / 3600); // TL平均値[hour]のみを出力
+            fclose(tl_avg_file);
+            printf("TB平均値をResults/ETb.txtに追記しました\n");
+        }
+        else
+        {
+            printf("警告: ETb.txtファイルの作成に失敗しました\n");
+        }
+    }
+    else
+    {
+        printf("警告: 配送完了件数が0のため、ETb.txtに出力できませんでした\n");
+    }
+
+    // ======= numerical_data.txt処理削除済み ===================================================================================================================
+
+    // コンソールにも表示（従来通り）
+
+    if (total_delivery_count > 0)
+    {
+        double avg_delivery_per_trip = total_extra_supply / total_delivery_count;
+
+        if (vehicle_delivery_count > 0)
+        {
+            double avg_vehicle_delivery = total_extra_supply_by_vehicle / vehicle_delivery_count;
+        }
+
+        if (drone_delivery_count > 0)
+        {
+            double avg_drone_delivery = total_extra_supply_by_drone / drone_delivery_count;
+        }
+
+        // 運搬主体の割合表示（運搬総量のうち何kgを車両・ドローンが運搬したか）
+        double vehicle_ratio = (total_extra_supply > 0) ? (total_extra_supply_by_vehicle / total_extra_supply) * 100.0 : 0.0;
+        double drone_ratio = (total_extra_supply > 0) ? (total_extra_supply_by_drone / total_extra_supply) * 100.0 : 0.0;
+
+        // 一周あたりの車両の余剰物資配送量
+        double vehicle_extra_supply_per_lap = total_extra_supply_by_vehicle / lap_count;
+    }
+    else
+    {
+        printf("余剰物資Aの配送は発生しませんでした\n");
+    }
+
+    // === TA（配送時間）統計 ===============================================================================================
+    total_ta_time = 0.0;
+    completed_deliveries = 0;
+
+    // Ta値をファイルに出力（時間単位、1行ずつ）
+    FILE *ta_file = fopen("Results/ta_values.txt", "w");
+    if (ta_file != NULL)
+    {
+        for (int i = 0; i < info_count; i++)
+        {
+            if (info_list[i].A_extra_delivery_completed && info_list[i].A_extra_delivery_completion_time > 0)
+            {
+                double tr = info_list[i].A_extra_delivery_completion_time - info_list[i].generation_time;
+                double tr_hours = tr / 3600.0; // 秒から時間に変換
+                // fprintf(tr_file, "%.6f\n", tr_hours); // 1行ずつTr値（時間単位）を出力
+                fprintf(ta_file, "shelter[%d] t = %f [hour] %.6f\n", info_list[i].shelter_id, info_list[i].A_extra_delivery_completion_time / 3600, tr_hours); // 1行ずつTr値（時間単位）を出力 debug用
+                total_ta_time += tr;
+                completed_deliveries++;
+            }
+        }
+        fclose(ta_file);
+    }
+    else
+    {
+
+        // ファイル出力に失敗した場合でも統計計算は実行
+        for (int i = 0; i < info_count; i++)
+        {
+            if (info_list[i].A_extra_delivery_completed && info_list[i].A_extra_delivery_completion_time > 0)
+            {
+                double ta = info_list[i].A_extra_delivery_completion_time - info_list[i].generation_time;
+                total_ta_time += ta;
+                completed_deliveries++;
+            }
+        }
+    }
+
+    if (completed_deliveries > 0)
+    {
+        double avg_ta = total_ta_time / completed_deliveries;
+    }
+
+    // === TB（配送時間）統計 ===========================================================================
+    total_tb_time = 0.0;
+    completed_tb_deliveries = 0;
+
+    // TB値をファイルに出力（時間単位、1行ずつ）
+    FILE *tb_file = fopen("Results/tb_values.txt", "w");
+    if (tb_file != NULL)
+    {
+        for (int i = 0; i < info_count; i++)
+        {
+            if (info_list[i].B_extra_delivery_completed && info_list[i].B_extra_delivery_completion_time > 0)
+            {
+                double tb = info_list[i].B_extra_delivery_completion_time - info_list[i].generation_time;
+                double tb_hours = tb / 3600.0; // 秒から時間に変換
+                // fprintf(tl_file, "%.6f\n", tl_hours); // 1行ずつTl値（時間単位）を出力
+                fprintf(tb_file, "shelter[%d] t = %f [hour] %.6f\n", info_list[i].shelter_id, info_list[i].B_extra_delivery_completion_time / 3600, tb_hours); // 1行ずつTl値（時間単位）を出力 debug用
+                total_tb_time += tb;
+                completed_tb_deliveries++;
+            }
+        }
+        fclose(tb_file);
+        printf("Tb値（時間単位）をResults/tb_values.txtに出力しました\n");
+    }
+    else
+    {
+        // ファイル出力に失敗した場合でも統計計算は実行
+        for (int i = 0; i < info_count; i++)
+        {
+            if (info_list[i].B_extra_delivery_completed && info_list[i].B_extra_delivery_completion_time > 0)
+            {
+                double tb = info_list[i].B_extra_delivery_completion_time - info_list[i].generation_time;
+                total_tb_time += tb;
+                completed_tb_deliveries++;
+            }
+        }
+    }
+
+    if (completed_tb_deliveries > 0)
+    {
+        double avg_tb = total_tb_time / completed_tb_deliveries;
+    }
+    // ====== TBについて各避難所ごとにの平均値を計算してファイル出力 ========================
+
+    // 既存のtb_shelter_avg.txtから値を読み込む
+    double existing_values[NS + NDI];
+    int existing_counts[NS + NDI];
+    for (int i = 0; i < NS + NDI; i++)
+    {
+        existing_values[i] = 0.0; // 初期化
+        existing_counts[i] = 0;   // 初期化
+    }
+
+    // まず既存のtotal.txtからカウンタ情報を読み取る
+    FILE *existing_total_file = fopen("Results/tb_shelter_avg_total.txt", "r");
+    if (existing_total_file != NULL)
+    {
+        int line_count = 0;
+        char line[256];
+        while (fgets(line, sizeof(line), existing_total_file) && line_count < NS + NDI - 1)
+        {
+            double total_value;
+            int count_value;
+            if (sscanf(line, "%lf %d", &total_value, &count_value) == 2)
+            {
+                existing_values[line_count] = total_value;
+                existing_counts[line_count] = count_value;
+            }
+            else if (sscanf(line, "%lf", &total_value) == 1)
+            {
+                // 古いフォーマット（カウンタなし）の場合
+                existing_values[line_count] = total_value;
+                existing_counts[line_count] = 1; // 1回分として扱う
+            }
+            line_count++;
+        }
+        fclose(existing_total_file);
+        printf("既存のtb_shelter_avg_total.txtから%d行の累積値とカウンタを読み込みました\n", line_count);
+    }
+    else
+    {
+        // total.txtがない場合は、通常のtb_shelter_avg.txtから読み込む
+        FILE *existing_file = fopen("Results/tb_shelter_avg.txt", "r");
+        if (existing_file != NULL)
+        {
+            int line_count = 0;
+            char line[256];
+            while (fgets(line, sizeof(line), existing_file) && line_count < NS + NDI - 1)
+            {
+                existing_values[line_count] = atof(line);
+                existing_counts[line_count] = 1; // 1回分として扱う
+                line_count++;
+            }
+            fclose(existing_file);
+            printf("既存のtb_shelter_avg.txtから%d行の値を読み込みました（初回カウント）\n", line_count);
+        }
+        else
+        {
+            printf("既存ファイルが見つからないため、新規作成します\n");
+        }
+    }
+
+    FILE *tb_shelter_file = fopen("Results/tb_shelter_avg.txt", "w");
+    FILE *tb_shelter_total_file = fopen("Results/tb_shelter_avg_total.txt", "w");
+
+    if (tb_shelter_file != NULL && tb_shelter_total_file != NULL)
+    {
+        // 避難所ごとのTB平均値を計算
+        for (int shelter_id = 1; shelter_id <= NS + NDI - 1; shelter_id++)
+        {
+            double total_tb_shelter = 0.0;
+            int count_tb_shelter = 0;
+
+            for (int i = 0; i < info_count; i++)
+            {
+                if (info_list[i].shelter_id == shelter_id && info_list[i].B_extra_delivery_completed && info_list[i].B_extra_delivery_completion_time > 0)
+                {
+                    double tb = info_list[i].B_extra_delivery_completion_time - info_list[i].generation_time;
+                    total_tb_shelter += tb;
+                    count_tb_shelter++;
+                }
+            }
+
+            double new_avg_value;
+            if (count_tb_shelter > 0)
+            {
+                double avg_tb_shelter = total_tb_shelter / count_tb_shelter;
+                new_avg_value = avg_tb_shelter / 3600.0;
+                // fprintf(tb_shelter_file, "shelter[%d]: Tb平均 = %.2f秒 (%.2f時間)\n", shelter_id, avg_tb_shelter, avg_tb_shelter / 3600.0);
+                fprintf(tb_shelter_file, "%.2f\n", new_avg_value);
+            }
+            else
+            {
+                new_avg_value = 0.0;
+                // fprintf(tl_shelter_file, "shelter[%d]: Tl平均 = N/A (配送完了なし)\n", shelter_id);
+                fprintf(tb_shelter_file, "%.2f\n", new_avg_value);
+            }
+
+            // 既存の値と新しい値の和を計算してtotal.txtに書き込み（カウンタ付き）
+            double total_value = existing_values[shelter_id - 1] + new_avg_value;
+            int new_count = existing_counts[shelter_id - 1] + 1;
+            fprintf(tb_shelter_total_file, "%.2f %d\n", total_value, new_count);
+        }
+
+        fclose(tb_shelter_file);
+        fclose(tb_shelter_total_file);
+        printf("避難所ごとのTl平均値をResults/tb_shelter_avg.txtに出力しました\n");
+        printf("避難所ごとのTl平均値の累積和とカウンタをResults/tb_shelter_avg_total.txtに出力しました\n");
+    }
+    else
+    {
+        if (tb_shelter_file == NULL)
+        {
+            printf("警告: TB避難所別平均値ファイル(tb_shelter_avg.txt)の作成に失敗しました\n");
+        }
+        if (tb_shelter_total_file == NULL)
+        {
+            printf("警告: TB避難所別平均値累積ファイル(tb_shelter_avg_total.txt)の作成に失敗しました\n");
+        }
+        if (tb_shelter_file != NULL)
+            fclose(tb_shelter_file);
+        if (tb_shelter_total_file != NULL)
+            fclose(tb_shelter_total_file);
+    }
+
+    // == 提案手法による物資Bの配送が短縮された割合（確率）に関する統計 ========================================================
+    int shortened_count = 0;
+    int total_b_deliveries = 0;
+    for (int i = 0; i < info_count; i++)
+    {
+        if (info_list[i].B_extra_delivery_completed)
+        {
+            total_b_deliveries++;
+            if (info_list[i].fast_detection_flag)
+            {
+                shortened_count++;
+                // debug
+                printf("shelter[%d] 物資B配送短縮\n", info_list[i].shelter_id);
+            }
+            else
+            {
+                // debug
+                printf("shelter[%d] 物資B配送短縮なし\n", info_list[i].shelter_id);
+            }
+        }
+    }
+    printf("\n=== 物資B配送短縮割合統計 ===\n");
+    if (total_b_deliveries > 0)
+    {
+        double shortening_ratio = ((double)shortened_count / total_b_deliveries) * 100.0;
+        printf("物資B配送短縮件数: %d件 / %d件 (%.2f%%)\n", shortened_count, total_b_deliveries, shortening_ratio);
+
+        // === Rsh.txt ファイルの出力（物資B配送短縮割合） ===
+        FILE *shortening_ratio_file = fopen("Results/Rsh.txt", "a");
+        if (shortening_ratio_file != NULL)
+        {
+            fprintf(shortening_ratio_file, "%.3f\n", shortening_ratio / 100.0); // 割合を0-1の範囲で出力
+            fclose(shortening_ratio_file);
+        }
+        else
+        {
+            printf("警告: Rsh.txtファイルの作成に失敗しました\n");
+        }
+    }
+    else
+    {
+        printf("物資B配送完了件数が0のため、短縮割合は計算できません\n");
+
+        // === Rsh.txt ファイルの出力（物資B配送短縮割合が計算できない場合） ===
+        FILE *shortening_ratio_file = fopen("Results/Rsh.txt", "a");
+        if (shortening_ratio_file != NULL)
+        {
+            fprintf(shortening_ratio_file, "0.000\n"); // 配送完了件数が0の場合は0を出力
+            fclose(shortening_ratio_file);
+            printf("物資B配送短縮割合をResults/Rsh.txtに追記しました（0値）\n");
+        }
+        else
+        {
+            printf("警告: Rsh.txtファイルの作成に失敗しました\n");
+        }
+    }
+
+    // == TG (通常物資の平均運搬間隔) 統計 ===============================================================
+    printf("\n=== TG (通常物資の平均運搬間隔) 統計 ===\n");
+    double tg_total = 0.0;
+    double tg_count = 0.0;
+    for (int i = 0; i < TOTAL_STOPS; i++)
+    {
+        if (facilities[i].tg_count > 0)
+        {
+            tg_total += facilities[i].tg_total_time / 3600.0; // 秒を時間に変換して加算
+            tg_count += facilities[i].tg_count;
+        }
+    }
+    printf("TG平均:E(TG) = %.2f時間 \n", (tg_count > 0) ? (tg_total / tg_count) : 0.0);
+
+    // === 【GIFファイル処理・クリーンアップ】 ===
+    if (ENABLE_GIF && gnuplot_pipe != NULL)
+    {
+        printf("\n=== GIF出力処理 ===\n");
+        printf("'simulation.gif' がカレントディレクトリに生成されました。\n");
+
+        // === GIFファイルの適切な終了処理 ===
+        // gnuplotに終了コマンドを送信してファイルを正常に閉じる
+        // この処理を省略するとGIFファイルが破損する可能性がある
+        fprintf(gnuplot_pipe, "unset output\n"); // 出力ファイルの明示的クローズ
+        fflush(gnuplot_pipe);                    // バッファの強制フラッシュ
+
+        // gnuplotプロセスの終了とパイプクローズ
+        pclose(gnuplot_pipe);
+    }
+    else if (ENABLE_GIF)
+    {
+        printf("\n=== GIF出力エラー ===\n");
+        printf("GIF出力が有効でしたが、gnuplotの初期化に失敗したため、GIFファイルは生成されませんでした。\n");
+    }
+    else
+    {
+        printf("\n=== GIF出力設定 ===\n");
+        printf("GIF出力が無効のため、GIFファイルは生成されませんでした。\n");
+    }
+
     return 0;
 }

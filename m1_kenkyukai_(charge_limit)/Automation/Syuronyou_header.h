@@ -1,8 +1,7 @@
-/*ヘッダファイル*/
 #ifndef HEADER_H
 #define HEADER_H
 
-/**************************************** マクロ変数定義 ************************************************************************/
+// === マクロ変数定義 ===/
 #define L 10.0      /*サービスエリアの大きさ*/
 #define R 5.0       /*中心市街地の半径*/
 #define A_R 1.0     /*中心市街地の半径 + A_R の範囲外に山間部の避難所を生成する*/
@@ -32,7 +31,7 @@
 #define MAX_charge_count 9999 // 各TVが一巡回する間にドローンを充電することができる回数
 #define MAX_TVchargeable 300  // TVで一巡回する間にドローンを充電することができる総計（単位は[min]）
 
-/*************************************************** 構造体定義 *********************************************************************/
+//=== 構造体定義 ===
 // 配送センターと避難所の構造体
 typedef struct
 {
@@ -86,7 +85,7 @@ typedef struct
     double flight_start_time; // ドローンの飛行開始時間
 } dro;
 
-/********************************************** 関数宣言 ******************************************************************/
+//=== 関数宣言 ===
 int search_index(int arry[], int num);
 double dijkstra(int start, int goal, double weight[][N], int numline);
 void RFCS_method(double weight[][N], int numline, int result_arry[], int *result_arry_size);
@@ -109,7 +108,6 @@ void split_array(int *new_jyunkai_keiro, int new_jyunkai_keiro_size, int **cir, 
 int add_to_row(int ***array, int *row_sizes, int target_row, int *add_array, int add_size);
 int prepend_to_row(int ***array, int *row_sizes, int target_row, int *add_array, int add_size);
 void readAdjacencyMatrix(const char *filename, int connect[][N]);
-double generate_normal(double mean, double std_dev);
 int get_random_int(int min, int max);
 void init_point(point *p, double x, double y);
 void init_vehicle(vehicle *v, double x, double y);

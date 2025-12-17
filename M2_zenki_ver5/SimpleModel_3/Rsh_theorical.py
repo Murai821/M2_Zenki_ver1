@@ -13,8 +13,8 @@ def calculate_rsh(Np, Ns):
     sigma_start_calc = Np + Ns - 1 - int(Ns/Np - 1)  # 計算値（小数点可能）
     sigma_start = int(sigma_start_calc)  # 整数に変換
     sigma_end = Np + Ns - 1  # シグマの終了値 (Np + Ns - 1)
-    denominator = Ns
-    numerator = 0
+    denominator = Ns #分母
+    numerator = 0 #分子
     
     # シグマ計算: Σ(k=sigma_start to sigma_end) f(k)
     for k in range(sigma_start, sigma_end + 1):

@@ -6,7 +6,7 @@
 #include <string.h>
 #define M_PI 3.14159265358979323846 // π の定義
 
-/*point構造体を初期化する関数*/
+// === point構造体を初期化する関数 ===
 void init_point(point *p, double x, double y)
 {
     // 座標を設定
@@ -43,7 +43,7 @@ void init_point(point *p, double x, double y)
     }
 }
 
-/*vehicle構造体を初期化する関数*/
+// === vehicle構造体を初期化する関数 ===
 void init_vehicle(vehicle *v, double x, double y)
 {
     // 座標を設定
@@ -82,7 +82,7 @@ void init_vehicle(vehicle *v, double x, double y)
     v->chargeable_flag = TRUE; // 充電可能
 }
 
-/*dro構造体を初期化する関数*/
+// === dro構造体を初期化する関数 ===
 void init_dro(dro *d, int follow_num, int target_num)
 {
     // 座標を初期化
@@ -121,15 +121,7 @@ void init_dro(dro *d, int follow_num, int target_num)
     // 引数で指定されたfollow_numを設定
     d->follow_num = follow_num;
 
-    // 巡回路のターゲット番号を設定
-    if (target_num == M)
-    {
-        d->target_num = 1;
-    }
-    else
-    {
-        d->target_num = target_num;
-    }
+    d->target_num = target_num;
 
     // その他のパラメータを初期化
     d->wait_flag = FALSE;
@@ -154,9 +146,7 @@ int search_index(int arry[], int num)
     return n;
 }
 
-/***************ダイクストラ法を行う関数の定義*************************/
-/******ダイクストラ法********/
-/*ダイクストラ法で用いる配列の宣言*/
+// ===ダイクストラ法を行う関数の定義 ===
 double COST[N]; /*距離*/
 int VIA[N];     /*経由点*/
 char USED[N];   /*確定か未確定か*/
@@ -229,9 +219,7 @@ void RFCS_method(double weight[][N], int numline, int result_arry[], int *result
             }
         }
     }
-
-    /****************** y_i,jの定義 ******************/
-
+    // === y_i,jの定義 ===
     for (int i = 0; i < N; i++)
     {
         for (int j = 0; j < N; j++)
@@ -251,7 +239,7 @@ void RFCS_method(double weight[][N], int numline, int result_arry[], int *result
         }
     }
 
-    /****M個の回線に分割するため処理：y_ijにおいてa0からaNまでの最短経路を求める****/
+    // M個の回線に分割するため処理：y_ijにおいてa0からaNまでの最短経路を求める
     int start_point = 0;
     int goal_point = N - 1;
 
@@ -482,7 +470,7 @@ double dijkstraArrayAppend(int start, int goal, double weight[N][N], int numline
     return result;
 }
 
-/*RFCS法の「その他」におけるコストを求める関数*/
+// === RFCS法の「その他」におけるコストを求める関数 ===
 double cost_sum(int i, int j, double weight[][N], int numline)
 {
     double cost = 0; // 総コスト
@@ -499,19 +487,19 @@ double cost_sum(int i, int j, double weight[][N], int numline)
     return cost;
 }
 
-/*(0,1)の一様分布に従う乱数の生成関数*/
+// === (0,1)の一様分布に従う乱数の生成関数 ===
 double Uniform(void)
 {
     return ((double)rand() + 1.0) / ((double)RAND_MAX + 2.0);
 }
 
-/*密度λ(lamda)の指数分布に従った乱数の生成関数*/
+// 密度λ(lamda)の指数分布に従った乱数の生成関数
 double rand_exp(double lambda)
 {
     return -log(Uniform()) / lambda;
 }
 
-/*配列内の最小値を返す関数*/
+// 配列内の最小値を返す関数
 double findMin(double arr[], int size)
 {
 
@@ -528,7 +516,7 @@ double findMin(double arr[], int size)
     return min;
 }
 
-/*配列内の最大値を返す関数*/
+// 配列内の最大値を返す関数
 double findMax(double arr[], int size)
 {
 
@@ -867,7 +855,6 @@ void split_array(int *new_jyunkai_keiro, int new_jyunkai_keiro_size, int **cir, 
 
                 // 現在のサブ配列を終了し、次のサブ配列に移動
                 size[current_subarray] = current_index + 1; // 現在のサブ配列のサイズを記録
-                printf("subsize:%d\n", size[current_subarray]);
             }
             else
             {
@@ -875,9 +862,8 @@ void split_array(int *new_jyunkai_keiro, int new_jyunkai_keiro_size, int **cir, 
                 cir[current_subarray][current_index++] = new_jyunkai_keiro[i];
                 // 現在のサブ配列を終了し、次のサブ配列に移動
                 size[current_subarray] = current_index; // 現在のサブ配列のサイズを記録
-                printf("subsize:%d\n", size[current_subarray]);
-                current_index = 0;     // 次のサブ配列のインデックスをリセット
-                current_subarray += 1; // 現在のサブ配列から次のサブ配列へ
+                current_index = 0;                      // 次のサブ配列のインデックスをリセット
+                current_subarray += 1;                  // 現在のサブ配列から次のサブ配列へ
             }
 
             split_num += J_N;

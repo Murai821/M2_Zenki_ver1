@@ -1,3 +1,4 @@
+// コンパイル方法「gcc -o my_program main.c module.c -lm」
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
@@ -11,7 +12,7 @@
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #endif
 
-// === メイン関数 ===
+/**************************************メイン関数******************************************************/
 int main(void)
 {
     int i, j, k, m;
@@ -47,7 +48,7 @@ int main(void)
     vehicle v[M]; // 配送車の宣言
     dro drone[D]; // ドローンの宣言
 
-    // === 構造体の初期化 ===
+    /************* 構造体の初期化 ************/
 
     // 配送センター初期化
     init_point(&p[0], L / 2, L / 2);
@@ -69,15 +70,15 @@ int main(void)
         init_dro(&drone[i], 0, 1);
     }
 
-    // === pythonの出力ファイルから点の「座標」と「隣接行列」を読み込む ===
+    /*********************************************** pythonの出力ファイルから点の「座標」と「隣接行列」を読み込む **************************************************************************/
 
-    // === adjacency_matrix.txt ファイルからconnect[][]へ要素を格納 ===
+    /*********************************************** adjacency_matrix.txt ファイルからconnect[][]へ要素を格納 **************************************************************/
     int connect[N][N] = {0}; // つながっている点同士の関係を表す配列
 
     // adjacency_matrix.txtからデータを読み込んでconnect配列に格納
     readAdjacencyMatrix("pythonfile/adjacency_matrix.txt", connect);
 
-    // === points.txt ファイルから p[].x, p[].y へ要素を格納 ===
+    /*********************************************** points.txt ファイルから p[].x, p[].y へ要素を格納 **************************************************************/
     // ファイルを開く
     FILE *file = fopen("pythonfile/points.txt", "r");
     if (file == NULL)
@@ -97,7 +98,7 @@ int main(void)
     // ファイルを閉じる
     fclose(file);
 
-    // === 各点間の距離をdi[][]に格納 ===
+    /**********************************************************　各点間の距離をdi[][]に格納 *********************************************************************/
     // 各避難所、配送センター間を格納
     double di[N][N];
 
@@ -158,7 +159,8 @@ int main(void)
     }
     fclose(fp_ad);
 
-    // === pythonファイルの出力ファイルから巡回セールスマン問題の近似解の巡回路を読み込む ===
+    /****************************************************************************************************************************/
+    /***** pythonファイルの出力ファイルから巡回セールスマン問題の近似解の巡回路を読み込む*******/
     // ファイルポインタを定義
     FILE *file_python_jyunkairo;
     // 読み込む配列データを格納する配列を定義
@@ -188,6 +190,8 @@ int main(void)
         }
     }
 
+    printf("python_jyunkairo_count:%d\n", python_jyunkairo_count);
+
     // ファイルを閉じる
     fclose(file_python_jyunkairo);
 
@@ -197,7 +201,7 @@ int main(void)
 
     int new_jyunkai_keiro[new_jyunkai_keiro_size]; // 番号を更新した巡回路の配列
 
-    // === セクション区切り ===
+    /****************************************************************************************************************************/
     FILE *fp_jyunkai;
     jyunkai_file = "drone_datafile/txtfile/jyunkai.txt";
     fp_jyunkai = fopen(jyunkai_file, "w");
@@ -210,7 +214,7 @@ int main(void)
 
     fclose(fp_jyunkai);
 
-    // === 新たに避難所の番号を定義 ===
+    /*****新たに避難所の番号を定義******/
     point new_p[N];
     double new_ad[N][N];
     double new_di[N][N];
@@ -252,7 +256,7 @@ int main(void)
         }
     }
 
-    // === 番号を更新 ===
+    /*番号を更新*/
     int flag[N] = {0};   // 再定義した座標new_p[N]に格納済みか
     int new_p_index = 0; // new_pに格納していくインデックス
     int corres[N];       // p[i]とnew_p[i]の対応関係を格納: 元：6　更新後：1 → corres[1] = 6
@@ -270,13 +274,13 @@ int main(void)
         }
     }
 
-    // === new_jyunkai_keiro[]更新 ===
+    /******** new_jyunkai_keiro[]更新 ********/
     for (i = 0; i < jyunkai_keiro_size; i++)
     {
         new_jyunkai_keiro[i] = re_corres[jyunkai_keiro[i]];
     }
 
-    // === 隣接行列を再定義 ===
+    /*隣接行列を再定義*/
 
     for (i = 0; i < N; i++)
     {
@@ -286,7 +290,7 @@ int main(void)
         }
     }
 
-    // === 新たな座標の各点間の距離 ===
+    /*新たな座標の各点間の距離*/
     for (i = 0; i < N; i++)
     {
         for (j = 0; j < N; j++)
@@ -325,17 +329,30 @@ int main(void)
 
     fclose(fp_new_ad);
 
-    // === RFCS法による巡回路分割 ===
+    /************************* RFCS法による巡回路分割 *******************************/
     int rfcs_re[M + 1] = {0}; // RFCS法の結果を格納する配列
     int rfcs_re_size = 0;     // RFCS法の結果を格納する配列のサイズ
     RFCS_method(new_ad, N, rfcs_re, &rfcs_re_size);
+    printf("RFCS result: ");
+    for (i = 0; i < rfcs_re_size; i++)
+    {
+        if (i == rfcs_re_size - 1)
+        {
+            printf("%d", rfcs_re[i]);
+        }
+        else
+        {
+            printf("%d -> ", rfcs_re[i]);
+        }
+    }
+    printf("\n");
 
-    // === ダイクストラ法を行う関数による経由地点追加配列処理 ===
+    /********************************************************ダイクストラ法を行う関数による経由地点追加配列処理***********************************************************************:*/
 
     // サブ配列の定義
     int size[MAX_SUBARRAYS] = {0}; // 各サブ配列のサイズを記録する配列
 
-    // === 配列動的確保 ===
+    /******************************** 配列動的確保 *******************************************************/
     int **cir;
     int **cir_flag;
 
@@ -350,7 +367,7 @@ int main(void)
 
     split_array(new_jyunkai_keiro, python_jyunkairo_count, cir, size); // 関数呼び出し
 
-    // === 要素追加 ===
+    /*****要素追加****/
     int *path;       // サブ配列に追加する配列
     int path_length; // 追加する配列のサイズ
 
@@ -379,7 +396,35 @@ int main(void)
         }
     }
 
-    // === 各小回線の最後に物資を下ろす避難所のindex ===
+    // 元の配列を表示
+
+    for (int i = 0; i < new_jyunkai_keiro_size; i++)
+    {
+        printf("%d ", new_jyunkai_keiro[i]);
+    }
+    printf("\n");
+
+    // 分割されたサブ配列を表示
+
+    for (int i = 0; i < MAX_SUBARRAYS && size[i] > 0; i++)
+    {
+        printf("Subarray cir[%d][]: ", i + 1); // サブ配列の番号を表示
+        for (int j = 0; j < size[i]; j++)
+        {
+            printf("%d ", cir[i][j]); // サブ配列の内容を表示
+        }
+        printf("\n");
+    }
+
+    // size確認
+    for (i = 0; i < M; i++)
+    {
+        printf("size[%d]:%d\n", i, size[i]);
+    }
+
+    /***************************************************************************************************************************************************************************/
+
+    /******************各小回線の最後に物資を下ろす避難所のindex*********************************/
     int ind_last[M] = {0};        // 各小回線の最後に物資を下ろす避難所のindex
     int size_indlast[M] = {0};    // indexのカウント用変数
     int indlast_current[M] = {0}; // 現在の物資を下ろす避難所番号、順に一づつ増える
@@ -392,7 +437,7 @@ int main(void)
 
         for (j = 0; j < size[i]; j++)
         {
-            if (indlast_current[i] == (i + 1) * J_N && cir[i][j] == (i + 1) * J_N)
+            if (indlast_current[i] == (i + 1) * J_N && cir[i][j] == (i + 1) * J_N) // 物資を運ぶ避難所に到達した and J_N箇所の避難所を巡回しているならそのときのindexを格納
             {
                 ind_last[i] = size_indlast[i];
             }
@@ -404,9 +449,10 @@ int main(void)
 
             size_indlast[i] += 1;
         }
+        // printf("%d\n", ind_last[i]); // 動作確認
     }
 
-    // === cir_flag[][] : cir[][]において物資を荷降ろしするindex ===
+    /*****************************cir_flag[][] : cir[][]において物資を荷降ろしするindex*******************************/
     // cir[][]において物資を荷降ろしする添字はTRUE
 
     int cirflag_current[M] = {0};
@@ -422,10 +468,20 @@ int main(void)
                 cir_flag[i][j] = TRUE;
                 cirflag_current[i] += 1;
             }
+            // 動作確認
+            if (cir_flag[i][j] == TRUE)
+            {
+                // printf("TRUE,");
+            }
+            else
+            {
+                // printf("%d,", cir_flag[i][j]);
+            }
         }
+        // printf("\n");
     }
 
-    // === 各小回線の総距離 ===
+    /***********************************各小回線の総距離********************************************/
     double total_di[M] = {0}; // 各小回線の総距離
     // 各小回線の総距離の導出
     for (i = 0; i < M; i++)
@@ -440,10 +496,11 @@ int main(void)
     printf("配送車の回線の総距離[km]\n");
     for (i = 0; i < M; i++)
     {
+        // printf("配送車%dの回線の総距離: %f\n", i + 1, total_di[i]);
         printf("%f\n", total_di[i]);
     }
 
-    // === 各小回線の総距離の平均値 ===
+    /***********************************各小回線の総距離の平均値********************************************/
     double total_di_sum = 0; // 各小回線の総距離の合計値
     double total_di_ave = 0; // 各小回線の総距離の平均値
 
@@ -462,7 +519,7 @@ int main(void)
     fprintf(fp_totaldi_data, "%f\n", total_di_ave);
     fclose(fp_totaldi_data);
 
-    // === 各小回線の総距離における最大値の出力 ===
+    /***********************************各小回線の総距離における最大値の出力********************************************/
     double max_value = total_di[0]; // 初期値として配列の最初の要素を最大値とする
 
     // 配列の要素を順に比較して最大値を探す
@@ -476,7 +533,8 @@ int main(void)
 
     // 最大値を出力
     printf("巡回路の総距離の最大値: %.2f[km]\n", max_value);
-    // === 各小回線の一周の所要時間 ===
+
+    /***********************************各小回線の一周の所要時間********************************************/
     for (i = 0; i < M; i++)
     {
         printf("配送車%dの回線の所要時間: %f\n", i + 1, total_di[i] * 360.0);
@@ -537,7 +595,8 @@ int main(void)
     }
     fclose(fp_v5);
 
-    // === GNUPLOT ===
+    /********************************************************************　シミュレーション（これより上を「titibumodel_douromou_kettei2.c」からコピペ）　*************************************************************************************/
+    /******************GNUPLOT**************************/
     FILE *gp, *fp;
 
     // 各避難所、配送センターの座標をプロットするためにファイルに書き込む
@@ -552,7 +611,7 @@ int main(void)
     // #if 0
     //  gnuplotの設定
 
-    // === シミュレーション ===
+    /************************************シミュレーション******************************************/
 
     double total_t = 0;                                  // シミュレーションの合計時間
     double r_velo = 360;                                 // 速度の逆数
@@ -666,7 +725,7 @@ int main(void)
     int total_ti[N] = {0};
     int total_ti_count[N] = {0};
 
-    // === 全TVのドローン総充電台数計算 ===
+    /********************全TVのドローン総充電台数計算*********************/
     double all_TV_chargecount = 0;     // 全てのドローンでの充電台数（一巡回）
     double all_TV_chargecount_ave = 0; // 全てのドローンでの充電台数の平均（一巡回）
     double TV_chargeAmount = 0;        // 各TVにおけるドローン総充電時間(一巡回):単位は[min]
@@ -715,7 +774,7 @@ int main(void)
     fp_inf_delay_part = fopen(inf_delay_part_file, "w");
     fp_re_interval = fopen(re_interval_file, "w"); // 平均物資到着間隔のファイルオープン
 
-    // === ループ処理 ===
+    /************************************ ループ処理 ***********************************************************/
     while (1)
     {
         for (i = 0; i < M; i++)
@@ -726,7 +785,7 @@ int main(void)
             n_tan[i] = n_sin[i] / n_cos[i];
         }
 
-        // === 配送車の座標更新 ===
+        /**************配送車の座標更新*****************/
         for (i = 0; i < M; i++)
         {
             // 待機中でないなら座標更新
@@ -745,7 +804,7 @@ int main(void)
             }
         }
 
-        // === 各配送車において始点から終点へ到達したときの処理 ===
+        /*****************各配送車において始点から終点へ到達したときの処理****************************/
         for (i = 0; i < M; i++)
         {
             if ((ind[i] == size[i] - 1 && n_cos[i] < 0 && v[i].y < new_p[cir[i][0]].y) || (ind[i] == size[i] - 1 && n_cos[i] > 0 && v[i].y > new_p[cir[i][0]].y))
@@ -806,12 +865,15 @@ int main(void)
                     total_tg_count[current[i]] += 1;
                     current_re_arrival_time[current[i]] = total_t;
 
-                    // === 避難所 -> 配送車 (各避難所において) ===
+                    /**************** 避難所 -> 配送車 (各避難所において)************/
                     for (j = 0; j < N; j++)
                     {
                         if (new_p[current[i]].i_ptr[j] > v[i].i_ptr[j])
                         { // 避難所の情報配列に要素が入っているならその分の情報を配送車に渡す
-
+                            if (i == 0)
+                            {
+                                // printf("配送車：%d 避難所：%d i_ptr[%d]\n",i+1,current[i],j);
+                            }
                             for (k = v[i].i_ptr[j]; k < new_p[current[i]].i_ptr[j]; k++)
                             {
 
@@ -827,7 +889,7 @@ int main(void)
                         }
                     }
 
-                    // === 配送車 -> 避難所（各避難所において） ===
+                    /***************** 配送車 -> 避難所（各避難所において）*********/
 
                     count = 0;
                     for (j = 0; j < N; j++)
@@ -878,7 +940,7 @@ int main(void)
             }
         }
 
-        // === ドローンの制御 ===
+        /******************************************** ドローンの制御 **********************************************************/
         if (SD != 0) // ドローン台数が0でないなら
         {
             // 配送車0（ドローン積載）が一番始めの避難所１に到達したら
@@ -899,20 +961,21 @@ int main(void)
                 }
             }
 
-            // === ドローン1 以降は時間差をおいて飛行開始 ===
+            /******************************* ドローン1 以降は時間差をおいて飛行開始 **********************************/
             for (i = 1; i < SD; i++)
             {
-                if (drone_depature_flag[0] == TRUE && (int)(drone[i].flight_start_time) == 0 && drone_depature_flag[i] == FALSE)
+                if (drone_depature_flag[0] == TRUE && (int)(drone[i].flight_start_time) == 0 && drone_depature_flag[i] == FALSE) // ドローン１が飛行済みで時間差分だけ時間が経過したら
                 {
                     drone_depature_flag[i] = TRUE;
                     drone[i].free_mode = TRUE;
+                    // printf("drone[%d]飛行開始:%lf[s]\n", i, total_t);
 
                     // ドローンと配送車の合流地点算出
                     solveConfluence(v[drone[i].target_num].x, v[drone[i].target_num].y, drone[i].x, drone[i].y, 1.0, v_d_ratio, new_p[target[drone[i].target_num]].x, new_p[target[drone[i].target_num]].y, &drone[i].xt, &drone[i].yt, v_d_ratio, r_d_velo, r_velo, stay_t, new_p, drone, i, v, drone[i].target_num, current, target, cir, cir_flag, ind, ind_last, ind_relief, size);
                 }
             }
 
-            // === ドローン free_mode によって場合分け ===
+            /************************************************* ドローン free_mode によって場合分け ******************************************************************/
             for (i = 0; i < SD; i++)
             {
                 if (drone[i].free_mode == FALSE) // free_modeオフの時
@@ -959,7 +1022,7 @@ int main(void)
 
                     flight_time[i] += time_span; // 飛行時間加算
 
-                    // === ドローンが目的の配送車に到着したら ===
+                    /************ ドローンが目的の配送車に到着したら **********/
                     if ((d_n_cos[i] < 0 && drone[i].y < drone[i].yt) || (d_n_cos[i] > 0 && drone[i].y > drone[i].yt))
                     {
                         drone[i].x = drone[i].xt; // 座標修正
@@ -967,6 +1030,7 @@ int main(void)
 
                         // 飛行時間処理
                         drone[i].charge_time = flight_time[i] * charge_constant; // ドローンの配送車での充電時間
+                        // printf("飛行時間:%f[min]\n", flight_time[i] / 60);
 
                         // TVの総充電時間(単位[min])
                         if (v[drone[i].target_num].chargeable_flag == TRUE) // 充電可能フラグが立っていれば総充電に加算
@@ -974,16 +1038,22 @@ int main(void)
                             v[drone[i].target_num].charge_amount += drone[i].charge_time / 60;
                         }
 
+                        // printf("ドローン%dの飛行時間:%lf[min]\n", i, flight_time[i] / 60);
+
                         if (v[drone[i].target_num].charge_amount >= MAX_TVchargeable && v[drone[i].target_num].chargeable_flag == TRUE) // TVの総ドローン充電量が規定量を超えた場合は充電不可能フラグをたてる
                         {
-                            v[drone[i].target_num].chargeable_flag = FALSE;                    // 充電不可能フラグたてる
+                            v[drone[i].target_num].chargeable_flag = FALSE; // 充電不可能フラグたてる
+                            printf("TV[%d]の総充電時間:%lf[min]  -> %lf[min]\n", drone[i].target_num, v[drone[i].target_num].charge_amount - (drone[i].charge_time / 60), v[drone[i].target_num].charge_amount);
                             v[drone[i].target_num].charge_amount -= drone[i].charge_time / 60; // 超過分の総充電量を戻す
                         }
 
-                        // === TVにおけるドローンの充電制限に関する処理 ===
+                        // printf("TV[%d]の総充電時間:%lf\n", drone[i].target_num, v[drone[i].target_num].charge_amount);
+
+                        /***************************** TVにおけるドローンの充電制限に関する処理 ***********************************************************************************/
                         if (v[drone[i].target_num].chargeable_flag == FALSE) // TVでの充電量が規定量を超えた場合はそのドローンは充電できずに待機
                         {
                             drone[i].free_mode = FALSE;
+                            // printf("drone[%d]はTV[%d]にて飛行やめる\n", i, drone[i].target_num);
                             // 飛行時間に関する処理
                             total_flight_time[i] += flight_time[i];
                             flight_count[i] += 1;
@@ -1001,7 +1071,7 @@ int main(void)
                             v[drone[i].target_num].drone_charge_count += 1; // ドローンがTVに到着するとそのTVの充電回数を + 1
                         }
 
-                        // === 配送車 -> ドローン ===
+                        /************************** 配送車 -> ドローン **********************************/
 
                         for (j = 0; j < N; j++)
                         {
@@ -1021,7 +1091,7 @@ int main(void)
                             }
                         }
 
-                        // === ドローン -> 配送車 ===
+                        /***************************************** ドローン -> 配送車 *****************************************************/
                         for (j = 0; j < N; j++)
                         {
                             if (drone[i].i_ptr[j] > v[drone[i].target_num].i_ptr[j])
@@ -1052,7 +1122,7 @@ int main(void)
                             // ドローンと配送車の合流地点算出
                             solveConfluence(v[drone[i].target_num].x, v[drone[i].target_num].y, drone[i].x, drone[i].y, 1.0, v_d_ratio, new_p[target[drone[i].target_num]].x, new_p[target[drone[i].target_num]].y, &drone[i].xt, &drone[i].yt, v_d_ratio, r_d_velo, r_velo, stay_t, new_p, drone, i, v, drone[i].target_num, current, target, cir, cir_flag, ind, ind_last, ind_relief, size);
                         }
-                        else // === ドローンが一周していないとき ===
+                        else /************ ドローンが一周していないとき ******************************/
                         {
                             drone[i].follow_num = drone[i].target_num; // follow_num更新
 
@@ -1096,20 +1166,23 @@ int main(void)
 
             if (SD != 0)
             {
-                // === TVにおけるドローンの充電回数制限に関する処理 ===
+                /******************TVにおけるドローンの充電回数制限に関する処理*****************/
                 for (i = 0; i < M; i++)
                 {
+                    printf("TV[%d]のドローン充電回数：%d\n", i, v[i].drone_charge_count);
                     all_TV_chargecount += v[i].drone_charge_count;
                     v[i].drone_charge_count = 0; // TVの充電回数初期化
                 }
                 all_TV_chargecount_ave = all_TV_chargecount / M;
                 all_TV_chargecount = 0;
+                printf("TVでのドローン充電回数の平均:%0.1lf\n", all_TV_chargecount_ave);
             }
 
-            // ===TVにおける総充電時間に関する処理(一巡回) ===
+            /**********************************TVにおける総充電時間に関する処理(一巡回)*************************************** */
             for (i = 0; i < M; i++)
             {
                 TV_chargeAmount += v[i].charge_amount;
+                // printf("TV[%d]のドローン総充電時間：%lf\n", i, v[i].charge_amount);
                 v[i].charge_amount = 0;      // TVの充電量初期化
                 v[i].chargeable_flag = TRUE; // TVの充電可能フラグ初期化
             }
@@ -1117,9 +1190,9 @@ int main(void)
             TV_chargeAmount = 0;                       // 一巡回分であるため初期化
         }
 
-        // === 情報交換に関する処理 ===
+        /**************************************** 情報交換に関する処理 ********************************************/
 
-        // === 配送車 -> 配送センター（配送センターにおいて） ===
+        /********************* 配送車 -> 配送センター（配送センターにおいて） ***********************/
 
         for (i = 0; i < M; i++)
         {
@@ -1145,7 +1218,7 @@ int main(void)
             }
         }
 
-        // === 配送センター -> 配送車（配送センターにおいて） ===
+        /********************* 配送センター -> 配送車（配送センターにおいて）****************************/
 
         for (i = 0; i < M; i++)
         {
@@ -1171,7 +1244,7 @@ int main(void)
             }
         }
 
-        // === 配送車 -> 配送車 (配送センターにおいて) ===
+        /********************* 配送車 -> 配送車 (配送センターにおいて)*****************************/
 
         for (i = 0; i < M; i++)
         {
@@ -1203,7 +1276,7 @@ int main(void)
         if (SD != 0) // ドローン台数が0でないなら
         {
 
-            // === 配送車 -> ドローン (ドローンが配送車にいるとき(followモード)または, 充電中のときは 配送車の情報をドローンにコピー) ===
+            /************************** 配送車 -> ドローン (ドローンが配送車にいるとき(followモード)または, 充電中のときは 配送車の情報をドローンにコピー) **********************************/
 
             for (i = 0; i < SD; i++)
             {
@@ -1230,7 +1303,7 @@ int main(void)
                 }
             }
 
-            // === ドローン -> 配送車(ドローンが配送車にいるとき(followモード)または充電中のときは 配送車の情報をドローンにコピー) ===
+            /*************************** ドローン -> 配送車(ドローンが配送車にいるとき(followモード)または充電中のときは 配送車の情報をドローンにコピー) *****************************/
             for (i = 0; i < SD; i++)
             {
                 if (drone[i].free_mode == FALSE || (drone[i].free_mode == TRUE && drone[i].charge_time != 0))
@@ -1257,7 +1330,7 @@ int main(void)
             }
         }
 
-        // === 避難所 -> 配送車（避難所で待機中にその避難所で情報が生成されたときの処理） ===
+        /***************************************** 避難所 -> 配送車（避難所で待機中にその避難所で情報が生成されたときの処理） *****************************************************/
         for (i = 0; i < M; i++)
         {
             if ((int)stay_t[i] != 0 && fabs(v[i].x - new_p[current[i]].x) < 0.001 && fabs(v[i].y - new_p[current[i]].y) < 0.001)
@@ -1266,6 +1339,10 @@ int main(void)
                 {
                     if (new_p[current[i]].i_ptr[j] > v[i].i_ptr[j])
                     { // 避難所の情報配列に要素が入っているならその分の情報を配送車に渡す
+                        if (i == 0)
+                        {
+                            // printf("配送車：%d 避難所：%d i_ptr[%d]\n",i+1,current[i],j);
+                        }
                         for (k = v[i].i_ptr[j]; k < new_p[current[i]].i_ptr[j]; k++)
                         {
                             v[i].inf[j][v[i].i_ptr[j]] = new_p[current[i]].inf[j][k];
@@ -1282,7 +1359,7 @@ int main(void)
             }
         }
 
-        // === 避難所への情報の到着 ===
+        /*****************避難所への情報の到着******************/
         if (total_t != 0 && (int)(total_t) % ((int)(poisson_inf_total) - (int)(poisson_inf_total) % 10) == 0)
         {
             poisson_inf_total += rand_exp(lambda_i) * 3600;
@@ -1295,7 +1372,7 @@ int main(void)
             }
         }
 
-        // === 配送センターへの物資の到着 ===
+        /*****配送センターへの物資の到着******/
         if (total_t != 0 && (int)(total_t) % ((int)(poisson_re_total) - (int)(poisson_re_total) % 10) == 0)
         {
             poisson_re_total += rand_exp(lambda_g) * 3600;
@@ -1325,7 +1402,7 @@ int main(void)
             }
         }
 
-        // === 配送車が出会う配送車の数の処理　（すべての配送車が配送センターに集まったらその時点で出発） ===
+        /*******************　配送車が出会う配送車の数の処理　（すべての配送車が配送センターに集まったらその時点で出発）　************************/
         // 初期化
         int vehicle_num = 0;
         for (i = 0; i < M; i++)
@@ -1367,7 +1444,7 @@ int main(void)
             vehicle_merge_flag = TRUE;
         }
 
-        // === 配送車が配送センターから出発する ===
+        /**************************************** 配送車が配送センターから出発する ****************************************************/
         // 配送車が配送センターから出発する際におけるmeet_vehicle_numの処理と表示
 
         for (i = 0; i < M; i++)
@@ -1380,7 +1457,7 @@ int main(void)
             }
         }
 
-        // === 終了条件 ===
+        /************************終了条件********************************/
         relief_count = 0;
 
         for (i = 1; i < N; i++)
@@ -1412,6 +1489,16 @@ int main(void)
 
             printf("配送センター reliefnum:%d\n", new_p[0].re);
 
+            // 各避難所のtd
+            printf("各避難所のE(TD)\n");
+            for (i = 1; i < N; i++)
+            {
+                printf("%f\n", (double)(total_td[i] / total_td_count[i]) / 3600);
+            }
+
+            // printf("ポアソン到着（物資）:%f\n", poisson_re_total / poisson_re_count / 3600);
+            // printf("ポアソン到着（情報）:%f\n", poisson_inf_total / poisson_inf_count / 3600);
+
             break; // ループ終了
         }
 
@@ -1426,14 +1513,403 @@ int main(void)
             }
         }
     }
-    // === while文処理終了 ===
+    /*********************************** while文処理終了 ********************************************************************/
 
     fclose(fp_re_interval); // 平均物資到着間隔ファイルクローズ
     fclose(fp_inf_delay);   // 平均情報遅延時間ファイルクローズ
     fclose(fp_inf_delay_part);
     fclose(fp_inf_interval); // 平均情報到着間隔ファイルクローズ
 
-    // === 動的確保した配列をfree ===
+    /*********平均値の導出**********/
+
+    /********情報の共有割合導出***********/
+    printf("避難所への情報共有数: %d\n", total_inf_num);
+
+    /*********平均物資到着間隔***************/
+    double value = 0;
+    double sum = 0;
+    double counter = 0;
+    fp_re_interval = fopen(re_interval_file, "r"); // 平均物資到着間隔のファイルオープン
+    if (fp_re_interval == NULL)
+    {
+        printf("ファイルを開くことができませんでした\n");
+        return 1;
+    }
+    while (fscanf(fp_re_interval, "%lf", &value) == 1)
+    {
+        sum += value;
+        counter++;
+    }
+    fclose(fp_re_interval); // 平均物資到着間隔ファイルクローズ
+
+    if (counter > 0)
+    {
+        double average = sum / counter;
+        printf("平均物資到着間隔：%f\n", average / 3600);
+        // 各シミュレーションごとの平均物資到着間隔のデータを格納する
+        fp_Etg_data = fopen(Etg_data_file, "a+");
+        fprintf(fp_Etg_data, "%f\n", average / 3600);
+        fclose(fp_Etg_data);
+    }
+    else
+    {
+        printf("データがありません\n");
+    }
+
+    /*****平均情報到着間隔*******/
+    value = 0; // 変数を再利用
+    sum = 0;
+    counter = 0;
+
+    fp_inf_interval = fopen(inf_interval_file, "r"); // 平均情報到着間隔ファイルのオープン
+    if (fp_inf_interval == NULL)
+    {
+        printf("ファイルを開くことができませんでした\n");
+        return 1;
+    }
+    while (fscanf(fp_inf_interval, "%lf", &value) == 1)
+    {
+        sum += value;
+        counter++;
+    }
+    fclose(fp_inf_interval); // 平均情報到着間隔ファイルクローズ
+
+    if (counter > 0)
+    {
+        double average = sum / counter;
+        printf("平均情報到着間隔：%f\n", average / 3600);
+        // 各シミュレーションごとの平均情報到着間隔のデータを格納する
+        fp_Eti_data = fopen(Eti_data_file, "a+");
+        fprintf(fp_Eti_data, "%f\n", average / 3600);
+        fclose(fp_Eti_data);
+    }
+    else
+    {
+        printf("データがありません\n");
+    }
+
+    /*******平均情報遅延*******/
+    value = 0; // 変数を再利用
+    sum = 0;
+    counter = 0;
+
+    fp_inf_delay = fopen(inf_delay_file, "r"); // 平均情報遅延間隔ファイルのオープン
+    if (fp_inf_delay == NULL)
+    {
+        printf("ファイルを開くことができませんでした\n");
+        return 1;
+    }
+    while (fscanf(fp_inf_delay, "%lf", &value) == 1)
+    {
+        sum += value;
+        counter++;
+    }
+    fclose(fp_inf_delay); // 平均情報遅延時間ファイルクローズ
+
+    if (counter > 0)
+    {
+        double average = sum / counter;
+        printf("平均情報遅延時間：%f\n", average / 3600);
+        // 各シミュレーションごとのE(TD)のデータを格納する
+        fp_Etd_data = fopen(Etd_data_file, "a+");
+        fprintf(fp_Etd_data, "%f\n", average / 3600);
+        fclose(fp_Etd_data);
+    }
+    else
+    {
+        printf("データがありません\n");
+    }
+
+    /*********平均情報遅延時間（各避難所）************/
+    value = 0; // 変数を再利用
+    sum = 0;
+    counter = 0;
+    double td_max = 0;
+    double td_min = INF;
+
+    fp_inf_delay_part = fopen(inf_delay_part_file, "r"); // 平均情報遅延間隔ファイルのオープン
+    if (fp_inf_delay_part == NULL)
+    {
+        printf("ファイルを開くことができませんでした\n");
+        return 1;
+    }
+    while (fscanf(fp_inf_delay_part, "%lf", &value) == 1)
+    {
+        sum += value;
+        counter++;
+
+        if (value > td_max)
+        {
+            td_max = value;
+        }
+        if (value < td_min)
+        {
+            td_min = value;
+        }
+    }
+    fclose(fp_inf_delay_part); // 平均情報遅延時間ファイルクローズ
+
+    if (counter > 0)
+    {
+        double average = sum / counter;
+        // printf("平均情報遅延時間（避難所%d）:%f\n", analyse_num, average / 3600);
+        printf("平均情報遅延時間（避難所%d）:%f\n", analyse_num, average);
+        printf("MAX:%f\n", td_max);
+        printf("min:%f\n", td_min);
+    }
+    else
+    {
+        printf("データがありません\n");
+    }
+
+    /************************* ドローンの平均飛行時間 ************************/
+#if SD > 0
+
+    double total_flight_time_alldrone = 0;
+    for (i = 0; i < SD; i++)
+    {
+        printf("total_flight_time[%d]:%lf\n", i, total_flight_time[i]);
+        printf("flight_count[%d]:%lf\n", i, flight_count[i]);
+        total_flight_time_alldrone += total_flight_time[i] / flight_count[i];
+    }
+    printf("ドローンの平均飛行時間：%lf[min]\n", total_flight_time_alldrone / SD / 60);
+
+    // ファイル書き込み
+    flight_ave_file = "drone_datafile/txtfile/flight_ave.txt";
+    FILE *fp_flight_ave;
+    fp_flight_ave = fopen(flight_ave_file, "a+");
+    if (isnan(total_flight_time_alldrone))
+    {
+        //
+    }
+    else
+    {
+        fprintf(fp_flight_ave, "%f\n", total_flight_time_alldrone / SD / 60);
+    }
+    // fprintf(fp_flight_ave, "%f\n", total_flight_time_alldrone / SD / 60);
+    fclose(fp_flight_ave);
+
+#endif
+
+    /*******************************TVでのドローンの平均充電台数**************************************** */
+    TV_chargecountAve_file = "drone_datafile/txtfile/TV_chargeCount.txt";
+    FILE *fp_TV_chargecount;
+    fp_TV_chargecount = fopen(TV_chargecountAve_file, "a+");
+    fprintf(fp_TV_chargecount, "%f\n", all_TV_chargecount_ave);
+    fclose(fp_TV_chargecount);
+
+    /*******************************TVでのドローンの平均充電時間*****************************************/
+    TV_chargeAmount_file = "drone_datafile/txtfile/TV_chargeAmount.txt";
+    FILE *fp_TV_chargeAmount;
+    fp_TV_chargeAmount = fopen(TV_chargeAmount_file, "a+");
+    fprintf(fp_TV_chargeAmount, "%f\n", ave_TV_chargeAmount);
+    fclose(fp_TV_chargeAmount);
+    printf("TVの平均総ドローン充電時間:%lf[min]\n", ave_TV_chargeAmount);
+
+    /********************************** TVでの総ドローン充電時間 *****************************************************************/
+
+    /********************************************************************　シミュレーション終了　**************************************************************************************************/
+    // #endif
+    /*************************** gnuplot表示 *************************************/
+
+    // 各避難所、配送センターの座標をプロットするためにファイルに書き込む
+
+    data_file = "drone_datafile/txtfile/data.txt";
+    fp = fopen(data_file, "w");
+    for (i = 0; i < N; i++)
+    {
+        fprintf(fp, "%d\t%lf\t%lf\n", i, p[i].x, p[i].y);
+    }
+    fclose(fp);
+
+    /************************ 点プロット(番号更新前) ********************************************/
+    gp = popen("gnuplot -persist", "w");
+    fprintf(gp, "set xrange [0:10]\n");
+    fprintf(gp, "set yrange [0:10]\n");
+    fprintf(gp, "set noxtics\n"); // 目盛り非表示
+    fprintf(gp, "set noytics\n");
+    fprintf(gp, "set parametric\n");
+    fprintf(gp, "set size square\n");
+    fprintf(gp, "unset key\n");
+    fprintf(gp, "set terminal png\n");
+    fprintf(gp, "set output 'drone_datafile/zahyou.png'\n");
+
+    // ラベルの表示
+    for (i = 0; i < N; i++)
+    {
+        fprintf(gp, "set label %d at first %f,%f '%d'\n", i + 1, p[i].x + 0.1, p[i].y + 0.1, i);
+    }
+
+    // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7 lt rgbcolor'black'\n", data_file);
+    fprintf(gp, "plot \'%s\' u 2:3 with points pt 7 lt rgbcolor'black',5 + %f*cos(t), 5 + %f*sin(t) lt rgbcolor'red'\n", data_file, R, R);
+
+    pclose(gp);
+
+    /************************ 点プロット(中心市街地のみ拡大) ********************************************/
+    gp = popen("gnuplot -persist", "w");
+    fprintf(gp, "set xrange [%f/2-%f:%f/2+%f]\n", L, R, L, R);
+    fprintf(gp, "set yrange [%f/2-%f:%f/2+%f]\n", L, R, L, R);
+    fprintf(gp, "set noxtics\n"); // 目盛り非表示
+    fprintf(gp, "set noytics\n");
+    fprintf(gp, "set parametric\n");
+    fprintf(gp, "set size square\n");
+    fprintf(gp, "unset key\n");
+    fprintf(gp, "set terminal png\n");
+    fprintf(gp, "set output 'drone_datafile/zahyou_Rkakudai.png'\n");
+
+    // ラベルの表示
+    for (i = 0; i < N; i++)
+    {
+        fprintf(gp, "set label %d at first %f,%f '%d'\n", i + 1, p[i].x + 0.1, p[i].y + 0.1, i);
+    }
+
+    // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7 lt rgbcolor'black'\n", data_file);
+    fprintf(gp, "plot \'%s\' u 2:3 with points pt 7 lt rgbcolor'black',5 + %f*cos(t), 5 + %f*sin(t) lt rgbcolor'red'\n", data_file, R, R);
+
+    pclose(gp);
+
+    /************************ 道路網プロット(番号更新前) ********************************************/
+
+    gp = popen("gnuplot -persist", "w");
+    fprintf(gp, "set xrange [0:10]\n");
+    fprintf(gp, "set yrange [0:10]\n");
+    fprintf(gp, "set noxtics\n"); // 目盛り非表示
+    fprintf(gp, "set noytics\n");
+    fprintf(gp, "set parametric\n");
+    fprintf(gp, "set size square\n");
+    fprintf(gp, "unset key\n");
+    fprintf(gp, "set terminal png\n");
+    fprintf(gp, "set output 'drone_datafile/douromou.png'\n");
+
+    // ラベルの表示
+    for (i = 0; i < N; i++)
+    {
+        fprintf(gp, "set label %d at first %f,%f '%d'\n", i + 1, p[i].x + 0.1, p[i].y + 0.1, i);
+    }
+
+    fprintf(gp, "plot \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'black',\'%s\' u 2:3 with points pt 7 lt rgbcolor'black',5 + %f*cos(t), 5 + %f*sin(t) lt rgbcolor'red'\n", ad_file, data_file, R, R);
+
+    pclose(gp);
+
+    /************************ 道路網プロット(番号更新後) ********************************************/
+
+    gp = popen("gnuplot -persist", "w");
+    fprintf(gp, "set xrange [0:10]\n");
+    fprintf(gp, "set yrange [0:10]\n");
+    fprintf(gp, "set noxtics\n"); // 目盛り非表示
+    fprintf(gp, "set noytics\n");
+    fprintf(gp, "set parametric\n");
+    fprintf(gp, "set size square\n");
+    fprintf(gp, "unset key\n");
+    fprintf(gp, "set terminal png\n");
+    fprintf(gp, "set output 'drone_datafile/douromou_new.png'\n");
+
+    // ラベルの表示
+    for (i = 0; i < N; i++)
+    {
+        fprintf(gp, "set label %d at first %f,%f '%d'\n", i + 1, new_p[i].x + 0.1, new_p[i].y + 0.1, i);
+    }
+
+    fprintf(gp, "plot \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'black',\'%s\' u 2:3 with points pt 7 lt rgbcolor'black',5 + %f*cos(t), 5 + %f*sin(t) lt rgbcolor'red'\n", ad_file, new_data_file, R, R);
+
+    pclose(gp);
+
+    /************************ 点プロット(番号更新後) ********************************************/
+    gp = popen("gnuplot -persist", "w");
+    fprintf(gp, "set xrange [0:10]\n");
+    fprintf(gp, "set yrange [0:10]\n");
+    fprintf(gp, "set noxtics\n"); // 目盛り非表示
+    fprintf(gp, "set noytics\n");
+    fprintf(gp, "set parametric\n");
+    fprintf(gp, "set size square\n");
+    fprintf(gp, "unset key\n");
+    fprintf(gp, "set terminal png\n");
+    fprintf(gp, "set output 'drone_datafile/zahyou_kousin.png'\n");
+
+    // ラベルの表示
+    for (i = 0; i < N; i++)
+    {
+        fprintf(gp, "set label %d at first %f,%f '%d'\n", i + 1, new_p[i].x + 0.1, new_p[i].y + 0.1, i);
+    }
+
+    // fprintf(gp, "plot \'%s\' u 2:3 with points pt 7 lt rgbcolor'black'\n", data_file);
+    fprintf(gp, "plot \'%s\' u 2:3 with points pt 7 lt rgbcolor'black',5 + %f*cos(t), 5 + %f*sin(t) lt rgbcolor'red',\'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'black'\n", new_data_file, R, R, jyunkai_file);
+
+    pclose(gp);
+
+    /************** それぞれの配送車の巡回路について *********************/
+
+    gp = popen("gnuplot -persist", "w");
+    fprintf(gp, "set xrange [0:10]\n");
+    fprintf(gp, "set yrange [0:10]\n");
+    fprintf(gp, "set noxtics\n"); // 目盛り非表示
+    fprintf(gp, "set noytics\n");
+    fprintf(gp, "set size square\n");
+    fprintf(gp, "unset key\n");
+    fprintf(gp, "set terminal png\n");
+    fprintf(gp, "set output 'drone_datafile/v1_v4_jyunkairo.png'\n");
+
+    for (i = 0; i < 10; i++)
+    {
+        fprintf(gp, "set label %d at first %f,%f '%d'\n", i + 1, new_p[i].x + 0.1, new_p[i].y + 0.1, i);
+    }
+
+    fprintf(gp, "plot \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'black',\'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'black'\n", v1_file, v4_file);
+    pclose(gp);
+
+    gp = popen("gnuplot -persist", "w");
+    fprintf(gp, "set xrange [0:10]\n");
+    fprintf(gp, "set yrange [0:10]\n");
+    fprintf(gp, "set noxtics\n"); // 目盛り非表示
+    fprintf(gp, "set noytics\n");
+    fprintf(gp, "set size square\n");
+    fprintf(gp, "unset key\n");
+    fprintf(gp, "set terminal png\n");
+    fprintf(gp, "set output 'drone_datafile/v3_v5_jyunkairo.png'\n");
+
+    fprintf(gp, "plot \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'black',\'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'black'\n", v3_file, v5_file);
+    pclose(gp);
+
+    gp = popen("gnuplot -persist", "w");
+    fprintf(gp, "set xrange [0:10]\n");
+    fprintf(gp, "set yrange [0:10]\n");
+    fprintf(gp, "set noxtics\n"); // 目盛り非表示
+    fprintf(gp, "set noytics\n");
+    fprintf(gp, "set size square\n");
+    fprintf(gp, "unset key\n");
+    fprintf(gp, "set terminal png\n");
+    fprintf(gp, "set output 'drone_datafile/v2_jyunkairo.png'\n");
+
+    fprintf(gp, "plot \'%s\' u 1:2 with linespoints pt 7 lt rgbcolor'black'\n", v2_file);
+    pclose(gp);
+
+    /************************* 全巡回路表示（各TVについて） ******************************/
+    gp = popen("gnuplot -persist", "w");
+    fprintf(gp, "set xrange [0:10]\n");
+    fprintf(gp, "set yrange [0:10]\n");
+    fprintf(gp, "unset border\n"); // 枠線を非表示
+    fprintf(gp, "set noxtics\n");  // 目盛り非表示
+    fprintf(gp, "set noytics\n");
+    fprintf(gp, "set parametric\n");
+    fprintf(gp, "set size square\n");
+    fprintf(gp, "unset key\n");
+    fprintf(gp, "unset object\n");
+    fprintf(gp, "set terminal png\n");
+    fprintf(gp, "set output 'drone_datafile/all_jyunkairo.png'\n");
+
+    double lw = 1.51; // パターン表示：1.51
+    double ps = 0.5;  // パターン表示：0.3
+
+    // fprintf(gp, "plot \'%s\' u 1:2 with linespoints linewidth 2 pt 7 lt rgbcolor'green',\'%s\' u 1:2 with linespoints linewidth 2 pt 7 lt rgbcolor'red',\'%s\' u 1:2 with linespoints linewidth 2 pt 7 lt rgbcolor'blue',\'%s\' u 1:2 with linespoints linewidth 2 pt 7 lt rgbcolor'orange',\'%s\' u 1:2 with linespoints linewidth 2 pt 7 lt rgbcolor'black'\n", v1_file, v2_file, v3_file, v4_file, v5_file);
+    // fprintf(gp, "plot \'%s\' u 1:2 with linespoints linewidth %f pointsize %f pt 7 lt rgbcolor'forest-green',\'%s\' u 1:2 with linespoints linewidth %f pointsize %f pt 7 lt rgbcolor'red',\'%s\' u 1:2 with linespoints linewidth %f pointsize %f pt 7 lt rgbcolor'blue',\'%s\' u 1:2 with linespoints linewidth %f pointsize %f pt 7 lt rgbcolor'dark-violet',\'%s\' u 1:2 with linespoints linewidth %f pointsize %f pt 7 lt rgbcolor'black',5 + %f*cos(t), 5 + %f*sin(t) lt rgbcolor'gray' linewidth %f,5 + %f*cos(t), 5 + %f*sin(t) lt rgbcolor'gray' linewidth %f\n", v1_file, lw, ps, v2_file, lw, ps, v3_file, lw, ps, v4_file, lw, ps, v5_file, lw, ps, 5.0, 5.0, lw, 4.4, 4.4, lw); // ４つのパターン表示 r=4.5
+    fprintf(gp, "plot 5 + %f*cos(t), 5 + %f*sin(t) lt rgbcolor'gray' linewidth %f dashtype 2, 5 + %f*cos(t), 5 + %f*sin(t) lt rgbcolor'gray' linewidth %f dashtype 2, \'%s\' u 1:2 with linespoints linewidth %f pointsize %f pt 7 lt rgbcolor'forest-green',\'%s\' u 1:2 with linespoints linewidth %f pointsize %f pt 7 lt rgbcolor'red',\'%s\' u 1:2 with linespoints linewidth %f pointsize %f pt 7 lt rgbcolor'blue',\'%s\' u 1:2 with linespoints linewidth %f pointsize %f pt 7 lt rgbcolor'dark-violet',\'%s\' u 1:2 with linespoints linewidth %f pointsize %f pt 7 lt rgbcolor'black'\n", 5.0, 5.0, lw, 2.9, 2.9, lw, v1_file, lw, ps, v2_file, lw, ps, v3_file, lw, ps, v4_file, lw, ps, v5_file, lw, ps); // r=3.0
+    // fprintf(gp, "plot 5 + %f*cos(t), 5 + %f*sin(t) lt rgbcolor'gray' linewidth %f dashtype 2, 5 + %f*cos(t), 5 + %f*sin(t) lt rgbcolor'gray' linewidth %f dashtype 2, \'%s\' u 1:2 with linespoints linewidth %f pointsize %f pt 7 lt rgbcolor'forest-green',\'%s\' u 1:2 with linespoints linewidth %f pointsize %f pt 7 lt rgbcolor'red',\'%s\' u 1:2 with linespoints linewidth %f pointsize %f pt 7 lt rgbcolor'blue',\'%s\' u 1:2 with linespoints linewidth %f pointsize %f pt 7 lt rgbcolor'dark-violet',\'%s\' u 1:2 with linespoints linewidth %f pointsize %f pt 7 lt rgbcolor'black'\n", 5.0, 5.0, lw, 4.4, 4.4, lw, v1_file, lw, ps, v2_file, lw, ps, v3_file, lw, ps, v4_file, lw, ps, v5_file, lw, ps); // r=4.5
+    //  fprintf(gp, "plot 5 + %f*cos(t), 5 + %f*sin(t) lt rgbcolor'gray' linewidth %f dashtype 2, 5 + %f*cos(t), 5 + %f*sin(t) lt rgbcolor'gray' linewidth %f dashtype 2, \'%s\' u 1:2 with linespoints linewidth %f pointsize %f pt 7 lt rgbcolor'forest-green',\'%s\' u 1:2 with linespoints linewidth %f pointsize %f pt 7 lt rgbcolor'red',\'%s\' u 1:2 with linespoints linewidth %f pointsize %f pt 7 lt rgbcolor'blue',\'%s\' u 1:2 with linespoints linewidth %f pointsize %f pt 7 lt rgbcolor'dark-violet',\'%s\' u 1:2 with linespoints linewidth %f pointsize %f pt 7 lt rgbcolor'black'\n", 5.0, 5.0, lw, 0.9, 0.9, lw, v1_file, lw, ps, v2_file, lw, ps, v3_file, lw, ps, v4_file, lw, ps, v5_file, lw, ps); // ４つのパターン表示 r=1.0
+    //  fprintf(gp, "plot \'%s\' u 1:2 with linespoints linewidth 1.5 pt 7 lt rgbcolor'green',\'%s\' u 1:2 with linespoints linewidth 1.5  pt 7 lt rgbcolor'red',\'%s\' u 1:2 with linespoints linewidth 1.5  pt 7 lt rgbcolor'blue',\'%s\' u 1:2 with linespoints linewidth 1.5  pt 7 lt rgbcolor'orange',\'%s\' u 1:2 with linespoints linewidth 1.5  pt 7 lt rgbcolor'black',5 + %f*cos(t), 5 + %f*sin(t) lt rgbcolor'gray',5 + %f*cos(t), 5 + %f*sin(t) lt rgbcolor'gray'\n", v1_file, v2_file, v3_file, v4_file, v5_file, 5.0, 5.0, 1.0, 1.0); // ４つのパターン表示 r=1.0
+    pclose(gp);
+    // fprintf(gp, "plot \'%s\' u 1:2 with linespoints linewidth 2 pt 7 lt rgbcolor'green',\'%s\' u 1:2 with linespoints linewidth 2 pt 7 lt rgbcolor'red',\'%s\' u 1:2 with linespoints linewidth 2 pt 7 lt rgbcolor'blue',\'%s\' u 1:2 with linespoints linewidth 2 pt 7 lt rgbcolor'orange',\'%s\' u 1:2 with linespoints linewidth 2 pt 7 lt rgbcolor'black',5 + %f*cos(t), 5 + %f*sin(t) lt rgbcolor'black',5 + %f*cos(t), 5 + %f*sin(t) lt rgbcolor'black'\n", v1_file, v2_file, v3_file, v4_file, v5_file, 5.0, 5.0, 3.0, 3.0);
+
+    /**************************動的確保した配列をfree*****************************/
 
     for (i = 0; i < MAX_SUBARRAYS; i++)
     {
