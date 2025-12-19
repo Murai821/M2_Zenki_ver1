@@ -15,18 +15,10 @@ int main(void)
     if (ENABLE_GIF)
     {
         gnuplot_pipe = init_gnuplot(); // GIFアニメーション用のgnuplotパイプを開く
-        if (gnuplot_pipe == NULL)
-        {
-            fprintf(stderr, "警告: gnuplotの初期化に失敗しました。GIF出力なしで続行します。\n");
-        }
-        else
-        {
-            printf("GIF出力が有効です。'simulation.gif' を生成します。\n");
-        }
     }
     else
     {
-        printf("GIF出力が無効です。処理を軽量化して実行します。\n");
+        printf("GIF出力が無効です。\n");
     }
 
     // === 拠点座標の初期化 ===
@@ -292,7 +284,7 @@ int main(void)
                         supply_vehicle[v].is_loaded = 1;                                               // 積載状態フラグを設定
                     }
                 }
-                else /***************** 避難所に停止する場合（current_stop_idx[] が０でないとき）********************/
+                else /****** 避難所に停止する場合（current_stop_idx[] が０でないとき）*****/
                 {
                     // === 【避難所での物資配送処理】 ===
                     // 車両が通常物資（A・B）を積載中で、両方とも残量がある場合のみ配送実行
@@ -437,7 +429,7 @@ int main(void)
                         }
                     }
                 }
-                //*************** 物資運搬車両の物資運搬処理ここまで *********************/
+                //***** 物資運搬車両の物資運搬処理ここまで ****/
 
                 // === 車両停止時間中のドローン処理ループ ===
                 // 停止期間中も時間を進めてドローンの位置更新と描画を実行
@@ -469,7 +461,7 @@ int main(void)
                         }
                     }
 
-                    /*****************ドローンの処理 車両移動中と同様の処理****************/
+                    /****ドローンの処理 車両移動中と同様の処理***/
                     // === 時間ステップ進行 ===
                     double time_step = 1.0; // 1秒刻みで時間を進める
                     elapsed_time += time_step;
@@ -636,7 +628,7 @@ int main(void)
                             }
                         }
                     }
-                    /******************************************************************************************************************/
+                    /*********************************/
 
                     // 集積所に停止する場合
                     if (is_depot) // current_stop_idx[] == 0など集積所インデックスと一致したとき
@@ -758,7 +750,7 @@ int main(void)
                 next_draw_time += DRAW_INTERVAL; // 次の描画時刻を更新
             }
 
-            /************************ 車両停止中と同様の処理 *****************************/
+            /***** 車両停止中と同様の処理 *******/
             // === 【時間ステップ進行】 ===
             double time_step = 1.0; // 1秒ステップ（バランスの取れた精度と計算速度）
             elapsed_time += time_step;
@@ -845,7 +837,7 @@ int main(void)
                         {
                             if (DELIVERY_METHOD == DELIVERY_METHOD_MULTI_DRONE) // 手法3のとき
                             {
-                                // 手法3: 協調運搬の判定
+                                // 協調運搬の判定
                                 int cooperative_shelter = check_drone_cooperative_transport(&drones[i], drones, ND, stop_coords, info_list, info_count, dis_idx);
                                 if (cooperative_shelter > 0)
                                 {
@@ -929,7 +921,7 @@ int main(void)
                     update_drone_state(&drones[i], drones, ND, stop_coords, elapsed_time, time_step, info_list, info_count, facilities, &total_extra_supply_by_drone, &drone_delivery_count, i, dis_idx, supply_vehicle, current_stop_idx, next_stop_idx, current_x, current_y);
                 }
             }
-            /*******************************************************************/
+            /***************/
         }
 
         // === 移動完了時の正確な位置調整 ===

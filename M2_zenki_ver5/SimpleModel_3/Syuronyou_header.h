@@ -15,7 +15,6 @@
 #define V (10000.0 / 3600.0)       // 車両の速度 (m/s) | 10km/h → 2.78m/s
 #define V_DRONE (20000.0 / 3600.0) // ドローンの速度 (m/s) | 20km/h → 5.56m/s（車両の2倍）
 #define T_STOP (30 * 60)           // 各避難所での停止時間 (s) | 30分=1800秒
-// #define T_STOP_DIS (30 * 60) / NDI // 各集積所での停止時間 (s) | 30分=1800秒/NDI
 #define T_STOP_DIS (30 * 60)
 #define DETECTION_RADIUS 10.0 // ドローンの検出半径 (m) | 避難所近傍での情報検出・協調運搬判定用
 
@@ -23,9 +22,9 @@
 #define NS 12              // 避難所の数（集積所除く）
 #define NDI 3              // 集積所の数(NV：物資運搬車両の台数と同じにする)
 #define NV 1               // 車両の一台
-#define NT 10              // シミュレーションの周回数
-#define ND 8               // ドローンの台数（0の場合はドローンなし、最大制限なし）
-#define ENABLE_GIF 0       // GIF出力の有効/無効 (1:有効, 0:無効) | 処理軽量化用
+#define NT 3               // シミュレーションの周回数
+#define ND 2               // ドローンの台数（0の場合はドローンなし、最大制限なし）
+#define ENABLE_GIF 1       // GIF出力の有効/無効 (1:有効, 0:無効) | 処理軽量化用
 #define CLEAN_PNG_OUTPUT 1 // PNG出力時の軸ラベル・枠線削除 (1:削除, 0:通常表示)
 
 // === ドローン巡回方向設定 ===

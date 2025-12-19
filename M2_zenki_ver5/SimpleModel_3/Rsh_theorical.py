@@ -34,8 +34,8 @@ if __name__ == "__main__":
     print("格式: Np | Ns | Rsh")
     print("-" * 30)
     
-    for i in range(1, 8):  # i = 1 to 7
-        for j in range(1, 8):  # j = 1 to 7
+    for i in range(1, 5):  # i = 1 to 7
+        for j in range(1, 6):  # j = 1 to 7
             Np = i
             Ns = j * Np  # Ns = j * Np
             
