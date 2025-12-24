@@ -25,6 +25,48 @@ def calculate_rsh(Np, Ns):
     
     return Rsh
 
+def calculate_rsh_Np_only(Np, m):
+    """
+    Rsh理論値を計算する関数（集積所数Npのみで表した形）
+    
+    Args:
+        Np (int): 集積所数
+        m (int): 避難所数の倍数 Ns = m * Np
+
+    Returns:
+        float: Rsh理論値
+    """
+    # シグマ（Σ）の範囲を定義
+    #sigma_start_calc = (1+m)*Np -1  # 計算値（小数点可能）
+    sigma_start = (1+m)*Np - m  # 整数に変換
+    sigma_end = (1+m)*Np - 1  # シグマの終了値 (Np + Ns - 1)
+    denominator = m*(1+m) * Np #分母
+    numerator = 0 #分子
+    
+    # シグマ計算: Σ(k=sigma_start to sigma_end) f(k)
+    for k in range(sigma_start, sigma_end + 1):
+        term = k 
+        numerator += term
+    
+    Rsh = numerator / denominator 
+    
+    return Rsh
+
+def calculate_rsh_Np_only_ver2(Np):
+    """
+    Rsh理論値を計算する関数（集積所数Npのみで表した形）
+    
+    Args:
+        Np (int): 集積所数
+
+    Returns:
+        float: Rsh理論値
+    """
+
+    Rsh = 1-1/(2*Np)
+
+    return Rsh
+
 # 使用例
 if __name__ == "__main__":
     
@@ -44,7 +86,37 @@ if __name__ == "__main__":
                 print(f"{Np:2d} | {Ns:2d} | {result:.6f}")
             except Exception as e:
                 print(f"{Np:2d} | {Ns:2d} | エラー: {e}")
+
+    # パラメータ範囲での実行テスト
+    print("\n=== パラメータ範囲実行 ===")
+    print("i=1から6, j=1から10 (Np=i, m=j)")
+    print("格式: Np | m | Rsh")
+    print("-" * 30)
     
+    for i in range(1, 8):  # i = 1 to 7
+        for j in range(1, 3):  # j = 1 to 7
+            Np = i
+            m = j
+            
+            try:
+                result = calculate_rsh_Np_only(Np, m)
+                print(f"{Np:2d} | {m:2d} | {result:.6f}")
+            except Exception as e:
+                print(f"{Np:2d} | {m:2d} | エラー: {e}")
+
+     # パラメータ範囲での実行テスト
+    print("\n=== パラメータ範囲実行 ===")
+    print("i=1から6")
+    print("格式: Np | Rsh")
+    print("-" * 30)
+    
+    for i in range(1, 8):  # i = 1 to 7
+        try:
+            result = calculate_rsh_Np_only_ver2(i)
+            print(f"{i:2d} | {result:.6f}")
+        except Exception as e:
+            print(f"{i:2d} | エラー: {e}")
+
     # デフォルト値での実行
     Np_default = 2  # 集積所数
     Ns_default = 10 # 避難所数
